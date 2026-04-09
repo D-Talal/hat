@@ -14,50 +14,31 @@ Base.metadata.create_all(bind=engine)
 
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
-app = FastAPI(
-    title="PropManager API",
-    version="2.0.0",
-    # Disable docs in production
-    docs_url="/docs" if ENVIRONMENT != "production" else None,
-    redoc_url=None,
-)
+app = FastAPI(title="PropManager API", version="2.0.0")
 
-# --- CORS: locked to specific origins ---
-ALLOWED_ORIGINS = [
-    o.strip() for o in os.getenv(
-        "ALLOWED_ORIGINS",
-        "http://localhost:3000,http://localhost:80"
-    ).split(",") if o.strip()
-]
-
+# Temporarily wide open CORS so crashes are visible
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=ALLOWED_ORIGINS,
+    allow_origins=["*"],
     allow_credentials=False,
-    allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type"],
+    allow_methods=["*"],
+    allow_headers=["*"],
 )
 
-# --- Security headers ---
 @app.middleware("http")
 async def security_headers(request: Request, call_next):
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["X-Frame-Options"] = "DENY"
-    response.headers["X-XSS-Protection"] = "1; mode=block"
     response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
-    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
-    response.headers["Permissions-Policy"] = "geolocation=(), microphone=(), camera=()"
-    response.headers["Cache-Control"] = "no-store"
     return response
 
-# --- Global error handler: never expose stack traces in production ---
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error on {request.method} {request.url}: {exc}", exc_info=True)
     return JSONResponse(
         status_code=500,
-        content={"detail": "An internal error occurred." if ENVIRONMENT == "production" else str(exc)}
+        content={"detail": str(exc)}  # Show error for debugging
     )
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
@@ -79,7 +60,7 @@ def health():
         db.close()
         return {"status": "healthy", "database": "connected"}
     except Exception:
-        return JSONResponse(status_code=503, content={"status": "unhealthy", "database": "disconnected"})
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
 
 @app.on_event("startup")
 def startup():
@@ -98,6 +79,12 @@ def startup():
             "ALTER TABLE retail_properties ADD COLUMN IF NOT EXISTS country VARCHAR(255)",
             "ALTER TABLE retail_properties ADD COLUMN IF NOT EXISTS continent VARCHAR(100)",
             "ALTER TABLE retail_properties ADD COLUMN IF NOT EXISTS annual_revenue FLOAT DEFAULT 0",
+            "ALTER TABLE hotel_guests ALTER COLUMN first_name TYPE VARCHAR(500)",
+            "ALTER TABLE hotel_guests ALTER COLUMN last_name TYPE VARCHAR(500)",
+            "ALTER TABLE hotel_guests ALTER COLUMN email TYPE VARCHAR(500)",
+            "ALTER TABLE hotel_guests ALTER COLUMN phone TYPE VARCHAR(500)",
+            "ALTER TABLE hotel_guests ALTER COLUMN id_number TYPE VARCHAR(500)",
+            "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE VARCHAR(255)",
         ]
         for migration in migrations:
             try:
@@ -105,7 +92,6 @@ def startup():
                 db.commit()
             except Exception as e:
                 db.rollback()
-                logger.debug(f"Migration skipped: {e}")
 
         if not db.query(User).first():
             admin = User(
@@ -117,6 +103,6 @@ def startup():
             )
             db.add(admin)
             db.commit()
-            logger.info("✅ Default admin created")
     finally:
         db.close()
+# Note: migrations are in startup()
