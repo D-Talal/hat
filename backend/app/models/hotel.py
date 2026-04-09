@@ -49,13 +49,14 @@ class Room(Base):
 class Guest(Base):
     __tablename__ = "hotel_guests"
     id = Column(Integer, primary_key=True, index=True)
-    first_name = Column(String(255), nullable=False)
-    last_name = Column(String(255), nullable=False)
-    email = Column(String(255))
-    phone = Column(String(50))
+    # Text columns to accommodate Fernet-encrypted values (~100+ chars)
+    first_name = Column(Text, nullable=False)
+    last_name = Column(Text, nullable=False)
+    email = Column(Text)
+    phone = Column(Text)
     nationality = Column(String(100))
     id_type = Column(String(50))
-    id_number = Column(String(100))
+    id_number = Column(Text)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     bookings = relationship("Booking", back_populates="guest")
 
