@@ -9,8 +9,8 @@ from sqlalchemy.orm import Session
 from sqlalchemy import func, extract, case, and_
 from datetime import datetime, date, timedelta
 from typing import Literal
-from database import get_db
-from models import (
+from app.database import get_db
+from app.models import (
     Property, Unit, Tenant, Invoice,
     Hotel, Room, Booking, MaintenanceRequest
 )
