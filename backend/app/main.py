@@ -7,7 +7,7 @@ from app.database import engine, Base, SessionLocal
 from app.routers import auth, users, retail, hotel
 from app.routers import map as map_router
 from app.routers.dashboard import router as dashboard_router
-app.include_router(dashboard_router)
+
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -48,6 +48,7 @@ app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(retail.router, prefix="/api/retail", tags=["retail"])
 app.include_router(hotel.router, prefix="/api/hotel", tags=["hotel"])
 app.include_router(map_router.router, prefix="/api/map", tags=["map"])
+app.include_router(dashboard_router)
 
 @app.get("/")
 def root():
