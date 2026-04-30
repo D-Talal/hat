@@ -6,6 +6,8 @@ from fastapi.responses import JSONResponse
 from app.database import engine, Base, SessionLocal
 from app.routers import auth, users, retail, hotel
 from app.routers import map as map_router
+from app.routers.dashboard import router as dashboard_router
+app.include_router(dashboard_router)
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
