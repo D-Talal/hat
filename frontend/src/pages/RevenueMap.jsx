@@ -1,51 +1,50 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PageHeader, Card } from '../components/UI';
 import { mapAPI } from '../api';
 
-// ─── Country lat/lon + ISO + continent ───────────────────────────────────────
 const COUNTRIES = {
-  'USA':          { lat: 37,   lon: -95,  iso: 'US', continent: 'North America' },
-  'Canada':       { lat: 56,   lon: -96,  iso: 'CA', continent: 'North America' },
-  'Mexico':       { lat: 23,   lon: -102, iso: 'MX', continent: 'North America' },
-  'Brazil':       { lat: -10,  lon: -55,  iso: 'BR', continent: 'South America' },
-  'Argentina':    { lat: -34,  lon: -64,  iso: 'AR', continent: 'South America' },
-  'Colombia':     { lat: 4,    lon: -72,  iso: 'CO', continent: 'South America' },
-  'Chile':        { lat: -30,  lon: -71,  iso: 'CL', continent: 'South America' },
-  'Peru':         { lat: -10,  lon: -75,  iso: 'PE', continent: 'South America' },
-  'France':       { lat: 46,   lon: 2,    iso: 'FR', continent: 'Europe' },
-  'Germany':      { lat: 51,   lon: 10,   iso: 'DE', continent: 'Europe' },
-  'UK':           { lat: 54,   lon: -2,   iso: 'GB', continent: 'Europe' },
-  'Spain':        { lat: 40,   lon: -4,   iso: 'ES', continent: 'Europe' },
-  'Italy':        { lat: 42,   lon: 12,   iso: 'IT', continent: 'Europe' },
-  'Portugal':     { lat: 39,   lon: -8,   iso: 'PT', continent: 'Europe' },
-  'Netherlands':  { lat: 52,   lon: 5,    iso: 'NL', continent: 'Europe' },
-  'Sweden':       { lat: 60,   lon: 18,   iso: 'SE', continent: 'Europe' },
-  'Norway':       { lat: 62,   lon: 10,   iso: 'NO', continent: 'Europe' },
-  'Poland':       { lat: 52,   lon: 20,   iso: 'PL', continent: 'Europe' },
-  'UAE':          { lat: 24,   lon: 54,   iso: 'AE', continent: 'Middle East' },
-  'Saudi Arabia': { lat: 24,   lon: 45,   iso: 'SA', continent: 'Middle East' },
-  'Qatar':        { lat: 25,   lon: 51,   iso: 'QA', continent: 'Middle East' },
-  'Turkey':       { lat: 39,   lon: 35,   iso: 'TR', continent: 'Middle East' },
-  'Israel':       { lat: 31,   lon: 35,   iso: 'IL', continent: 'Middle East' },
-  'China':        { lat: 35,   lon: 105,  iso: 'CN', continent: 'Asia Pacific' },
-  'Japan':        { lat: 36,   lon: 138,  iso: 'JP', continent: 'Asia Pacific' },
-  'South Korea':  { lat: 36,   lon: 128,  iso: 'KR', continent: 'Asia Pacific' },
-  'India':        { lat: 20,   lon: 78,   iso: 'IN', continent: 'Asia Pacific' },
-  'Singapore':    { lat: 1,    lon: 104,  iso: 'SG', continent: 'Asia Pacific' },
-  'Thailand':     { lat: 15,   lon: 101,  iso: 'TH', continent: 'Asia Pacific' },
-  'Australia':    { lat: -27,  lon: 133,  iso: 'AU', continent: 'Asia Pacific' },
-  'Indonesia':    { lat: -5,   lon: 120,  iso: 'ID', continent: 'Asia Pacific' },
-  'Hong Kong':    { lat: 22,   lon: 114,  iso: 'HK', continent: 'Asia Pacific' },
-  'Taiwan':       { lat: 23,   lon: 121,  iso: 'TW', continent: 'Asia Pacific' },
-  'Malaysia':     { lat: 4,    lon: 108,  iso: 'MY', continent: 'Asia Pacific' },
-  'Vietnam':      { lat: 16,   lon: 108,  iso: 'VN', continent: 'Asia Pacific' },
-  'New Zealand':  { lat: -41,  lon: 174,  iso: 'NZ', continent: 'Asia Pacific' },
-  'Philippines':  { lat: 13,   lon: 122,  iso: 'PH', continent: 'Asia Pacific' },
-  'South Africa': { lat: -29,  lon: 25,   iso: 'ZA', continent: 'Africa' },
-  'Nigeria':      { lat: 10,   lon: 8,    iso: 'NG', continent: 'Africa' },
-  'Kenya':        { lat: -1,   lon: 37,   iso: 'KE', continent: 'Africa' },
-  'Egypt':        { lat: 26,   lon: 30,   iso: 'EG', continent: 'Africa' },
-  'Morocco':      { lat: 32,   lon: -5,   iso: 'MA', continent: 'Africa' },
+  'USA':          { lat: 37,   lon: -95,  continent: 'North America' },
+  'Canada':       { lat: 56,   lon: -96,  continent: 'North America' },
+  'Mexico':       { lat: 23,   lon: -102, continent: 'North America' },
+  'Brazil':       { lat: -10,  lon: -55,  continent: 'South America' },
+  'Argentina':    { lat: -34,  lon: -64,  continent: 'South America' },
+  'Colombia':     { lat: 4,    lon: -72,  continent: 'South America' },
+  'Chile':        { lat: -30,  lon: -71,  continent: 'South America' },
+  'Peru':         { lat: -10,  lon: -75,  continent: 'South America' },
+  'France':       { lat: 46,   lon: 2,    continent: 'Europe' },
+  'Germany':      { lat: 51,   lon: 10,   continent: 'Europe' },
+  'UK':           { lat: 54,   lon: -2,   continent: 'Europe' },
+  'Spain':        { lat: 40,   lon: -4,   continent: 'Europe' },
+  'Italy':        { lat: 42,   lon: 12,   continent: 'Europe' },
+  'Portugal':     { lat: 39,   lon: -8,   continent: 'Europe' },
+  'Netherlands':  { lat: 52,   lon: 5,    continent: 'Europe' },
+  'Sweden':       { lat: 60,   lon: 18,   continent: 'Europe' },
+  'Norway':       { lat: 62,   lon: 10,   continent: 'Europe' },
+  'Poland':       { lat: 52,   lon: 20,   continent: 'Europe' },
+  'UAE':          { lat: 24,   lon: 54,   continent: 'Middle East' },
+  'Saudi Arabia': { lat: 24,   lon: 45,   continent: 'Middle East' },
+  'Qatar':        { lat: 25,   lon: 51,   continent: 'Middle East' },
+  'Turkey':       { lat: 39,   lon: 35,   continent: 'Middle East' },
+  'Israel':       { lat: 31,   lon: 35,   continent: 'Middle East' },
+  'China':        { lat: 35,   lon: 105,  continent: 'Asia Pacific' },
+  'Japan':        { lat: 36,   lon: 138,  continent: 'Asia Pacific' },
+  'South Korea':  { lat: 36,   lon: 128,  continent: 'Asia Pacific' },
+  'India':        { lat: 20,   lon: 78,   continent: 'Asia Pacific' },
+  'Singapore':    { lat: 1,    lon: 104,  continent: 'Asia Pacific' },
+  'Thailand':     { lat: 15,   lon: 101,  continent: 'Asia Pacific' },
+  'Australia':    { lat: -27,  lon: 133,  continent: 'Asia Pacific' },
+  'Indonesia':    { lat: -5,   lon: 120,  continent: 'Asia Pacific' },
+  'Hong Kong':    { lat: 22,   lon: 114,  continent: 'Asia Pacific' },
+  'Taiwan':       { lat: 23,   lon: 121,  continent: 'Asia Pacific' },
+  'Malaysia':     { lat: 4,    lon: 108,  continent: 'Asia Pacific' },
+  'Vietnam':      { lat: 16,   lon: 108,  continent: 'Asia Pacific' },
+  'New Zealand':  { lat: -41,  lon: 174,  continent: 'Asia Pacific' },
+  'Philippines':  { lat: 13,   lon: 122,  continent: 'Asia Pacific' },
+  'South Africa': { lat: -29,  lon: 25,   continent: 'Africa' },
+  'Nigeria':      { lat: 10,   lon: 8,    continent: 'Africa' },
+  'Kenya':        { lat: -1,   lon: 37,   continent: 'Africa' },
+  'Egypt':        { lat: 26,   lon: 30,   continent: 'Africa' },
+  'Morocco':      { lat: 32,   lon: -5,   continent: 'Africa' },
 };
 
 function fmtRev(v) {
@@ -55,7 +54,6 @@ function fmtRev(v) {
   return `$${v.toLocaleString()}`;
 }
 
-// Inject Leaflet CSS once
 function ensureLeafletCSS() {
   const id = 'leaflet-css';
   if (!document.getElementById(id)) {
@@ -79,23 +77,19 @@ function loadScript(src, globalKey) {
   });
 }
 
-// ─── Leaflet Map component ────────────────────────────────────────────────────
 function LeafletMap({ byCountry, onCountryClick }) {
   const containerRef = useRef(null);
   const mapInstanceRef = useRef(null);
-  const layersRef = useRef([]);
 
   useEffect(() => {
     if (!containerRef.current || !window.L) return;
     const L = window.L;
 
-    // Destroy previous instance
     if (mapInstanceRef.current) {
       mapInstanceRef.current.remove();
       mapInstanceRef.current = null;
     }
 
-    // Init map
     const map = L.map(containerRef.current, {
       center: [20, 10],
       zoom: 2,
@@ -106,12 +100,10 @@ function LeafletMap({ byCountry, onCountryClick }) {
     });
     mapInstanceRef.current = map;
 
-    // Dark tile layer (CartoDB dark matter — no API key needed)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
     }).addTo(map);
 
-    // Country name labels (subtle)
     L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_only_labels/{z}/{x}/{y}{r}.png', {
       maxZoom: 19,
       opacity: 0.5,
@@ -119,19 +111,14 @@ function LeafletMap({ byCountry, onCountryClick }) {
 
     const maxRev = Math.max(...Object.values(byCountry).map(d => d.revenue), 1);
 
-    // Draw a circle marker for each country with data
-    layersRef.current = [];
     Object.entries(byCountry).forEach(([country, stats]) => {
       const info = COUNTRIES[country];
       if (!info) return;
 
       const rev = stats.revenue;
       const ratio = rev / maxRev;
-
-      // Bubble radius: 8–50px
       const radius = 8 + ratio * 42;
 
-      // Color: interpolate from steel blue → gold
       const r = Math.round(28 + ratio * (201 - 28));
       const g = Math.round(90 + ratio * (168 - 90));
       const b = Math.round(160 + ratio * (76 - 160));
@@ -146,7 +133,6 @@ function LeafletMap({ byCountry, onCountryClick }) {
         opacity: 0.9,
       }).addTo(map);
 
-      // Tooltip
       circle.bindTooltip(`
         <div style="font-family:'DM Sans',sans-serif;padding:6px 2px;min-width:140px">
           <div style="font-size:13px;font-weight:700;margin-bottom:4px">${country}</div>
@@ -160,15 +146,13 @@ function LeafletMap({ byCountry, onCountryClick }) {
       });
 
       circle.on('click', () => onCountryClick(info.continent));
-      layersRef.current.push(circle);
     });
 
     return () => {
       map.remove();
       mapInstanceRef.current = null;
     };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [byCountry]);
+  }, [byCountry, onCountryClick]);
 
   return (
     <>
@@ -197,7 +181,6 @@ function LeafletMap({ byCountry, onCountryClick }) {
   );
 }
 
-// ─── Main component ───────────────────────────────────────────────────────────
 export default function RevenueMap() {
   const [module, setModule] = useState('hotel');
   const [view, setView] = useState('world');
@@ -206,14 +189,12 @@ export default function RevenueMap() {
   const [loading, setLoading] = useState(true);
   const [leafletReady, setLeafletReady] = useState(false);
 
-  // Load Leaflet once
   useEffect(() => {
     ensureLeafletCSS();
     loadScript('https://unpkg.com/leaflet@1.9.4/dist/leaflet.js', 'L')
       .then(() => setLeafletReady(true));
   }, []);
 
-  // Fetch data
   useEffect(() => {
     setLoading(true);
     mapAPI.stats(module)
@@ -222,10 +203,10 @@ export default function RevenueMap() {
       .finally(() => setLoading(false));
   }, [module]);
 
-  const handleCountryClick = (continent) => {
+  const handleCountryClick = useCallback((continent) => {
     setSelectedContinent(continent);
     setView('continent');
-  };
+  }, []);
 
   const totalRevenue = data ? Object.values(data.by_continent || {}).reduce((s, d) => s + d.revenue, 0) : 0;
   const totalProperties = data ? Object.values(data.by_continent || {}).reduce((s, d) => s + d.count, 0) : 0;
@@ -237,7 +218,6 @@ export default function RevenueMap() {
     <div className="animate-fade">
       <PageHeader title="Revenue Map" sub="Global portfolio performance by region and country" />
 
-      {/* Module toggle */}
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
         {['hotel', 'retail'].map(m => (
           <button key={m}
@@ -248,7 +228,6 @@ export default function RevenueMap() {
         ))}
       </div>
 
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
           { label: 'Total Revenue', value: fmtRev(totalRevenue) },
@@ -263,7 +242,6 @@ export default function RevenueMap() {
         ))}
       </div>
 
-      {/* Nav */}
       <div style={{ display: 'flex', gap: 12, marginBottom: 16, alignItems: 'center' }}>
         {view === 'continent' && (
           <button onClick={() => setView('world')}
@@ -279,7 +257,6 @@ export default function RevenueMap() {
       </div>
 
       <Card style={{ padding: 0, overflow: 'hidden' }}>
-        {/* World map */}
         {view === 'world' && (
           <>
             {!showMap && (
@@ -297,7 +274,6 @@ export default function RevenueMap() {
           </>
         )}
 
-        {/* Continent drill-down */}
         {view === 'continent' && (() => {
           const contData = data?.by_continent?.[selectedContinent];
           const countries = Object.entries(data?.by_country || {})
