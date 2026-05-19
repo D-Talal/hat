@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
-import CommercialModal from '../components/CommercialModal';
 
 
 const ROLES = ['master_tenant', 'guarantor', 'landlord', 'vendor', 'contact_person'];
@@ -15,6 +14,26 @@ const ROLE_LABELS = {
 };
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
+
+function Modal({ title, onClose, children, wide }) {
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, overflowY: 'auto', padding: '40px 20px' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: 'white', borderRadius: 16, padding: 32, width: '100%', maxWidth: wide ? 820 : 580, margin: '0 auto', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 function Field({ label, children }) {
   return (
@@ -164,10 +183,10 @@ export default function BusinessPartners() {
         </div>
       )}
 
-      {modal && <CommercialModal title="New Business Partner" onClose={() => setModal(false)}><BPForm onSave={load} onClose={() => setModal(false)} /></CommercialModal>}
+      {modal && <Modal title="New Business Partner" onClose={() => setModal(false)}><BPForm onSave={load} onClose={() => setModal(false)} /></Modal>}
 
       {selected && (
-        <CommercialModal title={selected.company_name} onClose={() => setSelected(null)}>
+        <Modal title={selected.company_name} onClose={() => setSelected(null)}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
               {(selected.roles || []).map((r, i) => {
@@ -193,7 +212,7 @@ export default function BusinessPartners() {
               ⚠ No Customer Account set — AR postings will be blocked for this tenant.
             </div>
           )}
-        </CommercialModal>
+        </Modal>
       )}
     </div>
   );

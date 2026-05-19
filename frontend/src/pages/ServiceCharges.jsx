@@ -2,9 +2,28 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
-import CommercialModal from '../components/CommercialModal';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
+
+function Modal({ title, onClose, children, wide }) {
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, overflowY: 'auto', padding: '40px 20px' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: 'white', borderRadius: 16, padding: 32, width: '100%', maxWidth: wide ? 820 : 580, margin: '0 auto', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 
 const CHARGE_CATEGORIES = ['general', 'utilities', 'waste', 'parking', 'security', 'marketing', 'insurance'];
 const MARKUP_RATES = [
@@ -254,7 +273,7 @@ export default function ServiceCharges() {
       )}
 
       {selected && (
-        <CommercialModal title={`${selected.code} — ${selected.charge_category}`} onClose={() => setSelected(null)} wide>
+        <Modal title={`${selected.code} — ${selected.charge_category}`} onClose={() => setSelected(null)} wide>
           <div style={{ marginBottom: 16, fontSize: 14, color: 'var(--slate)' }}>Building: <strong>{selected.building?.name}</strong></div>
 
           <SectionTitle>Members</SectionTitle>
@@ -300,11 +319,11 @@ export default function ServiceCharges() {
               </div>
             </div>
           ))}
-        </CommercialModal>
+        </Modal>
       )}
 
-      {modal === 'pg' && <CommercialModal title="New Participation Group" onClose={() => setModal(null)} wide><PGForm onSave={load} onClose={() => setModal(null)} /></CommercialModal>}
-      {modal?.type === 'cc' && <CommercialModal title="New Cost Collector" onClose={() => setModal(null)}><CostCollectorForm pgId={modal.pgId} onSave={load} onClose={() => setModal(null)} /></CommercialModal>}
+      {modal === 'pg' && <Modal title="New Participation Group" onClose={() => setModal(null)} wide><PGForm onSave={load} onClose={() => setModal(null)} /></Modal>}
+      {modal?.type === 'cc' && <Modal title="New Cost Collector" onClose={() => setModal(null)}><CostCollectorForm pgId={modal.pgId} onSave={load} onClose={() => setModal(null)} /></Modal>}
     </div>
   );
 }

@@ -2,7 +2,6 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
-import CommercialModal from '../components/CommercialModal';
 
 const SPACE_STATUS_COLORS = {
   available:   { bg: '#e8f5e9', text: '#2e7d32' },
@@ -41,6 +40,26 @@ function Field({ label, children }) {
 }
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
+
+function Modal({ title, onClose, children, wide }) {
+  React.useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => { document.body.style.overflow = ''; };
+  }, []);
+  return (
+    <div onClick={e => e.target === e.currentTarget && onClose()}
+      style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0,0,0,0.5)', zIndex: 9999, overflowY: 'auto', padding: '40px 20px' }}>
+      <div onClick={e => e.stopPropagation()}
+        style={{ background: 'white', borderRadius: 16, padding: 32, width: '100%', maxWidth: wide ? 820 : 580, margin: '0 auto', boxShadow: '0 24px 64px rgba(0,0,0,0.22)' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}
 const btnPrimary = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
 const btnSecondary = { padding: '10px 20px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans' };
 const btnAdd = { background: 'var(--ink)', color: 'var(--gold)', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'DM Sans', fontWeight: 700 };
@@ -291,10 +310,10 @@ export default function Patrimoine() {
         )}
       </div>
 
-      {modal === 'be'       && <CommercialModal title={tc.newBusinessEntity} onClose={() => setModal(null)}><BusinessEntityForm onSave={loadEntities} onClose={() => setModal(null)} t={t} /></CommercialModal>}
-      {modal === 'building' && selectedBE      && <CommercialModal title={tc.newBuilding} onClose={() => setModal(null)}><BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} /></CommercialModal>}
-      {modal === 'floor'    && selectedBuilding && <CommercialModal title={tc.newFloor} onClose={() => setModal(null)}><FloorForm buildingId={selectedBuilding.id} onSave={() => loadFloors(selectedBuilding.id)} onClose={() => setModal(null)} t={t} /></CommercialModal>}
-      {modal === 'space'    && selectedFloor    && <CommercialModal title={tc.newSpace} onClose={() => setModal(null)}><SpaceForm floorId={selectedFloor.id} onSave={() => loadSpaces(selectedFloor.id)} onClose={() => setModal(null)} t={t} /></CommercialModal>}
+      {modal === 'be'       && <Modal title={tc.newBusinessEntity} onClose={() => setModal(null)}><BusinessEntityForm onSave={loadEntities} onClose={() => setModal(null)} t={t} /></Modal>}
+      {modal === 'building' && selectedBE      && <Modal title={tc.newBuilding} onClose={() => setModal(null)}><BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} /></Modal>}
+      {modal === 'floor'    && selectedBuilding && <Modal title={tc.newFloor} onClose={() => setModal(null)}><FloorForm buildingId={selectedBuilding.id} onSave={() => loadFloors(selectedBuilding.id)} onClose={() => setModal(null)} t={t} /></Modal>}
+      {modal === 'space'    && selectedFloor    && <Modal title={tc.newSpace} onClose={() => setModal(null)}><SpaceForm floorId={selectedFloor.id} onSave={() => loadSpaces(selectedFloor.id)} onClose={() => setModal(null)} t={t} /></Modal>}
     </div>
   );
 }
