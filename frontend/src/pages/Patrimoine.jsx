@@ -52,35 +52,35 @@ function Modal({ title, onClose, children, wide }) {
       onClick={e => e.target === e.currentTarget && onClose()}
       style={{
         position: 'fixed',
-        top: 0,
-        left: 260,
-        right: 0,
-        bottom: 0,
+        top: 0, left: 260, right: 0, bottom: 0,
         background: 'rgba(0,0,0,0.5)',
         zIndex: 9999,
+        overflowY: 'auto',
+      }}>
+      <div style={{
+        minHeight: '100%',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        padding: '20px',
+        padding: '40px 20px',
         boxSizing: 'border-box',
       }}>
-      <div
-        onClick={e => e.stopPropagation()}
-        style={{
-          background: 'white',
-          borderRadius: 16,
-          padding: 32,
-          width: '100%',
-          maxWidth: wide ? 820 : 580,
-          maxHeight: '85vh',
-          overflowY: 'auto',
-          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-        }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+        <div
+          onClick={e => e.stopPropagation()}
+          style={{
+            background: 'white',
+            borderRadius: 16,
+            padding: 32,
+            width: '100%',
+            maxWidth: wide ? 820 : 580,
+            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+          }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
+            <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
+            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
+          </div>
+          {children}
         </div>
-        {children}
       </div>
     </div>
   );
