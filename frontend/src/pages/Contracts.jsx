@@ -15,18 +15,28 @@ function Modal({ title, onClose, children, wide }) {
     <div
       onClick={e => e.target === e.currentTarget && onClose()}
       style={{
-        position: 'fixed', top: 0, left: 0, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.5)', zIndex: 9999,
-        display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
-        overflowY: 'auto', padding: '5vh 20px 40px',
+        position: 'fixed',
+        top: 0, left: 0, width: '100vw', height: '100vh',
+        background: 'rgba(0,0,0,0.5)',
+        zIndex: 9999,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        boxSizing: 'border-box',
+        padding: '20px',
       }}>
       <div
         onClick={e => e.stopPropagation()}
         style={{
-          background: 'white', borderRadius: 16, padding: 32,
-          width: '100%', maxWidth: wide ? 820 : 580,
-          boxShadow: '0 24px 64px rgba(0,0,0,0.22)',
-          margin: 'auto',
+          background: 'white',
+          borderRadius: 16,
+          padding: 32,
+          width: '100%',
+          maxWidth: wide ? 820 : 580,
+          maxHeight: '85vh',
+          overflowY: 'auto',
+          boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
+          position: 'relative',
         }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
