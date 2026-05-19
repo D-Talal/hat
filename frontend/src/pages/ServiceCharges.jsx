@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
+import CommercialModal from '../components/CommercialModal';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 
@@ -22,20 +23,6 @@ function Field({ label, children }) {
   );
 }
 
-function Modal({ title, onClose, children, wide }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 32, width: '100%', maxWidth: wide ? 780 : 580, maxHeight: '92vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#999' }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 20, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
@@ -267,7 +254,7 @@ export default function ServiceCharges() {
       )}
 
       {selected && (
-        <Modal title={`${selected.code} — ${selected.charge_category}`} onClose={() => setSelected(null)} wide>
+        <CommercialModal title={`${selected.code} — ${selected.charge_category}`} onClose={() => setSelected(null)} wide>
           <div style={{ marginBottom: 16, fontSize: 14, color: 'var(--slate)' }}>Building: <strong>{selected.building?.name}</strong></div>
 
           <SectionTitle>Members</SectionTitle>
@@ -313,11 +300,11 @@ export default function ServiceCharges() {
               </div>
             </div>
           ))}
-        </Modal>
+        </CommercialModal>
       )}
 
-      {modal === 'pg' && <Modal title="New Participation Group" onClose={() => setModal(null)} wide><PGForm onSave={load} onClose={() => setModal(null)} /></Modal>}
-      {modal?.type === 'cc' && <Modal title="New Cost Collector" onClose={() => setModal(null)}><CostCollectorForm pgId={modal.pgId} onSave={load} onClose={() => setModal(null)} /></Modal>}
+      {modal === 'pg' && <CommercialModal title="New Participation Group" onClose={() => setModal(null)} wide><PGForm onSave={load} onClose={() => setModal(null)} /></CommercialModal>}
+      {modal?.type === 'cc' && <CommercialModal title="New Cost Collector" onClose={() => setModal(null)}><CostCollectorForm pgId={modal.pgId} onSave={load} onClose={() => setModal(null)} /></CommercialModal>}
     </div>
   );
 }

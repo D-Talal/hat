@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
+import CommercialModal from '../components/CommercialModal';
 
 
 const ROLES = ['master_tenant', 'guarantor', 'landlord', 'vendor', 'contact_person'];
@@ -24,20 +25,6 @@ function Field({ label, children }) {
   );
 }
 
-function Modal({ title, onClose, children }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 32, width: '100%', maxWidth: 600, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#999' }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function BPForm({ onSave, onClose, initial }) {
   const [form, setForm] = useState(initial || {
@@ -177,10 +164,10 @@ export default function BusinessPartners() {
         </div>
       )}
 
-      {modal && <Modal title="New Business Partner" onClose={() => setModal(false)}><BPForm onSave={load} onClose={() => setModal(false)} /></Modal>}
+      {modal && <CommercialModal title="New Business Partner" onClose={() => setModal(false)}><BPForm onSave={load} onClose={() => setModal(false)} /></CommercialModal>}
 
       {selected && (
-        <Modal title={selected.company_name} onClose={() => setSelected(null)}>
+        <CommercialModal title={selected.company_name} onClose={() => setSelected(null)}>
           <div style={{ marginBottom: 16 }}>
             <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
               {(selected.roles || []).map((r, i) => {
@@ -206,7 +193,7 @@ export default function BusinessPartners() {
               ⚠ No Customer Account set — AR postings will be blocked for this tenant.
             </div>
           )}
-        </Modal>
+        </CommercialModal>
       )}
     </div>
   );

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
+import CommercialModal from '../components/CommercialModal';
 
 const SPACE_STATUS_COLORS = {
   available:   { bg: '#e8f5e9', text: '#2e7d32' },
@@ -15,20 +16,6 @@ function Badge({ status }) {
   return <span style={{ background: c.bg, color: c.text, borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{status}</span>;
 }
 
-function Modal({ title, onClose, children }) {
-  return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.45)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}
-      onClick={e => e.target === e.currentTarget && onClose()}>
-      <div style={{ background: 'white', borderRadius: 16, padding: 32, width: '100%', maxWidth: 560, maxHeight: '90vh', overflowY: 'auto', boxShadow: '0 24px 64px rgba(0,0,0,0.18)' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-          <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
-          <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 22, cursor: 'pointer', color: '#999' }}>×</button>
-        </div>
-        {children}
-      </div>
-    </div>
-  );
-}
 
 function ConfirmDelete({ label, onConfirm, onCancel, t }) {
   return (
@@ -304,10 +291,10 @@ export default function Patrimoine() {
         )}
       </div>
 
-      {modal === 'be'       && <Modal title={tc.newBusinessEntity} onClose={() => setModal(null)}><BusinessEntityForm onSave={loadEntities} onClose={() => setModal(null)} t={t} /></Modal>}
-      {modal === 'building' && selectedBE      && <Modal title={tc.newBuilding} onClose={() => setModal(null)}><BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} /></Modal>}
-      {modal === 'floor'    && selectedBuilding && <Modal title={tc.newFloor} onClose={() => setModal(null)}><FloorForm buildingId={selectedBuilding.id} onSave={() => loadFloors(selectedBuilding.id)} onClose={() => setModal(null)} t={t} /></Modal>}
-      {modal === 'space'    && selectedFloor    && <Modal title={tc.newSpace} onClose={() => setModal(null)}><SpaceForm floorId={selectedFloor.id} onSave={() => loadSpaces(selectedFloor.id)} onClose={() => setModal(null)} t={t} /></Modal>}
+      {modal === 'be'       && <CommercialModal title={tc.newBusinessEntity} onClose={() => setModal(null)}><BusinessEntityForm onSave={loadEntities} onClose={() => setModal(null)} t={t} /></CommercialModal>}
+      {modal === 'building' && selectedBE      && <CommercialModal title={tc.newBuilding} onClose={() => setModal(null)}><BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} /></CommercialModal>}
+      {modal === 'floor'    && selectedBuilding && <CommercialModal title={tc.newFloor} onClose={() => setModal(null)}><FloorForm buildingId={selectedBuilding.id} onSave={() => loadFloors(selectedBuilding.id)} onClose={() => setModal(null)} t={t} /></CommercialModal>}
+      {modal === 'space'    && selectedFloor    && <CommercialModal title={tc.newSpace} onClose={() => setModal(null)}><SpaceForm floorId={selectedFloor.id} onSave={() => loadSpaces(selectedFloor.id)} onClose={() => setModal(null)} t={t} /></CommercialModal>}
     </div>
   );
 }
