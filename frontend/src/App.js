@@ -33,14 +33,14 @@ function AppLayout({ children }) {
         marginLeft: 260,
         flex: 1,
         minHeight: '100vh',
-        display: 'flex',
-        justifyContent: 'center',
         background: 'var(--cream)',
       }}>
         <div style={{
           width: '100%',
           maxWidth: 1280,
+          margin: '0 auto',
           padding: '40px 48px',
+          boxSizing: 'border-box',
         }}>
           {children}
         </div>
