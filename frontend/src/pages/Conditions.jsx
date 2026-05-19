@@ -1,54 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
-import { PageHeader, Card } from '../components/UI';
+import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 
-function Modal({ title, onClose, children, wide }) {
-  React.useEffect(() => {
-    const prev = document.body.style.overflow;
-    document.body.style.overflow = 'hidden';
-    return () => { document.body.style.overflow = prev; };
-  }, []);
-  return (
-    <div
-      onClick={e => e.target === e.currentTarget && onClose()}
-      style={{
-        position: 'fixed',
-        top: 0, left: 260, right: 0, bottom: 0,
-        background: 'rgba(0,0,0,0.5)',
-        zIndex: 9999,
-        overflowY: 'auto',
-      }}>
-      <div style={{
-        minHeight: '100%',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px 20px',
-        boxSizing: 'border-box',
-      }}>
-        <div
-          onClick={e => e.stopPropagation()}
-          style={{
-            background: 'white',
-            borderRadius: 16,
-            padding: 32,
-            width: '100%',
-            maxWidth: wide ? 820 : 580,
-            boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-          }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
-            <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
-            <button onClick={onClose} style={{ background: 'none', border: 'none', fontSize: 24, cursor: 'pointer', color: '#999', lineHeight: 1 }}>×</button>
-          </div>
-          {children}
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const CONDITION_TYPES = {
   base_rent:      { label: 'Base Rent',         color: '#1a237e', bg: '#e8eaf6' },
