@@ -58,8 +58,9 @@ function Modal({ title, onClose, children, wide }) {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
+        paddingLeft: 260,
         boxSizing: 'border-box',
-        padding: '20px',
+        padding: '20px 20px 20px 280px',
       }}>
       <div
         onClick={e => e.stopPropagation()}
@@ -72,7 +73,6 @@ function Modal({ title, onClose, children, wide }) {
           maxHeight: '85vh',
           overflowY: 'auto',
           boxShadow: '0 24px 64px rgba(0,0,0,0.25)',
-          position: 'relative',
         }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24 }}>
           <h2 style={{ fontFamily: 'DM Serif Display', fontSize: 22, margin: 0 }}>{title}</h2>
