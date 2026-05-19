@@ -73,12 +73,13 @@ def startup():
             "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS country VARCHAR(255)",
             "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS continent VARCHAR(100)",
             "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS annual_revenue FLOAT DEFAULT 0",
-            "ALTER TABLE hotel_guests ALTER COLUMN first_name TYPE VARCHAR(500)",
-            "ALTER TABLE hotel_guests ALTER COLUMN last_name TYPE VARCHAR(500)",
-            "ALTER TABLE hotel_guests ALTER COLUMN email TYPE VARCHAR(500)",
-            "ALTER TABLE hotel_guests ALTER COLUMN phone TYPE VARCHAR(500)",
-            "ALTER TABLE hotel_guests ALTER COLUMN id_number TYPE VARCHAR(500)",
-            "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE VARCHAR(255)",
+            "ALTER TABLE hotel_guests ALTER COLUMN first_name TYPE TEXT",
+            "ALTER TABLE hotel_guests ALTER COLUMN last_name TYPE TEXT",
+            "ALTER TABLE hotel_guests ALTER COLUMN email TYPE TEXT",
+            "ALTER TABLE hotel_guests ALTER COLUMN phone TYPE TEXT",
+            "ALTER TABLE hotel_guests ALTER COLUMN id_number TYPE TEXT",
+            "ALTER TABLE hotel_guests ALTER COLUMN id_type TYPE TEXT",
+            "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE TEXT",
         ]
         for migration in migrations:
             try:
