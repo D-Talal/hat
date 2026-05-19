@@ -26,15 +26,17 @@ function Modal({ title, onClose, children, wide }) {
       onClick={e => e.target === e.currentTarget && onClose()}
       style={{
         position: 'fixed',
-        top: 0, left: 0, width: '100vw', height: '100vh',
+        top: 0,
+        left: 260,
+        right: 0,
+        bottom: 0,
         background: 'rgba(0,0,0,0.5)',
         zIndex: 9999,
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        paddingLeft: 260,
+        padding: '20px',
         boxSizing: 'border-box',
-        padding: '20px 20px 20px 280px',
       }}>
       <div
         onClick={e => e.stopPropagation()}
