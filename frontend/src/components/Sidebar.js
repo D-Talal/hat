@@ -22,6 +22,7 @@ export default function Sidebar() {
       { path: '/commercial/conditions',      label: language === 'fr' ? 'Conditions'        : 'Conditions',        icon: '≡' },
       { path: '/commercial/rental-objects',  label: language === 'fr' ? 'Objets locatifs'   : 'Rental Objects',    icon: '⊞' },
       { path: '/commercial/service-charges', label: language === 'fr' ? 'Charges locatives' : 'Service Charges',   icon: '⚖' },
+      { path: '/commercial/posting-engine',  label: language === 'fr' ? 'Moteur de posting' : 'Posting Engine',    icon: '⚡', roles: ['admin','manager','accountant'] },
     ]},
     { section: t.nav.hospitality, items: [
       { path: '/hotel/hotels',   label: t.nav.hotels,   icon: '▲' },
