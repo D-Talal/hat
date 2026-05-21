@@ -123,3 +123,19 @@ export const commercial = {
     update: (id, status) => API.patch(`/commercial/maintenance/${id}?status=${status}`),
   },
 };
+
+export const posting = {
+  run:         (d) => API.post('/posting/run', d),
+  runs:        () => API.get('/posting/runs'),
+  runEntries:  (id) => API.get(`/posting/runs/${id}/entries`),
+  stats:       () => API.get('/posting/stats'),
+  applyIpc:    (d) => API.post('/posting/ipc/apply', d),
+  ipcHistory:  (contractId) => API.get('/posting/ipc/history' + (contractId ? `?contract_id=${contractId}` : '')),
+  setupIfrs16: (d) => API.post('/posting/ifrs16/setup', d),
+  ifrs16List:  () => API.get('/posting/ifrs16/schedules'),
+  ifrs16Lines: (id) => API.get(`/posting/ifrs16/schedules/${id}/lines`),
+  deleteIfrs16:(contractId) => API.delete(`/posting/ifrs16/schedules/${contractId}`),
+  fxRates:     () => API.get('/posting/fx-rates'),
+  createFxRate:(d) => API.post('/posting/fx-rates', d),
+  simulateSales:(d) => API.post('/posting/sales/simulate', d),
+};
