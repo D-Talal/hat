@@ -8,6 +8,7 @@ from app.routers import auth, users, retail, hotel
 from app.routers import map as map_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.commercial import router as commercial_router
+from app.routers.posting import router as posting_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -45,6 +46,7 @@ app.include_router(hotel.router, prefix="/api/hotel", tags=["hotel"])
 app.include_router(map_router.router, prefix="/api/map", tags=["map"])
 app.include_router(dashboard_router)
 app.include_router(commercial_router, prefix="/api/commercial", tags=["commercial"])
+app.include_router(posting_router, prefix="/api/posting", tags=["posting"])
 
 @app.get("/")
 def root():
