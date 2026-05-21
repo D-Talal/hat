@@ -89,20 +89,20 @@ function ContractForm({ onSave, onClose, initial }) {
     <>
       <SectionTitle>Contract Information</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label="Contract Number"><input style={inputStyle} value={form.contract_number} onChange={set('contract_number')} placeholder="Auto-generated if empty" disabled={isEdit} /></Field>
-        <Field label="Type">
+        <Field label=tc.contractNumber><input style={inputStyle} value={form.contract_number} onChange={set('contract_number')} placeholder="Auto-generated if empty" disabled={isEdit} /></Field>
+        <Field label=tc.contractType>
           <select style={inputStyle} value={form.contract_type} onChange={set('contract_type')} disabled={isEdit}>
             <option value="lease_out">Lease Out (LO) — Landlord → Tenant</option>
             <option value="lease_in">Lease In (LI) — Tenant from Landlord</option>
           </select>
         </Field>
-        <Field label="Business Entity *">
+        <Field label=tc.businessEntity + " *">
           <select style={inputStyle} value={form.business_entity_id} onChange={set('business_entity_id')} disabled={isEdit}>
             <option value="">— Select —</option>
             {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
           </select>
         </Field>
-        <Field label="Business Partner (Tenant) *">
+        <Field label=tc.businessPartner + " *">
           <select style={inputStyle} value={form.business_partner_id} onChange={set('business_partner_id')} disabled={isEdit}>
             <option value="">— Select —</option>
             {partners.map(p => <option key={p.id} value={p.id}>{p.company_name}</option>)}
@@ -114,12 +114,12 @@ function ContractForm({ onSave, onClose, initial }) {
       <div style={{ background: '#f0f7ff', borderRadius: 10, padding: 16, marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: '#1565c0', marginBottom: 12 }}>ℹ Any modification to these dates creates a new time slot.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-          <Field label="Start Date *"><input style={inputStyle} type="date" value={form.start_date} onChange={set('start_date')} disabled={isEdit} /></Field>
-          <Field label="First End Date"><input style={inputStyle} type="date" value={form.first_end_date} onChange={set('first_end_date')} disabled={isEdit} /></Field>
-          <Field label="Probable End Date"><input style={inputStyle} type="date" value={form.probable_end_date} onChange={set('probable_end_date')} /></Field>
-          <Field label="Absolute End Date"><input style={inputStyle} type="date" value={form.absolute_end_date} onChange={set('absolute_end_date')} /></Field>
-          <Field label="Notice Date"><input style={inputStyle} type="date" value={form.notice_date} onChange={set('notice_date')} disabled={isEdit} /></Field>
-          <Field label="Signing Date"><input style={inputStyle} type="date" value={form.signing_date} onChange={set('signing_date')} disabled={isEdit} /></Field>
+          <Field label=tc.startDate + " *"><input style={inputStyle} type="date" value={form.start_date} onChange={set('start_date')} disabled={isEdit} /></Field>
+          <Field label=tc.firstEndDate><input style={inputStyle} type="date" value={form.first_end_date} onChange={set('first_end_date')} disabled={isEdit} /></Field>
+          <Field label=tc.probableEndDate><input style={inputStyle} type="date" value={form.probable_end_date} onChange={set('probable_end_date')} /></Field>
+          <Field label=tc.absoluteEndDate><input style={inputStyle} type="date" value={form.absolute_end_date} onChange={set('absolute_end_date')} /></Field>
+          <Field label=tc.noticeDate><input style={inputStyle} type="date" value={form.notice_date} onChange={set('notice_date')} disabled={isEdit} /></Field>
+          <Field label=tc.signingDate><input style={inputStyle} type="date" value={form.signing_date} onChange={set('signing_date')} disabled={isEdit} /></Field>
         </div>
       </div>
 
@@ -127,13 +127,13 @@ function ContractForm({ onSave, onClose, initial }) {
         <>
           <SectionTitle>Posting Parameters</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            <Field label="Payment Timing">
+            <Field label=tc.paymentTiming>
               <select style={inputStyle} value={form.payment_timing} onChange={set('payment_timing')}>
                 <option value="in_advance">In Advance (start of month)</option>
                 <option value="in_arrears">In Arrears (end of month)</option>
               </select>
             </Field>
-            <Field label="Day Count Method">
+            <Field label=tc.dayCountMethod>
               <select style={inputStyle} value={form.day_count_method} onChange={set('day_count_method')}>
                 <option value="act_365">Actual / 365</option>
                 <option value="30E_360">30E / 360</option>
@@ -160,7 +160,7 @@ function ContractForm({ onSave, onClose, initial }) {
         </>
       )}
 
-      <Field label="Notes"><textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }} value={form.notes} onChange={set('notes')} /></Field>
+      <Field label=tc.notes><textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }} value={form.notes} onChange={set('notes')} /></Field>
 
       {!isEdit && (
         <div style={{ background: '#fff8e1', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#e65100', marginBottom: 16 }}>
@@ -391,7 +391,7 @@ export default function Contracts() {
       )}
 
       {(modal === 'new' || modal === 'edit') && (
-        <Modal title={modal === 'edit' ? `Edit — ${selected?.contract_number || `#${selected?.id}`}` : tc.newContract} onClose={() => setModal(null)}>
+        <Modal title={modal === 'edit' ? `${t.common.edit} — ${selected?.contract_number || "#"+selected?.id}` : tc.newContract} onClose={() => setModal(null)}>
           <ContractForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} />
         </Modal>
       )}
@@ -404,7 +404,7 @@ export default function Contracts() {
       )}
 
       {confirm && (
-        <Modal title="Confirm Delete" onClose={() => setConfirm(null)}>
+        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete contract <strong>{confirm.contract_number}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

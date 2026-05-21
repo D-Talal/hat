@@ -77,33 +77,33 @@ function ConditionForm({ onSave, onClose, initial }) {
         </Field>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label="Condition Type">
+        <Field label=tc.conditionType>
           <select style={inputStyle} value={form.condition_type} onChange={set('condition_type')}>
             {Object.entries(CONDITION_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
         </Field>
-        <Field label="Condition Code"><input style={inputStyle} value={form.condition_code} onChange={set('condition_code')} placeholder="e.g. *40, A500" /></Field>
-        <Field label="Valid From *"><input style={inputStyle} type="date" value={form.valid_from} onChange={set('valid_from')} /></Field>
-        <Field label="Valid To (empty = active)"><input style={inputStyle} type="date" value={form.valid_to} onChange={set('valid_to')} /></Field>
+        <Field label=tc.conditionCode><input style={inputStyle} value={form.condition_code} onChange={set('condition_code')} placeholder="e.g. *40, A500" /></Field>
+        <Field label=tc.validFrom + " *"><input style={inputStyle} type="date" value={form.valid_from} onChange={set('valid_from')} /></Field>
+        <Field label=tc.validTo><input style={inputStyle} type="date" value={form.valid_to} onChange={set('valid_to')} /></Field>
       </div>
 
       {form.condition_type !== 'markup_fee' && (
         <>
           <SectionTitle>Amount & Schedule</SectionTitle>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-            <Field label="Amount *"><input style={inputStyle} type="number" value={form.amount} onChange={set('amount')} /></Field>
+            <Field label=tc.amount + " *"><input style={inputStyle} type="number" value={form.amount} onChange={set('amount')} /></Field>
             <Field label="Currency">
               <select style={inputStyle} value={form.currency} onChange={set('currency')}>
                 {['USD','EUR','GBP','AED','CHF','CAD'].map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
-            <Field label="Frequency">
+            <Field label=tc.frequency>
               <select style={inputStyle} value={form.frequency} onChange={set('frequency')}>
                 {Object.entries(FREQUENCIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
               </select>
             </Field>
           </div>
-          <Field label="Payment Timing">
+          <Field label=tc.paymentTimingLabel>
             <select style={inputStyle} value={form.payment_timing} onChange={set('payment_timing')}>
               <option value="in_advance">In Advance</option>
               <option value="in_arrears">In Arrears</option>
@@ -115,7 +115,7 @@ function ConditionForm({ onSave, onClose, initial }) {
       {form.condition_type === 'markup_fee' && (
         <>
           <SectionTitle>Markup Fee (Statistical)</SectionTitle>
-          <Field label="Markup Rate">
+          <Field label=tc.markupRate>
             <select style={inputStyle} value={form.markup_rate} onChange={set('markup_rate')}>
               <option value="0">0%</option><option value="0.05">5%</option><option value="0.13">13%</option><option value="0.15">15%</option>
             </select>
@@ -138,14 +138,14 @@ function ConditionForm({ onSave, onClose, initial }) {
           </label>
           {form.ipc_enabled && (
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <Field label="Base Index"><input style={inputStyle} type="number" value={form.ipc_base_index} onChange={set('ipc_base_index')} /></Field>
-              <Field label="Reference Date"><input style={inputStyle} type="date" value={form.ipc_reference_date} onChange={set('ipc_reference_date')} /></Field>
+              <Field label=tc.baseIndex><input style={inputStyle} type="number" value={form.ipc_base_index} onChange={set('ipc_base_index')} /></Field>
+              <Field label=tc.referenceDate><input style={inputStyle} type="date" value={form.ipc_reference_date} onChange={set('ipc_reference_date')} /></Field>
             </div>
           )}
         </>
       )}
 
-      <Field label="Notes"><textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={set('notes')} /></Field>
+      <Field label=tc.notes><textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.notes} onChange={set('notes')} /></Field>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
         <button onClick={onClose} style={btnSecondary}>Cancel</button>
         <button onClick={save} style={btnPrimary}>{isEdit ? 'Save Changes' : 'Save Condition'}</button>
@@ -255,7 +255,7 @@ export default function Conditions() {
       )}
 
       {confirm && (
-        <Modal title="Confirm Delete" onClose={() => setConfirm(null)}>
+        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete this condition? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

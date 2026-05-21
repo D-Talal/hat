@@ -55,15 +55,15 @@ function PGForm({ onSave, onClose }) {
         ℹ Every tenant must belong to at least one Participation Group. Vacant units are never included.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label="Building *">
+        <Field label=tc.buildings + " *">
           <select style={inputStyle} value={form.building_id} onChange={set('building_id')}>
             <option value="">— Select —</option>
             {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </Field>
         <Field label="Code *"><input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. PG-GEN-01" /></Field>
-        <Field label="Name"><input style={inputStyle} value={form.name} onChange={set('name')} /></Field>
-        <Field label="Charge Category">
+        <Field label=tc.name><input style={inputStyle} value={form.name} onChange={set('name')} /></Field>
+        <Field label=tc.chargeCategory>
           <select style={inputStyle} value={form.charge_category} onChange={set('charge_category')}>
             {CHARGE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
           </select>
@@ -90,7 +90,7 @@ function PGForm({ onSave, onClose }) {
             <button onClick={() => setMembers(ms => ms.filter(x => x.contract_object_id !== m.contract_object_id))} style={{ background: 'none', border: 'none', color: '#c62828', fontSize: 18, cursor: 'pointer' }}>×</button>
           </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
-            <Field label="Max Cost (cap)"><input style={inputStyle} type="number" placeholder="No cap" value={m.max_cost} onChange={e => setMember(m.contract_object_id, 'max_cost', e.target.value)} /></Field>
+            <Field label=tc.maxCost><input style={inputStyle} type="number" placeholder="No cap" value={m.max_cost} onChange={e => setMember(m.contract_object_id, 'max_cost', e.target.value)} /></Field>
             <Field label="Markup Rate">
               <select style={inputStyle} value={m.markup_rate} onChange={e => setMember(m.contract_object_id, 'markup_rate', e.target.value)}>
                 {MARKUP_RATES.map(r => <option key={r.value} value={r.value}>{r.label}</option>)}
@@ -125,21 +125,21 @@ function CostCollectorForm({ pgId, onSave, onClose }) {
         ⚠ Cost Collector must be Released before posting. Once Settled, it rejects new postings.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label="Charge Category">
+        <Field label=tc.chargeCategory>
           <select style={inputStyle} value={form.charge_category} onChange={set('charge_category')}>
             {CHARGE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
           </select>
         </Field>
-        <Field label="Fiscal Year"><input style={inputStyle} type="number" value={form.fiscal_year} onChange={set('fiscal_year')} /></Field>
-        <Field label="Total Costs"><input style={inputStyle} type="number" value={form.total_costs} onChange={set('total_costs')} /></Field>
-        <Field label="Ancillary Revenues (reduces pool)"><input style={inputStyle} type="number" value={form.ancillary_revenues} onChange={set('ancillary_revenues')} /></Field>
+        <Field label=tc.fiscalYear><input style={inputStyle} type="number" value={form.fiscal_year} onChange={set('fiscal_year')} /></Field>
+        <Field label=tc.totalCosts><input style={inputStyle} type="number" value={form.total_costs} onChange={set('total_costs')} /></Field>
+        <Field label=tc.ancillaryRevenues><input style={inputStyle} type="number" value={form.ancillary_revenues} onChange={set('ancillary_revenues')} /></Field>
       </div>
       {(form.total_costs || form.ancillary_revenues) && (
         <div style={{ background: '#e8f5e9', borderRadius: 8, padding: '10px 14px', marginBottom: 16, fontSize: 14 }}>
           Net Pool to distribute: <strong>{netPool.toLocaleString()}</strong>
         </div>
       )}
-      <Field label="Description"><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
+      <Field label=tc.description><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
         <button onClick={onClose} style={btnSecondary}>Cancel</button>
         <button onClick={save} style={btnPrimary}>Create</button>
@@ -297,7 +297,7 @@ export default function ServiceCharges() {
       )}
 
       {confirm && (
-        <Modal title="Confirm Delete" onClose={() => setConfirm(null)}>
+        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete group <strong>{confirm.code}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

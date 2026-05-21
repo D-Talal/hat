@@ -57,16 +57,16 @@ function BPForm({ onSave, onClose, initial }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label="Company Name *"><input style={inputStyle} value={form.company_name} onChange={set('company_name')} /></Field>
-        <Field label="Trade Name"><input style={inputStyle} value={form.trade_name} onChange={set('trade_name')} /></Field>
-        <Field label="Contact Name"><input style={inputStyle} value={form.contact_name} onChange={set('contact_name')} /></Field>
-        <Field label="Tax ID"><input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} /></Field>
-        <Field label="Email"><input style={inputStyle} type="email" value={form.email} onChange={set('email')} /></Field>
-        <Field label="Phone"><input style={inputStyle} value={form.phone} onChange={set('phone')} /></Field>
-        <Field label="City"><input style={inputStyle} value={form.city} onChange={set('city')} /></Field>
-        <Field label="Country"><input style={inputStyle} value={form.country} onChange={set('country')} /></Field>
+        <Field label=tc.companyName + " *"><input style={inputStyle} value={form.company_name} onChange={set('company_name')} /></Field>
+        <Field label=tc.tradeName><input style={inputStyle} value={form.trade_name} onChange={set('trade_name')} /></Field>
+        <Field label=tc.contactName><input style={inputStyle} value={form.contact_name} onChange={set('contact_name')} /></Field>
+        <Field label=tc.taxId><input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} /></Field>
+        <Field label=tc.email><input style={inputStyle} type="email" value={form.email} onChange={set('email')} /></Field>
+        <Field label=tc.phone><input style={inputStyle} value={form.phone} onChange={set('phone')} /></Field>
+        <Field label=tc.city><input style={inputStyle} value={form.city} onChange={set('city')} /></Field>
+        <Field label=tc.country><input style={inputStyle} value={form.country} onChange={set('country')} /></Field>
       </div>
-      <Field label="Address"><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
+      <Field label=tc.address><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
       <div style={{ marginTop: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)' }}>Roles</span>
@@ -77,14 +77,14 @@ function BPForm({ onSave, onClose, initial }) {
           return (
             <div key={i} style={{ background: '#f8f9fa', borderRadius: 10, padding: 14, marginBottom: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-                <Field label="Role">
+                <Field label=tc.roles>
                   <select style={inputStyle} value={r.role} onChange={e => setRole(i, 'role', e.target.value)}>
                     {ROLES.map(ro => <option key={ro} value={ro}>{ROLE_LABELS[ro].label}</option>)}
                   </select>
                 </Field>
                 {r.role === 'master_tenant' && (
-                  <Field label="Customer Account (AR)">
-                    <input style={inputStyle} value={r.customer_account} onChange={e => setRole(i, 'customer_account', e.target.value)} placeholder="Required for AR postings" />
+                  <Field label=tc.customerAccount>
+                    <input style={inputStyle} value={r.customer_account} onChange={e => setRole(i, 'customer_account', e.target.value)} placeholder={tc.arWarning} />
                   </Field>
                 )}
                 <button onClick={() => removeRole(i)} style={{ background: 'none', border: 'none', color: '#c62828', fontSize: 18, cursor: 'pointer', paddingBottom: 4 }}>×</button>
@@ -161,7 +161,7 @@ export default function BusinessPartners() {
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontSize: 11, color: 'var(--slate)', background: '#f5f5f5', borderRadius: 6, padding: '2px 8px' }}>BP-{p.id}</span>
                   <button onClick={() => { setSelected(p); setModal('edit'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }} title="Edit">✏️</button>
-                  <button onClick={() => setConfirm(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }} title="Delete">🗑</button>
+                  <button onClick={() => setConfirm(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }} title=t.common.delete>🗑</button>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -223,7 +223,7 @@ export default function BusinessPartners() {
       )}
 
       {confirm && (
-        <Modal title="Confirm Delete" onClose={() => setConfirm(null)}>
+        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete <strong>{confirm.company_name}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>
