@@ -33,6 +33,8 @@ function SectionTitle({ children }) {
 }
 
 function ConditionForm({ onSave, onClose, initial }) {
+  const { t } = useLanguage();
+  const tc = t.commercial;
   const [contracts, setContracts] = useState([]);
   const [form, setForm] = useState({
     contract_id: initial?.contract_id || '',

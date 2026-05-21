@@ -45,6 +45,8 @@ function SectionTitle({ children }) {
 }
 
 function ContractForm({ onSave, onClose, initial }) {
+  const { t } = useLanguage();
+  const tc = t.commercial;
   const [partners, setPartners] = useState([]);
   const [entities, setEntities] = useState([]);
   const [rentalObjects, setRentalObjects] = useState([]);

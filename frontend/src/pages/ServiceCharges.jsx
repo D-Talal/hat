@@ -30,6 +30,8 @@ function SectionTitle({ children }) {
 }
 
 function PGForm({ onSave, onClose }) {
+  const { t } = useLanguage();
+  const tc = t.commercial;
   const [buildings, setBuildings] = useState([]);
   const [contractObjects, setContractObjects] = useState([]);
   const [members, setMembers] = useState([]);
@@ -115,6 +117,8 @@ function PGForm({ onSave, onClose }) {
 }
 
 function CostCollectorForm({ pgId, onSave, onClose }) {
+  const { t } = useLanguage();
+  const tc = t.commercial;
   const [form, setForm] = useState({ participation_group_id: pgId, charge_category: 'general', description: '', total_costs: '', ancillary_revenues: '', fiscal_year: new Date().getFullYear() });
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const netPool = (Number(form.total_costs) || 0) - (Number(form.ancillary_revenues) || 0);

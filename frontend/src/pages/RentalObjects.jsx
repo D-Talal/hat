@@ -28,6 +28,8 @@ function SectionTitle({ children }) {
 }
 
 function RentalObjectForm({ onSave, onClose, initial }) {
+  const { t } = useLanguage();
+  const tc = t.commercial;
   const [buildings, setBuildings] = useState([]);
   const [spaces, setSpaces] = useState([]);
   const [selectedSpaces, setSelectedSpaces] = useState([]);
