@@ -10,3 +10,7 @@ from app.models.retail import (
     ParticipationGroup, ParticipationGroupMember, SettlementUnit, CostCollector,
     DepositContract, VacancyPosting, Invoice, MaintenanceRequest,
 )
+from app.models.posting import (
+    PostingRun, PostingEntry, FxRate, IpcHistory,
+    Ifrs16Schedule, Ifrs16ScheduleLine,
+)
