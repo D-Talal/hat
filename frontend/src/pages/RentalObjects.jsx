@@ -62,27 +62,27 @@ function RentalObjectForm({ onSave, onClose, initial }) {
         ℹ A Rental Object (Usage View) groups one or more physical Spaces.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label=tc.name + " " + tc.buildings + " *">
+        <Field label={tc.name + " " + tc.buildings + " *}>
           <select style={inputStyle} value={form.building_id} onChange={set('building_id')} disabled={isEdit}>
             <option value="">— Select —</option>
             {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </Field>
         <Field label="Code *"><input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. RO-A101" disabled={isEdit} /></Field>
-        <Field label=tc.usageType>
+        <Field label={tc.usageType}>
           <select style={inputStyle} value={form.usage_type} onChange={set('usage_type')}>
             {['retail','office','storage','restaurant','kiosk','common_area'].map(u => <option key={u}>{u}</option>)}
           </select>
         </Field>
-        <Field label=tc.status>
+        <Field label={tc.status}>
           <select style={inputStyle} value={form.status} onChange={set('status')}>
             {['available','occupied','maintenance','vacant'].map(s => <option key={s}>{s}</option>)}
           </select>
         </Field>
-        <Field label=tc.costCenter><input style={inputStyle} value={form.cost_center} onChange={set('cost_center')} placeholder="e.g. CC-1001" /></Field>
-        <Field label=tc.imKey><input style={inputStyle} value={form.im_key} onChange={set('im_key')} placeholder="e.g. ASSET-4200" /></Field>
+        <Field label={tc.costCenter}><input style={inputStyle} value={form.cost_center} onChange={set('cost_center')} placeholder="e.g. CC-1001" /></Field>
+        <Field label={tc.imKey}><input style={inputStyle} value={form.im_key} onChange={set('im_key')} placeholder="e.g. ASSET-4200" /></Field>
       </div>
-      <Field label=tc.description><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
+      <Field label={tc.description}><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
 
       {!isEdit && (
         <>

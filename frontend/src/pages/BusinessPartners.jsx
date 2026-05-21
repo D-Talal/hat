@@ -57,16 +57,16 @@ function BPForm({ onSave, onClose, initial }) {
   return (
     <>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label=tc.companyName + " *"><input style={inputStyle} value={form.company_name} onChange={set('company_name')} /></Field>
-        <Field label=tc.tradeName><input style={inputStyle} value={form.trade_name} onChange={set('trade_name')} /></Field>
-        <Field label=tc.contactName><input style={inputStyle} value={form.contact_name} onChange={set('contact_name')} /></Field>
-        <Field label=tc.taxId><input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} /></Field>
-        <Field label=tc.email><input style={inputStyle} type="email" value={form.email} onChange={set('email')} /></Field>
-        <Field label=tc.phone><input style={inputStyle} value={form.phone} onChange={set('phone')} /></Field>
-        <Field label=tc.city><input style={inputStyle} value={form.city} onChange={set('city')} /></Field>
-        <Field label=tc.country><input style={inputStyle} value={form.country} onChange={set('country')} /></Field>
+        <Field label={tc.companyName + " *"}><input style={inputStyle} value={form.company_name} onChange={set('company_name')} /></Field>
+        <Field label={tc.tradeName}><input style={inputStyle} value={form.trade_name} onChange={set('trade_name')} /></Field>
+        <Field label={tc.contactName}><input style={inputStyle} value={form.contact_name} onChange={set('contact_name')} /></Field>
+        <Field label={tc.taxId}><input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} /></Field>
+        <Field label={tc.email}><input style={inputStyle} type="email" value={form.email} onChange={set('email')} /></Field>
+        <Field label={tc.phone}><input style={inputStyle} value={form.phone} onChange={set('phone')} /></Field>
+        <Field label={tc.city}><input style={inputStyle} value={form.city} onChange={set('city')} /></Field>
+        <Field label={tc.country}><input style={inputStyle} value={form.country} onChange={set('country')} /></Field>
       </div>
-      <Field label=tc.address><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
+      <Field label={tc.address}><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
       <div style={{ marginTop: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)' }}>Roles</span>
@@ -77,13 +77,13 @@ function BPForm({ onSave, onClose, initial }) {
           return (
             <div key={i} style={{ background: '#f8f9fa', borderRadius: 10, padding: 14, marginBottom: 10 }}>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr auto', gap: 12, alignItems: 'end' }}>
-                <Field label=tc.roles>
+                <Field label={tc.roles}>
                   <select style={inputStyle} value={r.role} onChange={e => setRole(i, 'role', e.target.value)}>
                     {ROLES.map(ro => <option key={ro} value={ro}>{ROLE_LABELS[ro].label}</option>)}
                   </select>
                 </Field>
                 {r.role === 'master_tenant' && (
-                  <Field label=tc.customerAccount>
+                  <Field label={tc.customerAccount}>
                     <input style={inputStyle} value={r.customer_account} onChange={e => setRole(i, 'customer_account', e.target.value)} placeholder={tc.arWarning} />
                   </Field>
                 )}

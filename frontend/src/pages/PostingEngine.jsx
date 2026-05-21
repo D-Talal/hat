@@ -190,14 +190,14 @@ function Ifrs16Setup({ onSave, onClose }) {
       </div>
       {!result ? (
         <>
-          <Field label=tc.contract + " (Released) *">
+          <Field label={tc.contract + "} (Released) *">
             <select style={inputStyle} value={form.contract_id} onChange={set('contract_id')}>
               <option value="">— Select —</option>
               {contracts.map(c => <option key={c.id} value={c.id}>{c.contract_number} — {c.business_partner?.company_name}</option>)}
             </select>
           </Field>
-          <Field label=tc.discountRate><input style={inputStyle} type="number" step="0.001" value={form.discount_rate} onChange={set('discount_rate')} placeholder="0.045" /></Field>
-          <Field label=tc.initialDirectCosts><input style={inputStyle} type="number" value={form.initial_direct_costs} onChange={set('initial_direct_costs')} /></Field>
+          <Field label={tc.discountRate}><input style={inputStyle} type="number" step="0.001" value={form.discount_rate} onChange={set('discount_rate')} placeholder="0.045" /></Field>
+          <Field label={tc.initialDirectCosts}><input style={inputStyle} type="number" value={form.initial_direct_costs} onChange={set('initial_direct_costs')} /></Field>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
             <button onClick={onClose} style={btnSecondary}>Cancel</button>
             <button onClick={save} style={btnPrimary}>Build Schedule</button>
@@ -259,14 +259,14 @@ function IpcModal({ onSave, onClose }) {
       </div>
       {!result ? (
         <>
-          <Field label=tc.contract + " *">
+          <Field label={tc.contract + " *"}>
             <select style={inputStyle} value={form.contract_id} onChange={set('contract_id')}>
               <option value="">— Select —</option>
               {contracts.map(c => <option key={c.id} value={c.id}>{c.contract_number} — {c.business_partner?.company_name}</option>)}
             </select>
           </Field>
-          <Field label=tc.newIndex + " *"><input style={inputStyle} type="number" step="0.01" value={form.new_index} onChange={set('new_index')} placeholder="e.g. 108.5" /></Field>
-          <Field label=tc.appliedDate + " *"><input style={inputStyle} type="date" value={form.applied_date} onChange={set('applied_date')} /></Field>
+          <Field label={tc.newIndex + " *"}><input style={inputStyle} type="number" step="0.01" value={form.new_index} onChange={set('new_index')} placeholder="e.g. 108.5" /></Field>
+          <Field label={tc.appliedDate + " *"}><input style={inputStyle} type="date" value={form.applied_date} onChange={set('applied_date')} /></Field>
           <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
             <button onClick={onClose} style={btnSecondary}>Cancel</button>
             <button onClick={apply} style={btnPrimary}>Apply IPC</button>
@@ -370,13 +370,13 @@ export default function PostingEngine() {
           <Card style={{ padding: 24 }}>
             <div style={{ fontFamily: 'DM Serif Display', fontSize: 18, marginBottom: 20 }}>Run Period Posting</div>
 
-            <Field label=tc.periodFrom>
+            <Field label={tc.periodFrom}>
               <input style={inputStyle} type="date" value={form.period_from} onChange={set('period_from')} />
             </Field>
-            <Field label=tc.periodTo>
+            <Field label={tc.periodTo}>
               <input style={inputStyle} type="date" value={form.period_to} onChange={set('period_to')} />
             </Field>
-            <Field label=tc.module>
+            <Field label={tc.module}>
               <select style={inputStyle} value={form.module} onChange={set('module')}>
                 {MODULES.map(m => <option key={m.value} value={m.value}>{m.icon} {m.label}</option>)}
               </select>
