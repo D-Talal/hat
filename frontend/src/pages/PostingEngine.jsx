@@ -424,7 +424,7 @@ export default function PostingEngine() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
               {runs.map(r => {
                 const sc = STATUS_COLORS[r.status] || STATUS_COLORS.pending;
-                const module = MODULES_KEYS.find(m => m.value === r.module);
+                const moduleInfo = MODULES.find(m => m.value === r.module);
                 return (
                   <Card key={r.id} style={{ padding: '16px 20px', cursor: 'pointer' }} onClick={() => setSelectedRun(r)}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
@@ -433,7 +433,7 @@ export default function PostingEngine() {
                           <span style={{ fontWeight: 700, fontFamily: 'monospace' }}>#{r.id}</span>
                           <span style={{ background: sc.bg, color: sc.text, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{r.status}</span>
                           {r.dry_run && <span style={{ background: '#eff6ff', color: '#3b82f6', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>DRY RUN</span>}
-                          {module && <span style={{ background: '#f5f5f5', borderRadius: 5, padding: '2px 8px', fontSize: 11 }}>{module.icon} {tc[module.key]}</span>}
+                          {moduleInfo && <span style={{ background: '#f5f5f5', borderRadius: 5, padding: '2px 8px', fontSize: 11 }}>{moduleInfo.icon} {moduleInfo.label}</span>}
                         </div>
                         <div style={{ fontSize: 13, color: 'var(--slate)' }}>
                           {r.period_from} → {r.period_to}
