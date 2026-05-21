@@ -27,6 +27,8 @@ function Field({ label, children }) {
 }
 
 function BPForm({ onSave, onClose, initial }) {
+  const { t } = useLanguage();
+  const tc = t.commercial;
   const [form, setForm] = useState({
     company_name: initial?.company_name || '',
     trade_name: initial?.trade_name || '',
@@ -161,7 +163,7 @@ export default function BusinessPartners() {
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontSize: 11, color: 'var(--slate)', background: '#f5f5f5', borderRadius: 6, padding: '2px 8px' }}>BP-{p.id}</span>
                   <button onClick={() => { setSelected(p); setModal('edit'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }} title="Edit">✏️</button>
-                  <button onClick={() => setConfirm(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }} title=t.common.delete>🗑</button>
+                  <button onClick={() => setConfirm(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }} title={t.common.delete}>🗑</button>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -223,7 +225,7 @@ export default function BusinessPartners() {
       )}
 
       {confirm && (
-        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
+        <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete <strong>{confirm.company_name}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

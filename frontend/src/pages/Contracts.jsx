@@ -404,7 +404,7 @@ export default function Contracts() {
       )}
 
       {confirm && (
-        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
+        <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete contract <strong>{confirm.contract_number}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

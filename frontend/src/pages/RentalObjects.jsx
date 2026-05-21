@@ -62,7 +62,7 @@ function RentalObjectForm({ onSave, onClose, initial }) {
         ℹ A Rental Object (Usage View) groups one or more physical Spaces.
       </div>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={tc.name + " " + tc.buildings + " *}>
+        <Field label={tc.name + " " + tc.buildings + " *"}>
           <select style={inputStyle} value={form.building_id} onChange={set('building_id')} disabled={isEdit}>
             <option value="">— Select —</option>
             {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
@@ -236,7 +236,7 @@ export default function RentalObjects() {
       )}
 
       {confirm && (
-        <Modal title=t.common.confirm + " " + t.common.delete onClose={() => setConfirm(null)}>
+        <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete <strong>{confirm.code}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

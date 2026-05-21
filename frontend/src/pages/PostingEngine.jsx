@@ -15,17 +15,17 @@ const STATUS_COLORS = {
   pending:   { bg: '#fafafa', text: '#9ca3af' },
 };
 
-const MODULES = [
-  { value: 'all',     label: tc.modAll,       icon: '⚡' },
-  { value: 'rent',    label: tc.modRent,          icon: '🏠' },
-  { value: 'scs',     label: tc.modScs,    icon: '⚖️' },
+function getModules(tc) { return [
+  { value: 'all',     label: tc.modAll,     icon: '⚡' },
+  { value: 'rent',    label: tc.modRent,    icon: '🏠' },
+  { value: 'scs',     label: tc.modScs,     icon: '⚖️' },
   { value: 'sales',   label: tc.modSales,   icon: '📊' },
-  { value: 'vacancy', label: tc.modVacancy,   icon: '🏚️' },
-  { value: 'deposit', label: tc.modDeposit,  icon: '🔒' },
-  { value: 'ifrs16',  label: tc.modIfrs16,            icon: '📋' },
-];
+  { value: 'vacancy', label: tc.modVacancy, icon: '🏚️' },
+  { value: 'deposit', label: tc.modDeposit, icon: '🔒' },
+  { value: 'ifrs16',  label: tc.modIfrs16,  icon: '📋' },
+]; }
 
-const ENTRY_TYPE_COLORS = {
+function getEntryTypeColors(tc) { return {
   base_rent:        { bg: '#eef0fd', text: '#4361ee', label: tc.condTypeBaseRent },
   service_charge:   { bg: '#ecfdf5', text: '#10b981', label: tc.condTypeServiceCharge },
   advance_payment:  { bg: '#fff7ed', text: '#f97316', label: tc.condTypeAdvancePayment },
@@ -41,7 +41,7 @@ const ENTRY_TYPE_COLORS = {
   ifrs16_interest:  { bg: '#f0fdfa', text: '#0d9488', label: 'IFRS16 ' + tc.ipcModalTitle },
   ifrs16_amort:     { bg: '#f0fdf4', text: '#16a34a', label: 'IFRS16 Amort' },
   catchup:          { bg: '#fafafa', text: '#6b7280', label: 'Catch-up' },
-};
+}; }
 
 function fmtAmt(v, cur = 'USD') {
   return new Intl.NumberFormat('en-CA', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(v || 0);
@@ -64,6 +64,7 @@ function SectionTitle({ children }) {
 function RunDetail({ run, onClose }) {
   const { t } = useLanguage();
   const tc = t.commercial;
+  const ENTRY_TYPE_COLORS = getEntryTypeColors(tc);
   const [entries, setEntries] = useState([]);
   const [loading, setLoading] = useState(true);
 
@@ -190,7 +191,7 @@ function Ifrs16Setup({ onSave, onClose }) {
       </div>
       {!result ? (
         <>
-          <Field label={tc.contract + "} (Released) *">
+          <Field label={tc.contract + " (Released) *"}>
             <select style={inputStyle} value={form.contract_id} onChange={set('contract_id')}>
               <option value="">— Select —</option>
               {contracts.map(c => <option key={c.id} value={c.id}>{c.contract_number} — {c.business_partner?.company_name}</option>)}
@@ -298,6 +299,9 @@ function IpcModal({ onSave, onClose }) {
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PostingEngine() {
   const { t } = useLanguage();
+  const tc = t.commercial;
+  const MODULES = getModules(tc);
+  const ENTRY_TYPE_COLORS = getEntryTypeColors(tc);
   const [stats, setStats] = useState(null);
   const [runs, setRuns] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -346,7 +350,7 @@ export default function PostingEngine() {
 
   return (
     <div className="animate-fade">
-      <PageHeader title=tc.postingTitle sub=tc.postingSub />
+      <PageHeader title={tc.postingTitle} sub={tc.postingSub} />
 
       {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 28 }}>
@@ -461,12 +465,12 @@ export default function PostingEngine() {
 
       {/* Modals */}
       {modal === 'ipc' && (
-        <Modal title=tc.ipcModalTitle onClose={() => setModal(null)}>
+        <Modal title={tc.ipcModalTitle} onClose={() => setModal(null)}>
           <IpcModal onSave={load} onClose={() => setModal(null)} />
         </Modal>
       )}
       {modal === 'ifrs16' && (
-        <Modal title=tc.ifrs16ModalTitle onClose={() => setModal(null)}>
+        <Modal title={tc.ifrs16ModalTitle} onClose={() => setModal(null)}>
           <Ifrs16Setup onSave={load} onClose={() => setModal(null)} />
         </Modal>
       )}
