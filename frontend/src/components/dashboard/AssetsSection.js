@@ -6,17 +6,13 @@ export default function AssetsSection({ data, module }) {
   const d = t.dashboard;
   if (!data) return null;
 
-  const byCityRows = (data.assets_by_city || []).sort(
-    (a, b) => (b.properties + b.hotels) - (a.properties + a.hotels)
-  );
-  const byCountryRows = (data.assets_by_country || []).sort(
-    (a, b) => (b.properties + b.hotels) - (a.properties + a.hotels)
-  );
+  const byCityRows = (data.assets_by_city || []).sort((a, b) => (b.properties + b.hotels) - (a.properties + a.hotels));
+  const byCountryRows = (data.assets_by_country || []).sort((a, b) => (b.properties + b.hotels) - (a.properties + a.hotels));
 
   return (
     <div className="dashboard-section">
       <div className="section-header">
-        <div className="section-icon" style={{ background: "rgba(245,158,11,0.12)", color: "#f59e0b" }}>🏗️</div>
+        <div className="section-icon" style={{ background: "#fffbeb", color: "#f59e0b" }}>🏗️</div>
         <div>
           <h2 className="section-title">{d.assetsTitle}</h2>
           <p className="section-subtitle">{d.assetsSub}</p>
@@ -38,7 +34,7 @@ export default function AssetsSection({ data, module }) {
         )}
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(320px, 1fr))", gap: 14 }}>
         {byCityRows.length > 0 && (
           <div className="assets-table-wrapper">
             <table className="assets-table">
@@ -61,7 +57,6 @@ export default function AssetsSection({ data, module }) {
             </table>
           </div>
         )}
-
         {byCountryRows.length > 0 && (
           <div className="assets-table-wrapper">
             <table className="assets-table">

@@ -15,9 +15,9 @@ const pct = (current, previous) => {
 const CustomTooltip = ({ active, payload, label, lang }) => {
   if (!active || !payload?.length) return null;
   return (
-    <div style={{ background: "#181c27", border: "0.5px solid #2a2f45", borderRadius: 8, padding: "10px 14px", fontSize: 13 }}>
-      <p style={{ color: "#8b90a8", marginBottom: 4 }}>{label}</p>
-      <p style={{ color: "#e8eaf2", fontFamily: "DM Mono, monospace" }}>{fmt(payload[0].value, lang)}</p>
+    <div style={{ background: "#fff", border: "1.5px solid #e8eaf0", borderRadius: 10, padding: "10px 14px", fontSize: 13, boxShadow: "0 4px 16px rgba(15,17,40,0.08)" }}>
+      <p style={{ color: "#9ea4be", marginBottom: 4, fontSize: 12 }}>{label}</p>
+      <p style={{ color: "#0f1117", fontFamily: "DM Mono, monospace", fontWeight: 500 }}>{fmt(payload[0].value, lang)}</p>
     </div>
   );
 };
@@ -41,7 +41,7 @@ export default function FinanceSection({ data, module }) {
   return (
     <div className="dashboard-section">
       <div className="section-header">
-        <div className="section-icon" style={{ background: "rgba(74,124,255,0.12)", color: "#4a7cff" }}>💰</div>
+        <div className="section-icon" style={{ background: "#eef0fd", color: "#4361ee" }}>💰</div>
         <div>
           <h2 className="section-title">{d.financeTitle}</h2>
           <p className="section-subtitle">{d.financeSub}</p>
@@ -64,13 +64,13 @@ export default function FinanceSection({ data, module }) {
         <div className="chart-wrapper">
           <p className="chart-title">{d.monthlyRevenue}</p>
           <ResponsiveContainer width="100%" height={220}>
-            <BarChart data={chartData} barCategoryGap="30%">
-              <CartesianGrid vertical={false} stroke="#2a2f45" strokeDasharray="3 3" />
-              <XAxis dataKey="label" tick={{ fill: "#555c78", fontSize: 11 }} axisLine={false} tickLine={false} />
-              <YAxis tick={{ fill: "#555c78", fontSize: 11 }} axisLine={false} tickLine={false}
+            <BarChart data={chartData} barCategoryGap="32%">
+              <CartesianGrid vertical={false} stroke="#f0f1f6" strokeDasharray="0" />
+              <XAxis dataKey="label" tick={{ fill: "#9ea4be", fontSize: 11 }} axisLine={false} tickLine={false} />
+              <YAxis tick={{ fill: "#9ea4be", fontSize: 11 }} axisLine={false} tickLine={false}
                 tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip content={<CustomTooltip lang={language} />} cursor={{ fill: "rgba(74,124,255,0.06)" }} />
-              <Bar dataKey="amount" fill="#4a7cff" radius={[4, 4, 0, 0]} />
+              <Tooltip content={<CustomTooltip lang={language} />} cursor={{ fill: "rgba(67,97,238,0.05)", radius: 6 }} />
+              <Bar dataKey="amount" fill="#4361ee" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
         </div>
