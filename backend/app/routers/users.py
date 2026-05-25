@@ -6,7 +6,7 @@ from app.database import get_db
 from app.models.user import User, UserRole
 from app.models.audit import AuditLog
 from app.core.auth import hash_password
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_current_org
 from app.core.permissions import require_permission
 
 router = APIRouter()
@@ -33,14 +33,15 @@ class UserOut(BaseModel):
     class Config: from_attributes = True
 
 @router.get("/", response_model=List[UserOut])
-def list_users(db: Session = Depends(get_db), current_user=Depends(require_permission("manage_users"))):
-    return db.query(User).all()
+def list_users(db: Session = Depends(get_db), current_user=Depends(require_permission("manage_users")), org=Depends(get_current_org)):
+    return db.query(User).filter(User.organization_id == org.id).all()
 
 @router.post("/", response_model=UserOut)
 def create_user(data: UserCreate, db: Session = Depends(get_db), current_user=Depends(require_permission("manage_users"))):
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "Email already registered")
     user = User(
+        organization_id=current_user.organization_id,
         email=data.email,
         full_name=data.full_name,
         hashed_password=hash_password(data.password),
@@ -75,8 +76,8 @@ def delete_user(id: int, db: Session = Depends(get_db), current_user=Depends(req
     return {"ok": True}
 
 @router.get("/audit-log")
-def get_audit_log(db: Session = Depends(get_db), current_user=Depends(require_permission("view_audit"))):
-    logs = db.query(AuditLog).order_by(AuditLog.created_at.desc()).limit(200).all()
+def get_audit_log(db: Session = Depends(get_db), current_user=Depends(require_permission("view_audit")), org=Depends(get_current_org)):
+    logs = db.query(AuditLog).filter(AuditLog.org_id == org.id).order_by(AuditLog.created_at.desc()).limit(200).all()
     return [{"id": l.id, "user_email": l.user_email, "action": l.action,
              "resource": l.resource, "resource_id": l.resource_id,
              "details": l.details, "ip_address": l.ip_address,

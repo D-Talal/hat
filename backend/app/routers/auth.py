@@ -187,7 +187,13 @@ def change_password(data: ChangePasswordRequest, request: Request, db: Session =
     return {"message": "Password changed successfully"}
 
 @router.get("/me")
-def get_me(current_user=Depends(get_current_user)):
+def get_me(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
+    org = None
+    if current_user.organization_id:
+        from app.models.organization import Organization
+        o = db.query(Organization).filter(Organization.id == current_user.organization_id).first()
+        if o:
+            org = {"id": o.id, "name": o.name, "slug": o.slug, "plan": o.plan}
     return {
         "id": current_user.id,
         "email": current_user.email,
@@ -195,4 +201,5 @@ def get_me(current_user=Depends(get_current_user)):
         "role": current_user.role,
         "totp_enabled": current_user.totp_enabled,
         "last_login": current_user.last_login,
+        "organization": org,
     }

@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from datetime import date
 from typing import Optional, List
 from app.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_current_org
 from app.core.permissions import require_permission
 from app.models.posting import (
     PostingRun, PostingEntry, FxRate, IpcHistory,
@@ -79,8 +79,8 @@ def run_posting(data: RunPostingRequest, db: Session = Depends(get_db),
 
 
 @router.get("/runs")
-def list_runs(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    runs = db.query(PostingRun).order_by(PostingRun.started_at.desc()).limit(50).all()
+def list_runs(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    runs = db.query(PostingRun).filter(PostingRun.org_id == org.id).order_by(PostingRun.started_at.desc()).limit(50).all()
     return [{"id": r.id, "period_from": r.period_from, "period_to": r.period_to,
              "module": r.module, "status": r.status, "dry_run": r.dry_run,
              "total_entries": r.total_entries, "total_amount": float(r.total_amount or 0),

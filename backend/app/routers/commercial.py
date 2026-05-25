@@ -5,7 +5,7 @@ from typing import List, Optional
 from pydantic import BaseModel
 from datetime import date, datetime
 from app.database import get_db
-from app.core.deps import get_current_user
+from app.core.deps import get_current_user, get_current_org
 from app.core.permissions import require_permission
 from app.models.audit import AuditLog
 from app.models.retail import (
@@ -20,9 +20,10 @@ from app.models.retail import (
 
 router = APIRouter()
 
-def audit(db, user, action, resource, rid=None, details=None):
+def audit(db, user, action, resource, rid=None, details=None, org_id=None):
     db.add(AuditLog(user_id=user.id, user_email=user.email, action=action,
-                    resource=resource, resource_id=rid, details=details))
+                    resource=resource, resource_id=rid, details=details,
+                    org_id=org_id or getattr(user, "organization_id", None)))
     db.commit()
 
 
@@ -286,12 +287,12 @@ class MaintenanceOut(MaintenanceCreate):
 # ── BUSINESS ENTITIES ─────────────────────────────────────────────────────────
 
 @router.get("/business-entities", response_model=List[BusinessEntityOut])
-def list_business_entities(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    return db.query(BusinessEntity).all()
+def list_business_entities(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    return db.query(BusinessEntity).filter(BusinessEntity.org_id == org.id).all()
 
 @router.post("/business-entities", response_model=BusinessEntityOut)
-def create_business_entity(data: BusinessEntityCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
-    obj = BusinessEntity(**data.dict())
+def create_business_entity(data: BusinessEntityCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    obj = BusinessEntity(**data.dict(), org_id=org.id)
     db.add(obj); db.commit(); db.refresh(obj)
     audit(db, u, "CREATE", "re_business_entities", obj.id)
     return obj
@@ -317,8 +318,9 @@ def list_buildings(be_id: int, db: Session = Depends(get_db), u=Depends(get_curr
     return db.query(Building).filter(Building.business_entity_id == be_id).all()
 
 @router.get("/buildings", response_model=List[BuildingOut])
-def list_all_buildings(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    return db.query(Building).all()
+def list_all_buildings(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    be_ids = [be.id for be in db.query(BusinessEntity).filter(BusinessEntity.org_id == org.id).all()]
+    return db.query(Building).filter(Building.business_entity_id.in_(be_ids)).all()
 
 @router.post("/business-entities/{be_id}/buildings", response_model=BuildingOut)
 def create_building(be_id: int, data: BuildingCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
@@ -404,15 +406,15 @@ def delete_space(id: int, db: Session = Depends(get_db), u=Depends(require_permi
 # ── BUSINESS PARTNERS ─────────────────────────────────────────────────────────
 
 @router.get("/business-partners", response_model=List[BusinessPartnerOut])
-def list_partners(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    return db.query(BusinessPartner).options(joinedload(BusinessPartner.roles)).all()
+def list_partners(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    return db.query(BusinessPartner).filter(BusinessPartner.org_id == org.id).options(joinedload(BusinessPartner.roles)).all()
 
 @router.post("/business-partners", response_model=BusinessPartnerOut)
-def create_partner(data: BusinessPartnerCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
+def create_partner(data: BusinessPartnerCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
     roles = data.roles or []
     payload = data.dict(exclude={"roles"})
-    obj = BusinessPartner(**payload)
-    count = db.query(BusinessPartner).count()
+    obj = BusinessPartner(**payload, org_id=org.id)
+    count = db.query(BusinessPartner).filter(BusinessPartner.org_id == org.id).count()
     obj.bp_number = f"BP-{count + 1:05d}"
     db.add(obj); db.flush()
     for r in roles:
