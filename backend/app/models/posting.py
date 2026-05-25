@@ -45,6 +45,7 @@ class PostingRun(Base):
     Tracks period, modules run, results and errors.
     """
     __tablename__ = "re_posting_runs"
+    __table_args__ = {'extend_existing': True}
 
     id             = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
@@ -73,6 +74,7 @@ class PostingEntry(Base):
     Analogous to a SAP FI document line.
     """
     __tablename__ = "re_posting_entries"
+    __table_args__ = {'extend_existing': True}
 
     id              = Column(Integer, primary_key=True, index=True)
     posting_run_id  = Column(Integer, ForeignKey("re_posting_runs.id"), nullable=False)
@@ -103,6 +105,7 @@ class PostingEntry(Base):
 class FxRate(Base):
     """Exchange rates for multi-currency support."""
     __tablename__ = "re_fx_rates"
+    __table_args__ = {'extend_existing': True}
 
     id              = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
@@ -119,6 +122,7 @@ class IpcHistory(Base):
     All linked conditions must be updated simultaneously.
     """
     __tablename__ = "re_ipc_history"
+    __table_args__ = {'extend_existing': True}
 
     id              = Column(Integer, primary_key=True, index=True)
     contract_id     = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
@@ -136,6 +140,7 @@ class Ifrs16Schedule(Base):
     One row per period — tracks liability balance and RoU balance.
     """
     __tablename__ = "re_ifrs16_schedules"
+    __table_args__ = {'extend_existing': True}
 
     id                  = Column(Integer, primary_key=True, index=True)
     contract_id         = Column(Integer, ForeignKey("re_contracts.id"), nullable=False, unique=True)
@@ -168,6 +173,7 @@ class Ifrs16ScheduleLine(Base):
     Generated when the schedule is created or modified.
     """
     __tablename__ = "re_ifrs16_schedule_lines"
+    __table_args__ = {'extend_existing': True}
 
     id              = Column(Integer, primary_key=True, index=True)
     schedule_id     = Column(Integer, ForeignKey("re_ifrs16_schedules.id"), nullable=False)

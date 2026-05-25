@@ -40,6 +40,7 @@ class MaintenanceStatus(str, enum.Enum):
 
 class BusinessEntity(Base):
     __tablename__ = "re_business_entities"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
@@ -58,6 +59,7 @@ class BusinessEntity(Base):
 
 class Building(Base):
     __tablename__ = "re_buildings"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     business_entity_id = Column(Integer, ForeignKey("re_business_entities.id"), nullable=False)
     name = Column(String(255), nullable=False)
@@ -75,6 +77,7 @@ class Building(Base):
 
 class Floor(Base):
     __tablename__ = "re_floors"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
     floor_number = Column(Integer, nullable=False)
@@ -87,6 +90,7 @@ class Floor(Base):
 
 class Space(Base):
     __tablename__ = "re_spaces"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     floor_id = Column(Integer, ForeignKey("re_floors.id"), nullable=False)
     space_code = Column(String(50), nullable=False)
@@ -101,6 +105,7 @@ class Space(Base):
 
 class SpaceMeasurement(Base):
     __tablename__ = "re_space_measurements"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=False)
     valid_from = Column(Date, nullable=False)
@@ -112,6 +117,7 @@ class SpaceMeasurement(Base):
 
 class RentalObject(Base):
     __tablename__ = "re_rental_objects"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
     code = Column(String(50), nullable=False)
@@ -131,6 +137,7 @@ class RentalObject(Base):
 
 class RentalObjectSpace(Base):
     __tablename__ = "re_rental_object_spaces"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
     space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=False)
@@ -142,6 +149,7 @@ class RentalObjectSpace(Base):
 
 class PooledSpace(Base):
     __tablename__ = "re_pooled_spaces"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
     code = Column(String(50), nullable=False)
@@ -154,6 +162,7 @@ class PooledSpace(Base):
 
 class PooledSpaceMember(Base):
     __tablename__ = "re_pooled_space_members"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     pooled_space_id = Column(Integer, ForeignKey("re_pooled_spaces.id"), nullable=False)
     rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
@@ -163,6 +172,7 @@ class PooledSpaceMember(Base):
 
 class BusinessPartner(Base):
     __tablename__ = "re_business_partners"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     bp_number = Column(String(50), unique=True)
@@ -184,6 +194,7 @@ class BusinessPartner(Base):
 
 class BusinessPartnerRole(Base):
     __tablename__ = "re_bp_roles"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     business_partner_id = Column(Integer, ForeignKey("re_business_partners.id"), nullable=False)
     role = Column(Enum(BPRole), nullable=False)
@@ -195,6 +206,7 @@ class BusinessPartnerRole(Base):
 
 class Contract(Base):
     __tablename__ = "re_contracts"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_number = Column(String(50), unique=True)
     business_partner_id = Column(Integer, ForeignKey("re_business_partners.id"), nullable=False)
@@ -228,6 +240,7 @@ class Contract(Base):
 
 class ContractDateSlot(Base):
     __tablename__ = "re_contract_date_slots"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     valid_from = Column(Date, nullable=False)
@@ -242,6 +255,7 @@ class ContractDateSlot(Base):
 
 class ContractObject(Base):
     __tablename__ = "re_contract_objects"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
@@ -255,6 +269,7 @@ class ContractObject(Base):
 
 class Condition(Base):
     __tablename__ = "re_conditions"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     condition_type = Column(Enum(ConditionType), nullable=False)
@@ -278,6 +293,7 @@ class Condition(Base):
 
 class SalesRule(Base):
     __tablename__ = "re_sales_rules"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     condition_id = Column(Integer, ForeignKey("re_conditions.id"), nullable=False, unique=True)
     name = Column(String(255))
@@ -295,6 +311,7 @@ class SalesRule(Base):
 
 class SalesRuleBracket(Base):
     __tablename__ = "re_sales_rule_brackets"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     sales_rule_id = Column(Integer, ForeignKey("re_sales_rules.id"), nullable=False)
     from_amount = Column(Numeric(18, 2), nullable=False)
@@ -305,6 +322,7 @@ class SalesRuleBracket(Base):
 
 class SalesDeclaration(Base):
     __tablename__ = "re_sales_declarations"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     sales_rule_id = Column(Integer, ForeignKey("re_sales_rules.id"), nullable=False)
@@ -323,6 +341,7 @@ class SalesDeclaration(Base):
 
 class ParticipationGroup(Base):
     __tablename__ = "re_participation_groups"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
     code = Column(String(50), nullable=False)
@@ -337,6 +356,7 @@ class ParticipationGroup(Base):
 
 class ParticipationGroupMember(Base):
     __tablename__ = "re_pg_members"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     participation_group_id = Column(Integer, ForeignKey("re_participation_groups.id"), nullable=False)
     contract_object_id = Column(Integer, ForeignKey("re_contract_objects.id"), nullable=False)
@@ -351,6 +371,7 @@ class ParticipationGroupMember(Base):
 
 class SettlementUnit(Base):
     __tablename__ = "re_settlement_units"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     participation_group_id = Column(Integer, ForeignKey("re_participation_groups.id"), nullable=False)
     code = Column(String(50), nullable=False)
@@ -363,6 +384,7 @@ class SettlementUnit(Base):
 
 class CostCollector(Base):
     __tablename__ = "re_cost_collectors"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     settlement_unit_id = Column(Integer, ForeignKey("re_settlement_units.id"), nullable=False)
     charge_category = Column(String(100))
@@ -379,6 +401,7 @@ class CostCollector(Base):
 
 class DepositContract(Base):
     __tablename__ = "re_deposit_contracts"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     main_contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     business_partner_id = Column(Integer, ForeignKey("re_business_partners.id"), nullable=False)
@@ -399,6 +422,7 @@ class DepositContract(Base):
 
 class VacancyPosting(Base):
     __tablename__ = "re_vacancy_postings"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
     period_from = Column(Date, nullable=False)
@@ -413,6 +437,7 @@ class VacancyPosting(Base):
 
 class Invoice(Base):
     __tablename__ = "re_invoices"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     condition_type = Column(Enum(ConditionType))
@@ -431,6 +456,7 @@ class Invoice(Base):
 
 class MaintenanceRequest(Base):
     __tablename__ = "re_maintenance"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=True)
     rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=True)

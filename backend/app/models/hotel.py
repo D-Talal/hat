@@ -18,6 +18,7 @@ class BookingStatus(str, enum.Enum):
 
 class Hotel(Base):
     __tablename__ = "hotels"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
@@ -33,6 +34,7 @@ class Hotel(Base):
 
 class Room(Base):
     __tablename__ = "hotel_rooms"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     hotel_id = Column(Integer, ForeignKey("hotels.id"))
     room_number = Column(String(20), nullable=False)
@@ -49,6 +51,7 @@ class Room(Base):
 
 class Guest(Base):
     __tablename__ = "hotel_guests"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     # Text columns to accommodate Fernet-encrypted values (~100+ chars)
     first_name = Column(Text, nullable=False)
@@ -63,6 +66,7 @@ class Guest(Base):
 
 class Booking(Base):
     __tablename__ = "hotel_bookings"
+    __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     room_id = Column(Integer, ForeignKey("hotel_rooms.id"))
     guest_id = Column(Integer, ForeignKey("hotel_guests.id"))
