@@ -47,6 +47,7 @@ class PostingRun(Base):
     __tablename__ = "re_posting_runs"
 
     id             = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     period_from    = Column(Date, nullable=False)
     period_to      = Column(Date, nullable=False)
     module         = Column(String(50), default="all")  # all|rent|scs|sales|ifrs16|vacancy
@@ -104,6 +105,7 @@ class FxRate(Base):
     __tablename__ = "re_fx_rates"
 
     id              = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     from_currency   = Column(String(10), nullable=False)
     to_currency     = Column(String(10), nullable=False)
     rate            = Column(Float, nullable=False)

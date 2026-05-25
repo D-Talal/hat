@@ -19,6 +19,7 @@ class BookingStatus(str, enum.Enum):
 class Hotel(Base):
     __tablename__ = "hotels"
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     address = Column(String(500))
     city = Column(String(255))

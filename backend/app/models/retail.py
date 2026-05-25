@@ -41,6 +41,7 @@ class MaintenanceStatus(str, enum.Enum):
 class BusinessEntity(Base):
     __tablename__ = "re_business_entities"
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     legal_name = Column(String(255))
     tax_id = Column(String(100))
@@ -163,6 +164,7 @@ class PooledSpaceMember(Base):
 class BusinessPartner(Base):
     __tablename__ = "re_business_partners"
     id = Column(Integer, primary_key=True, index=True)
+    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
     bp_number = Column(String(50), unique=True)
     company_name = Column(String(255), nullable=False)
     trade_name = Column(String(255))
