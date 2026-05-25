@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.database import engine, Base, SessionLocal
-from app.routers import auth, users, retail, hotel
+from app.routers import auth, users, retail, hotel, register
 from app.routers import map as map_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.commercial import router as commercial_router
@@ -13,6 +13,7 @@ from app.routers.posting import router as posting_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+from app.models import organization  # noqa — ensures Organization is registered in Base.metadata
 Base.metadata.create_all(bind=engine)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
@@ -20,8 +21,8 @@ app = FastAPI(title="PropManager API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=False,
+    allow_origins=[os.getenv("FRONTEND_URL", "*")],
+    allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -37,9 +38,11 @@ async def security_headers(request: Request, call_next):
 @app.exception_handler(Exception)
 async def global_exception_handler(request: Request, exc: Exception):
     logger.error(f"Unhandled error on {request.method} {request.url}: {exc}", exc_info=True)
-    return JSONResponse(status_code=500, content={"detail": str(exc)})
+    msg = str(exc) if ENVIRONMENT != "production" else "An internal error occurred."
+    return JSONResponse(status_code=500, content={"detail": msg})
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
+app.include_router(register.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
 app.include_router(retail.router, prefix="/api/retail", tags=["retail"])
 app.include_router(hotel.router, prefix="/api/hotel", tags=["hotel"])
@@ -71,6 +74,22 @@ def startup():
     db = SessionLocal()
     try:
         migrations = [
+            # Multi-tenancy
+            "CREATE TABLE IF NOT EXISTS organizations (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, slug VARCHAR(100) UNIQUE NOT NULL, plan VARCHAR(50) DEFAULT 'trial', is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT now())",
+            "INSERT INTO organizations (name, slug, plan) SELECT 'Default', 'default', 'trial' WHERE NOT EXISTS (SELECT 1 FROM organizations WHERE slug='default')",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)",
+            "UPDATE users SET organization_id = (SELECT id FROM organizations WHERE slug='default') WHERE organization_id IS NULL",
+            "ALTER TABLE re_business_entities ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
+            "UPDATE re_business_entities SET org_id = (SELECT id FROM organizations WHERE slug='default') WHERE org_id IS NULL",
+            "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
+            "UPDATE re_business_partners SET org_id = (SELECT id FROM organizations WHERE slug='default') WHERE org_id IS NULL",
+            "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
+            "UPDATE hotels SET org_id = (SELECT id FROM organizations WHERE slug='default') WHERE org_id IS NULL",
+            "ALTER TABLE re_posting_runs ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
+            "UPDATE re_posting_runs SET org_id = (SELECT id FROM organizations WHERE slug='default') WHERE org_id IS NULL",
+            "ALTER TABLE re_fx_rates ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
+            "UPDATE re_fx_rates SET org_id = (SELECT id FROM organizations WHERE slug='default') WHERE org_id IS NULL",
+            # Hotels
             "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS city VARCHAR(255)",
             "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS country VARCHAR(255)",
             "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS continent VARCHAR(100)",
@@ -82,6 +101,7 @@ def startup():
             "ALTER TABLE hotel_guests ALTER COLUMN id_number TYPE TEXT",
             "ALTER TABLE hotel_guests ALTER COLUMN id_type TYPE TEXT",
             "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE TEXT",
+            "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
         ]
         for migration in migrations:
             try:
@@ -89,9 +109,19 @@ def startup():
             except Exception:
                 db.rollback()
         if not db.query(User).first():
-            db.add(User(email="admin@propmanager.com", full_name="System Admin",
-                        hashed_password=hash_password("Admin@1234"),
-                        role=UserRole.admin, is_active=True))
+            from app.models.organization import Organization
+            # Create default org for the seeded admin
+            org = Organization(name="PropManager", slug="propmanager", plan="trial")
+            db.add(org)
+            db.flush()
+            db.add(User(
+                organization_id=org.id,
+                email="admin@propmanager.com",
+                full_name="System Admin",
+                hashed_password=hash_password("Admin@1234"),
+                role=UserRole.admin,
+                is_active=True,
+            ))
             db.commit()
     finally:
         db.close()
