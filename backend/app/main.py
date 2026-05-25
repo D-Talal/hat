@@ -13,7 +13,7 @@ from app.routers.posting import router as posting_router
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-from app.models import organization  # noqa — ensures Organization is registered in Base.metadata
+from app.models.organization import Organization  # noqa — ensures Organization is registered in Base.metadata
 Base.metadata.create_all(bind=engine)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
