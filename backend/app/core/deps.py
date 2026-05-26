@@ -55,4 +55,9 @@ def get_current_org(current_user=Depends(get_current_user), db: Session = Depend
         raise HTTPException(status_code=403, detail="Organization not found.")
     if org.is_active is False:
         raise HTTPException(status_code=403, detail="Organization is inactive.")
+    if getattr(org, 'is_validated', True) is False:
+        raise HTTPException(
+            status_code=403,
+            detail="Your account is pending approval. You will be notified by email once validated."
+        )
     return org
