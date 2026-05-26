@@ -18,6 +18,8 @@ import RentalObjects from './pages/RentalObjects';
 import ServiceCharges from './pages/ServiceCharges';
 import PostingEngine from './pages/PostingEngine';
 import CsvImport from './pages/CsvImport';
+import Register from './pages/Register';
+import SuperAdmin from './pages/SuperAdmin';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -69,6 +71,8 @@ function AppRoutes() {
   return (
     <Routes>
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
+      <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
+      <Route path="/super-admin" element={<ProtectedRoute><AppLayout><SuperAdmin /></AppLayout></ProtectedRoute>} />
       <Route path="/" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
       <Route path="/revenue-map" element={<ProtectedRoute><AppLayout><RevenueMap /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/patrimoine" element={<ProtectedRoute><AppLayout><Patrimoine /></AppLayout></ProtectedRoute>} />
