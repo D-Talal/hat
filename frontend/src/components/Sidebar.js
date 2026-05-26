@@ -23,6 +23,7 @@ export default function Sidebar() {
       { path: '/commercial/rental-objects',  label: language === 'fr' ? 'Objets locatifs'   : 'Rental Objects',    icon: '⊞' },
       { path: '/commercial/service-charges', label: language === 'fr' ? 'Charges locatives' : 'Service Charges',   icon: '⚖' },
       { path: '/commercial/posting-engine',  label: language === 'fr' ? 'Moteur de posting' : 'Posting Engine',    icon: '⚡', roles: ['admin','manager','accountant'] },
+      { path: '/commercial/csv-import',         label: language === 'fr' ? 'Import CSV'        : 'CSV Import',         icon: '📂', roles: ['admin','manager'] },
     ]},
     { section: t.nav.hospitality, items: [
       { path: '/hotel/hotels',   label: t.nav.hotels,   icon: '▲' },
