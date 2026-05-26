@@ -25,5 +25,6 @@ class User(Base):
     totp_enabled      = Column(Boolean, default=False)
     created_at        = Column(DateTime(timezone=True), server_default=func.now())
     last_login        = Column(DateTime(timezone=True), nullable=True)
+    must_change_password = Column(Boolean, default=False)
 
     organization = relationship("Organization", back_populates="users")
