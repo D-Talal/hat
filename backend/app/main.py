@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.database import engine, Base, SessionLocal
-from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module, alerts as alerts_router_module, csv_import as csv_import_router
+from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module, alerts as alerts_router_module, csv_import as csv_import_router, super_admin as super_admin_router
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.routers import map as map_router
@@ -68,6 +68,7 @@ app.include_router(posting_router, prefix="/api/posting", tags=["posting"])
 app.include_router(pdf_router_module.router, prefix="/api/pdf", tags=["pdf"])
 app.include_router(alerts_router_module.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(csv_import_router.router, prefix="/api/import", tags=["import"])
+app.include_router(super_admin_router.router, prefix="/api/super-admin", tags=["super-admin"])
 
 @app.get("/")
 def root():
@@ -122,6 +123,9 @@ def startup():
             "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE TEXT",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_validated BOOLEAN DEFAULT false",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255)",
+            "UPDATE organizations SET is_validated = true WHERE slug = 'default' OR slug = 'propmanager'",
         ]
         for migration in migrations:
             try:
