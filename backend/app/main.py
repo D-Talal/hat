@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.database import engine, Base, SessionLocal
-from app.routers import auth, users, retail, hotel, register
+from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module
 from app.routers import map as map_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.commercial import router as commercial_router
@@ -50,6 +50,7 @@ app.include_router(map_router.router, prefix="/api/map", tags=["map"])
 app.include_router(dashboard_router)
 app.include_router(commercial_router, prefix="/api/commercial", tags=["commercial"])
 app.include_router(posting_router, prefix="/api/posting", tags=["posting"])
+app.include_router(pdf_router_module.router, prefix="/api/pdf", tags=["pdf"])
 
 @app.get("/")
 def root():
