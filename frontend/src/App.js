@@ -27,6 +27,7 @@ function ProtectedRoute({ children, roles }) {
 }
 
 function AppLayout({ children }) {
+  const { user } = useAuth();
   return (
     <div style={{ display: 'flex', minHeight: '100vh' }}>
       <Sidebar />
@@ -36,6 +37,18 @@ function AppLayout({ children }) {
         minHeight: '100vh',
         background: 'var(--cream)',
       }}>
+        {user?.must_change_password && (
+          <div style={{
+            background: '#fff3cd', borderBottom: '1px solid #ffc107',
+            padding: '12px 24px', fontSize: 13, color: '#856404',
+            display: 'flex', alignItems: 'center', gap: 12,
+          }}>
+            <span>⚠️ <strong>Security notice:</strong> You are using a default password. Please change it immediately.</span>
+            <a href="/settings" style={{ color: '#856404', fontWeight: 700, textDecoration: 'underline', marginLeft: 'auto' }}>
+              Change password →
+            </a>
+          </div>
+        )}
         <div style={{
           width: '100%',
           maxWidth: 1280,
