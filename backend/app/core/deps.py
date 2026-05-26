@@ -23,14 +23,33 @@ def get_current_user(
 def get_current_org(current_user=Depends(get_current_user), db: Session = Depends(get_db)):
     """
     Returns the Organization of the current user.
-    Every route that accesses tenant data must inject this dependency
-    and filter queries with .filter(Model.org_id == org.id).
+    If the user has no organization_id yet (pre-migration users), auto-assigns
+    the default org so existing deployments don't break.
     """
     from app.models.organization import Organization
-    if not current_user.organization_id:
-        raise HTTPException(status_code=403, detail="User is not associated with an organization.")
+    from app.models.user import User
+
+    org_id = current_user.organization_id
+
+    # Auto-heal: assign default org to users without one (legacy data)
+    if not org_id:
+        default_org = db.query(Organization).filter(Organization.slug == "default").first()
+        if not default_org:
+            default_org = db.query(Organization).first()
+        if default_org:
+            db.query(User).filter(User.id == current_user.id).update(
+                {"organization_id": default_org.id}
+            )
+            db.commit()
+            org_id = default_org.id
+        else:
+            raise HTTPException(
+                status_code=403,
+                detail="No organization found. Please contact your administrator."
+            )
+
     org = db.query(Organization).filter(
-        Organization.id == current_user.organization_id,
+        Organization.id == org_id,
         Organization.is_active == True
     ).first()
     if not org:
