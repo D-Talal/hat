@@ -17,6 +17,7 @@ import Conditions from './pages/Conditions';
 import RentalObjects from './pages/RentalObjects';
 import ServiceCharges from './pages/ServiceCharges';
 import PostingEngine from './pages/PostingEngine';
+import CsvImport from './pages/CsvImport';
 
 function ProtectedRoute({ children, roles }) {
   const { user, loading } = useAuth();
@@ -76,6 +77,7 @@ function AppRoutes() {
       <Route path="/commercial/conditions" element={<ProtectedRoute><AppLayout><Conditions /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/rental-objects" element={<ProtectedRoute><AppLayout><RentalObjects /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/service-charges" element={<ProtectedRoute><AppLayout><ServiceCharges /></AppLayout></ProtectedRoute>} />
+      <Route path="/commercial/csv-import" element={<ProtectedRoute roles={['admin','manager']}><AppLayout><CsvImport /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/posting-engine" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><PostingEngine /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/hotels" element={<ProtectedRoute><AppLayout><HotelList /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/rooms" element={<ProtectedRoute><AppLayout><HotelRooms /></AppLayout></ProtectedRoute>} />
