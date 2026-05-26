@@ -50,8 +50,9 @@ def get_current_org(current_user=Depends(get_current_user), db: Session = Depend
 
     org = db.query(Organization).filter(
         Organization.id == org_id,
-        Organization.is_active == True
     ).first()
     if not org:
-        raise HTTPException(status_code=403, detail="Organization not found or inactive.")
+        raise HTTPException(status_code=403, detail="Organization not found.")
+    if org.is_active is False:
+        raise HTTPException(status_code=403, detail="Organization is inactive.")
     return org
