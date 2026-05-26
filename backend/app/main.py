@@ -17,11 +17,21 @@ from app.models.organization import Organization  # noqa — ensures Organizatio
 Base.metadata.create_all(bind=engine)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
+# ── Startup security checks ────────────────────────────────────────────────────
+_FRONTEND_URL = os.getenv("FRONTEND_URL")
+if ENVIRONMENT == "production":
+    if not _FRONTEND_URL:
+        raise RuntimeError("FRONTEND_URL environment variable must be set in production")
+    if _FRONTEND_URL == "*":
+        raise RuntimeError("FRONTEND_URL cannot be '*' in production")
+
+_ALLOWED_ORIGINS = [_FRONTEND_URL] if _FRONTEND_URL else ["http://localhost:3000", "http://localhost:5173"]
+
 app = FastAPI(title="PropManager API", version="2.0.0")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("FRONTEND_URL", "*")],
+    allow_origins=_ALLOWED_ORIGINS,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -104,6 +114,7 @@ def startup():
             "ALTER TABLE hotel_guests ALTER COLUMN id_type TYPE TEXT",
             "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE TEXT",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
+            "ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false",
         ]
         for migration in migrations:
             try:
@@ -123,6 +134,7 @@ def startup():
                 hashed_password=hash_password("Admin@1234"),
                 role=UserRole.admin,
                 is_active=True,
+                must_change_password=True,
             ))
             db.commit()
     finally:
