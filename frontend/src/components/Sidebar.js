@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { NavLink, useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { useLanguage } from '../context/LanguageContext';
+import API from '../api';
 
 const roleColors = { admin: '#C9A84C', manager: '#4A7C59', viewer: '#6B7280', accountant: '#3B82F6' };
 
@@ -9,6 +10,27 @@ export default function Sidebar() {
   const loc = useLocation();
   const { user, logout } = useAuth();
   const { language, toggleLanguage, t } = useLanguage();
+
+  const [pendingCount, setPendingCount] = useState(0);
+
+  const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+
+  useEffect(() => {
+    if (!user) return;
+    const fetchPending = async () => {
+      try {
+        const res = await API.get('/super-admin/orgs');
+        setIsSuperAdmin(true);
+        const count = res.data.filter(o => !o.is_validated && o.is_active).length;
+        setPendingCount(count);
+      } catch {
+        setIsSuperAdmin(false);
+      }
+    };
+    fetchPending();
+    const interval = setInterval(fetchPending, 60000);
+    return () => clearInterval(interval);
+  }, [user?.email]);
 
   const navItems = [
     { section: t.nav.overview, items: [
@@ -32,9 +54,10 @@ export default function Sidebar() {
       { path: '/hotel/bookings', label: t.nav.bookings, icon: '◈' },
     ]},
     { section: t.nav.admin, items: [
-      { path: '/users',    label: t.nav.users,    icon: '◑', roles: ['admin'] },
-      { path: '/audit',    label: t.nav.auditLog, icon: '▣', roles: ['admin', 'manager'] },
-      { path: '/settings', label: t.nav.settings, icon: '◌' },
+      { path: '/users',       label: t.nav.users,    icon: '◑', roles: ['admin'] },
+      { path: '/audit',       label: t.nav.auditLog, icon: '▣', roles: ['admin', 'manager'] },
+      { path: '/settings',    label: t.nav.settings, icon: '◌' },
+      { path: '/super-admin', label: 'Super Admin',   icon: '🛡', superAdminOnly: true },
     ]}
   ];
 
@@ -57,7 +80,10 @@ export default function Sidebar() {
       )}
       <div style={{ flex: 1, overflowY: 'auto', padding: '16px 12px' }}>
         {navItems.map(group => {
-          const visibleItems = group.items.filter(item => !item.roles || item.roles.includes(user?.role));
+          const visibleItems = group.items.filter(item => {
+            if (item.superAdminOnly) return isSuperAdmin;
+            return !item.roles || item.roles.includes(user?.role);
+          });
           if (visibleItems.length === 0) return null;
           return (
             <div key={group.section} style={{ marginBottom: 24 }}>
@@ -66,7 +92,13 @@ export default function Sidebar() {
                 const active = loc.pathname === item.path || (item.path !== '/' && loc.pathname.startsWith(item.path));
                 return (
                   <NavLink key={item.path} to={item.path} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 8, marginBottom: 2, textDecoration: 'none', fontSize: 14, fontWeight: active ? 600 : 400, color: active ? 'var(--gold)' : 'rgba(255,255,255,0.65)', background: active ? 'rgba(201,168,76,0.12)' : 'transparent', transition: 'all 0.15s' }}>
-                    <span style={{ fontSize: 16 }}>{item.icon}</span>{item.label}
+                    <span style={{ fontSize: 16 }}>{item.icon}</span>
+                    <span style={{ flex: 1 }}>{item.label}</span>
+                    {item.superAdminOnly && pendingCount > 0 && (
+                      <span style={{ background: '#ef4444', color: '#fff', borderRadius: 20, fontSize: 10, fontWeight: 700, padding: '2px 7px', minWidth: 18, textAlign: 'center' }}>
+                        {pendingCount}
+                      </span>
+                    )}
                   </NavLink>
                 );
               })}
