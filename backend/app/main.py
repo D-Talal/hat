@@ -4,7 +4,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.database import engine, Base, SessionLocal
-from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module, alerts as alerts_router_module
+from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module, alerts as alerts_router_module, csv_import as csv_import_router
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
 from app.routers import map as map_router
@@ -67,6 +67,7 @@ app.include_router(commercial_router, prefix="/api/commercial", tags=["commercia
 app.include_router(posting_router, prefix="/api/posting", tags=["posting"])
 app.include_router(pdf_router_module.router, prefix="/api/pdf", tags=["pdf"])
 app.include_router(alerts_router_module.router, prefix="/api/alerts", tags=["alerts"])
+app.include_router(csv_import_router.router, prefix="/api/import", tags=["import"])
 
 @app.get("/")
 def root():
