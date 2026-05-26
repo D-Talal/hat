@@ -4,7 +4,9 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from app.database import engine, Base, SessionLocal
-from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module
+from app.routers import auth, users, retail, hotel, register, pdf as pdf_router_module, alerts as alerts_router_module
+from apscheduler.schedulers.background import BackgroundScheduler
+from apscheduler.triggers.cron import CronTrigger
 from app.routers import map as map_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.commercial import router as commercial_router
@@ -28,6 +30,9 @@ if ENVIRONMENT == "production":
 _ALLOWED_ORIGINS = [_FRONTEND_URL] if _FRONTEND_URL else ["http://localhost:3000", "http://localhost:5173"]
 
 app = FastAPI(title="PropManager API", version="2.0.0")
+
+# ── Background alert scheduler ────────────────────────────────────────────────
+_scheduler = BackgroundScheduler(timezone="UTC")
 
 app.add_middleware(
     CORSMiddleware,
@@ -61,6 +66,7 @@ app.include_router(dashboard_router)
 app.include_router(commercial_router, prefix="/api/commercial", tags=["commercial"])
 app.include_router(posting_router, prefix="/api/posting", tags=["posting"])
 app.include_router(pdf_router_module.router, prefix="/api/pdf", tags=["pdf"])
+app.include_router(alerts_router_module.router, prefix="/api/alerts", tags=["alerts"])
 
 @app.get("/")
 def root():
@@ -139,3 +145,18 @@ def startup():
             db.commit()
     finally:
         db.close()
+
+    # Start alert scheduler
+    if not _scheduler.running:
+        from app.services.alert_engine import (
+            check_overdue_invoices,
+            check_expiring_contracts,
+            check_stale_maintenance,
+            send_monthly_summaries,
+        )
+        _scheduler.add_job(check_overdue_invoices,    CronTrigger(hour=8,  minute=0), id="overdue_invoices",    replace_existing=True)
+        _scheduler.add_job(check_expiring_contracts,  CronTrigger(hour=8,  minute=5), id="expiring_contracts",  replace_existing=True)
+        _scheduler.add_job(check_stale_maintenance,   CronTrigger(hour=8,  minute=10), id="stale_maintenance",  replace_existing=True)
+        _scheduler.add_job(send_monthly_summaries,    CronTrigger(hour=9,  minute=0), id="monthly_summary",     replace_existing=True)
+        _scheduler.start()
+        logger.info("[SCHEDULER] Alert scheduler started — jobs run daily at 08:00 UTC")
