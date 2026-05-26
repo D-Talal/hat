@@ -182,6 +182,7 @@ def change_password(data: ChangePasswordRequest, request: Request, db: Session =
     if not verify_password(data.current_password, current_user.hashed_password):
         raise HTTPException(400, "Current password is incorrect")
     current_user.hashed_password = hash_password(data.new_password)
+    current_user.must_change_password = False
     db.commit()
     log_action(db, current_user, "CHANGE_PASSWORD", "auth", ip=ip)
     return {"message": "Password changed successfully"}
@@ -201,5 +202,6 @@ def get_me(current_user=Depends(get_current_user), db: Session = Depends(get_db)
         "role": current_user.role,
         "totp_enabled": current_user.totp_enabled,
         "last_login": current_user.last_login,
+        "must_change_password": getattr(current_user, "must_change_password", False),
         "organization": org,
     }

@@ -1,6 +1,7 @@
 import re
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Request
 from sqlalchemy.orm import Session
+from app.core.rate_limit import rate_limit, get_client_ip
 from pydantic import BaseModel, EmailStr, field_validator
 from app.database import get_db
 from app.models.organization import Organization
@@ -55,11 +56,14 @@ def _make_slug(name: str, db: Session) -> str:
     return slug
 
 @router.post("/register")
-def register(data: RegisterRequest, db: Session = Depends(get_db)):
+def register(data: RegisterRequest, request: Request, db: Session = Depends(get_db)):
     """
     Public endpoint — creates a new Organization + Admin user in one shot.
     No auth required. Used for client onboarding.
     """
+    # Rate limit: max 5 registrations per IP per hour
+    rate_limit(f"register:{get_client_ip(request)}", max_requests=5, window_seconds=3600)
+
     # Check email not already taken
     if db.query(User).filter(User.email == data.email).first():
         raise HTTPException(400, "An account with this email already exists.")
