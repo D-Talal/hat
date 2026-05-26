@@ -28,6 +28,7 @@ export default function FinanceSection({ data, module }) {
   if (!data) return null;
 
   const trend = pct(data.revenue_this_month, data.revenue_last_month);
+  const isCommercial = module === "commercial" || module === "all";
 
   const chartData = (data.revenue_by_month || []).map((item) => {
     const [year, month] = item.month.split("-");
@@ -48,18 +49,37 @@ export default function FinanceSection({ data, module }) {
         </div>
       </div>
 
+      {/* Revenue KPIs */}
       <div className="kpi-grid">
         <KPICard label={d.revenueThisMonth} value={fmt(data.revenue_this_month, language)} color="blue"
           trend={trend} trendLabel={d.vsPrevMonth} />
         <KPICard label={d.totalRevenue} value={fmt(data.total_revenue, language)} sub={d.sinceBeginning} color="green" />
-        {(module === "commercial" || module === "all") && (
+        {isCommercial && (
           <KPICard label={d.pendingInvoices} value={fmt(data.outstanding_invoices, language)} color="orange" />
         )}
-        {(module === "commercial" || module === "all") && (
+        {isCommercial && (
           <KPICard label={d.overdueInvoices} value={fmt(data.overdue_invoices, language)} color="red" />
         )}
       </div>
 
+      {/* Commercial operational KPIs */}
+      {isCommercial && (data.active_contracts > 0 || data.expiring_soon > 0 || data.pending_maintenance > 0) && (
+        <div className="kpi-grid" style={{ marginTop: 12 }}>
+          {data.active_contracts != null && (
+            <KPICard label={d.activeContracts} value={data.active_contracts} color="blue" />
+          )}
+          {data.expiring_soon != null && (
+            <KPICard label={d.expiringSoon} value={data.expiring_soon}
+              color={data.expiring_soon > 0 ? "orange" : "green"} />
+          )}
+          {data.pending_maintenance != null && (
+            <KPICard label={d.pendingMaintenance} value={data.pending_maintenance}
+              color={data.pending_maintenance > 0 ? "orange" : "green"} />
+          )}
+        </div>
+      )}
+
+      {/* Monthly revenue chart */}
       {chartData.length > 0 && (
         <div className="chart-wrapper">
           <p className="chart-title">{d.monthlyRevenue}</p>
