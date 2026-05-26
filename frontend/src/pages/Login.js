@@ -153,6 +153,9 @@ export default function Login() {
             </button>
           </>
         )}
+      <p style={{ textAlign: 'center', marginTop: 20, color: 'rgba(255,255,255,0.35)', fontSize: 13 }}>
+        Don't have an account? <a href="/register" style={{ color: '#818cf8', textDecoration: 'none' }}>Request access</a>
+      </p>
       </div>
     </div>
   );
