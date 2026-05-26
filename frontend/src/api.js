@@ -116,6 +116,8 @@ export const commercial = {
     list: (contractId) => API.get('/commercial/invoices' + (contractId ? `?contract_id=${contractId}` : '')),
     create: (d) => API.post('/commercial/invoices', d),
     pay: (id) => API.patch(`/commercial/invoices/${id}/pay`),
+    downloadPdf: (id) => API.get(`/pdf/invoice/${id}`, { responseType: 'blob' }),
+    downloadStatement: (contractId) => API.get(`/pdf/lease-statement/${contractId}`, { responseType: 'blob' }),
   },
   maintenance: {
     list: () => API.get('/commercial/maintenance'),
