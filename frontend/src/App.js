@@ -19,6 +19,7 @@ import ServiceCharges from './pages/ServiceCharges';
 import PostingEngine from './pages/PostingEngine';
 import CsvImport from './pages/CsvImport';
 import Register from './pages/Register';
+import Landing from './pages/Landing';
 import SuperAdmin from './pages/SuperAdmin';
 
 function ProtectedRoute({ children, roles }) {
@@ -73,7 +74,11 @@ function AppRoutes() {
       <Route path="/login" element={user ? <Navigate to="/" replace /> : <Login />} />
       <Route path="/register" element={user ? <Navigate to="/" replace /> : <Register />} />
       <Route path="/super-admin" element={<ProtectedRoute><AppLayout><SuperAdmin /></AppLayout></ProtectedRoute>} />
-      <Route path="/" element={<ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>} />
+      <Route path="/" element={
+        user
+          ? <ProtectedRoute><AppLayout><Dashboard /></AppLayout></ProtectedRoute>
+          : <Landing />
+      } />
       <Route path="/revenue-map" element={<ProtectedRoute><AppLayout><RevenueMap /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/patrimoine" element={<ProtectedRoute><AppLayout><Patrimoine /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/partners" element={<ProtectedRoute><AppLayout><BusinessPartners /></AppLayout></ProtectedRoute>} />
