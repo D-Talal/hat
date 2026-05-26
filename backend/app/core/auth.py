@@ -8,7 +8,14 @@ from datetime import datetime, timedelta
 from typing import Optional
 from jose import JWTError, jwt
 
-SECRET_KEY = os.getenv("SECRET_KEY", "supersecretkey-change-in-production-please")
+SECRET_KEY = os.getenv("SECRET_KEY")
+if not SECRET_KEY:
+    import sys
+    env = os.getenv("ENVIRONMENT", "development")
+    if env == "production":
+        raise RuntimeError("SECRET_KEY environment variable is required in production")
+    else:
+        SECRET_KEY = "dev-secret-key-not-for-production"
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 60 * 8  # 8 hours
 

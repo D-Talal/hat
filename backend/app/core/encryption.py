@@ -5,13 +5,20 @@ logger = logging.getLogger(__name__)
 
 def _get_fernet():
     key = os.getenv("FIELD_ENCRYPTION_KEY", "").strip()
+    env = os.getenv("ENVIRONMENT", "development")
     if not key:
-        logger.warning("FIELD_ENCRYPTION_KEY not set — PII will not be encrypted")
+        if env == "production":
+            raise RuntimeError(
+                "FIELD_ENCRYPTION_KEY environment variable is required in production. "
+                "Generate one with: python -c \"from cryptography.fernet import Fernet; print(Fernet.generate_key().decode())\"")
+        logger.warning("FIELD_ENCRYPTION_KEY not set — guest PII will not be encrypted (dev mode only)")
         return None
     try:
         from cryptography.fernet import Fernet
         return Fernet(key.encode() if isinstance(key, str) else key)
     except Exception as e:
+        if env == "production":
+            raise RuntimeError(f"Invalid FIELD_ENCRYPTION_KEY: {e}")
         logger.error(f"Invalid FIELD_ENCRYPTION_KEY: {e}")
         return None
 
