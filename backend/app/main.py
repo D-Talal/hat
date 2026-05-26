@@ -76,9 +76,10 @@ def startup():
         migrations = [
             # Multi-tenancy
             "CREATE TABLE IF NOT EXISTS organizations (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, slug VARCHAR(100) UNIQUE NOT NULL, plan VARCHAR(50) DEFAULT 'trial', is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT now())",
-            "INSERT INTO organizations (name, slug, plan) SELECT 'Default', 'default', 'trial' WHERE NOT EXISTS (SELECT 1 FROM organizations WHERE slug='default')",
+            "INSERT INTO organizations (name, slug, plan, is_active) SELECT 'Default', 'default', 'trial', true WHERE NOT EXISTS (SELECT 1 FROM organizations WHERE slug='default')",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS organization_id INTEGER REFERENCES organizations(id)",
             "UPDATE users SET organization_id = (SELECT id FROM organizations WHERE slug='default') WHERE organization_id IS NULL",
+            "UPDATE organizations SET is_active = true WHERE is_active IS NULL",
             "ALTER TABLE re_business_entities ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
             "UPDATE re_business_entities SET org_id = (SELECT id FROM organizations WHERE slug='default') WHERE org_id IS NULL",
             "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
