@@ -181,12 +181,30 @@ function ContractForm({ onSave, onClose, initial }) {
 function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
   const [conditions, setConditions] = useState([]);
   const [activeTab, setActiveTab] = useState('info');
+  const [invoices, setInvoices] = useState([]);
+
+  const downloadInvoicePdf = async (invoiceId) => {
+    try {
+      const res = await api.invoices.downloadPdf(invoiceId);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `invoice_INV-${String(invoiceId).padStart(5, '0')}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Failed to download PDF');
+    }
+  };
   const s = STATUS_COLORS[contract.status] || STATUS_COLORS.draft;
   const days = daysUntil(contract.absolute_end_date);
   const expiringSoon = days !== null && days <= 90 && days > 0;
   const expired = days !== null && days <= 0;
 
   useEffect(() => {
+    if (activeTab === 'invoices') {
+      api.invoices.list(contract.id).then(r => setInvoices(r.data)).catch(() => {});
+    }
     if (activeTab === 'conditions') {
       API.get(`/commercial/conditions?contract_id=${contract.id}`)
         .then(r => setConditions(r.data || [])).catch(() => {});
@@ -206,7 +224,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
 
       {/* Tabs */}
       <div style={{ display: 'flex', gap: 4, marginBottom: 20, borderBottom: '2px solid var(--border)' }}>
-        {['info', 'conditions'].map(tab => (
+        {['info', 'conditions', 'invoices'].map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)}
             style={{ padding: '8px 16px', border: 'none', background: 'none', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 13, fontWeight: activeTab === tab ? 700 : 400, color: activeTab === tab ? 'var(--ink)' : 'var(--slate)', borderBottom: activeTab === tab ? '2px solid var(--ink)' : '2px solid transparent', marginBottom: -2, textTransform: 'capitalize' }}>
             {tab}
@@ -280,6 +298,44 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
         </div>
       )}
 
+      {activeTab === 'invoices' && (
+        <div>
+          {invoices.length === 0 ? (
+            <p style={{ color: 'var(--slate)', fontSize: 13 }}>No invoices found for this contract.</p>
+          ) : (
+            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: '#f5f7ff' }}>
+                  {['Period', 'Type', 'Amount', 'Due Date', 'Status', 'PDF'].map(h => (
+                    <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', borderBottom: '1px solid var(--border)' }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map(inv => (
+                  <tr key={inv.id} style={{ borderBottom: '1px solid var(--border)' }}>
+                    <td style={{ padding: '8px 10px' }}>{inv.period_from ? `${inv.period_from} – ${inv.period_to}` : '—'}</td>
+                    <td style={{ padding: '8px 10px' }}>{(inv.condition_type || '—').replace(/_/g, ' ')}</td>
+                    <td style={{ padding: '8px 10px', fontWeight: 600 }}>{inv.currency} {parseFloat(inv.amount || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}</td>
+                    <td style={{ padding: '8px 10px' }}>{inv.due_date || '—'}</td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <span style={{ padding: '2px 8px', borderRadius: 4, fontSize: 11, fontWeight: 700,
+                        background: inv.status === 'paid' ? '#ecfdf5' : inv.status === 'overdue' ? '#fef2f2' : '#fff7ed',
+                        color: inv.status === 'paid' ? '#10b981' : inv.status === 'overdue' ? '#ef4444' : '#f97316' }}>
+                        {(inv.status || 'pending').toUpperCase()}
+                      </span>
+                    </td>
+                    <td style={{ padding: '8px 10px' }}>
+                      <button onClick={() => downloadInvoicePdf(inv.id)} title="Download receipt PDF"
+                        style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 16 }}>📥</button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
+        </div>
+      )}
       <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
         <button onClick={onEdit} style={btnPrimary}>✏️ Edit</button>
         {contract.status === 'draft' && <button onClick={onDelete} style={btnDanger}>🗑 Delete</button>}
@@ -291,6 +347,20 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
 export default function Contracts() {
   const { t } = useLanguage();
   const tc = t.commercial;
+
+  const downloadStatement = async (contractId, contractNumber) => {
+    try {
+      const res = await api.invoices.downloadStatement(contractId);
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `lease_statement_${contractNumber || contractId}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch (e) {
+      alert('Failed to download PDF');
+    }
+  };
   const [contracts, setContracts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
@@ -379,6 +449,7 @@ export default function Contracts() {
                     <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
                       <div style={{ display: 'flex', gap: 4 }}>
                         <button onClick={() => { setSelected(c); setModal('view'); }} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'DM Sans' }}>View</button>
+                        <button onClick={() => downloadStatement(c.id, c.contract_number)} title="Download lease statement PDF" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>📄</button>
                         <button onClick={() => { setSelected(c); setModal('edit'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>✏️</button>
                         {c.status === 'draft' && <button onClick={() => setConfirm(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }}>🗑</button>}
                       </div>
