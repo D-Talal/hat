@@ -12,6 +12,8 @@ class Organization(Base):
     slug         = Column(String(100), unique=True, nullable=False, index=True)
     plan         = Column(String(50), default="trial")   # trial | starter | pro | enterprise
     is_active    = Column(Boolean, default=True)
+    is_validated = Column(Boolean, default=False)  # must be True to log in
+    contact_email= Column(String(255), nullable=True)  # admin's email for notifications
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
     # Relationships (optional, for eager loading convenience)
