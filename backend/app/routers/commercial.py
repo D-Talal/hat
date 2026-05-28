@@ -305,10 +305,15 @@ def update_business_entity(id: int, data: BusinessEntityCreate, db: Session = De
     db.commit(); db.refresh(obj); return obj
 
 @router.delete("/business-entities/{id}")
-def delete_business_entity(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
-    obj = db.query(BusinessEntity).filter(BusinessEntity.id == id).first()
+def delete_business_entity(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
+    obj = db.query(BusinessEntity).filter(BusinessEntity.id == id, BusinessEntity.org_id == org.id).first()
     if not obj: raise HTTPException(404, "Not found")
-    db.delete(obj); db.commit(); return {"ok": True}
+    building_count = db.query(Building).filter(Building.business_entity_id == id).count()
+    if building_count > 0:
+        raise HTTPException(400, f"Cannot delete: this property has {building_count} building(s). Remove them first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_business_entities", id)
+    return {"ok": True}
 
 
 # ── BUILDINGS ─────────────────────────────────────────────────────────────────
@@ -329,17 +334,30 @@ def create_building(be_id: int, data: BuildingCreate, db: Session = Depends(get_
     audit(db, u, "CREATE", "re_buildings", obj.id); return obj
 
 @router.put("/buildings/{id}", response_model=BuildingOut)
-def update_building(id: int, data: BuildingCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
+def update_building(id: int, data: BuildingCreate, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
     obj = db.query(Building).filter(Building.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
+    # Validate: building area must be >= sum of floor areas
+    if data.total_area_sqm is not None:
+        from sqlalchemy import func as sqlfunc
+        floor_total = db.query(sqlfunc.coalesce(sqlfunc.sum(Floor.area_sqm), 0)).filter(Floor.building_id == id).scalar() or 0
+        if data.total_area_sqm < floor_total:
+            raise HTTPException(400, f"Building area ({data.total_area_sqm} m²) cannot be smaller than the total floor area ({floor_total:.1f} m²).")
     for k, v in data.dict().items(): setattr(obj, k, v)
-    db.commit(); db.refresh(obj); return obj
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_buildings", id)
+    return obj
 
 @router.delete("/buildings/{id}")
-def delete_building(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
+def delete_building(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
     obj = db.query(Building).filter(Building.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
-    db.delete(obj); db.commit(); return {"ok": True}
+    floor_count = db.query(Floor).filter(Floor.building_id == id).count()
+    if floor_count > 0:
+        raise HTTPException(400, f"Cannot delete: this building has {floor_count} floor(s). Remove them first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_buildings", id)
+    return {"ok": True}
 
 
 # ── FLOORS ────────────────────────────────────────────────────────────────────
@@ -353,11 +371,39 @@ def create_floor(building_id: int, data: FloorCreate, db: Session = Depends(get_
     obj = Floor(building_id=building_id, **data.dict())
     db.add(obj); db.commit(); db.refresh(obj); return obj
 
+@router.put("/floors/{id}", response_model=FloorOut)
+def update_floor(id: int, data: FloorCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
+    obj = db.query(Floor).filter(Floor.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    # Validate: floor area must be >= sum of space areas
+    if data.area_sqm is not None:
+        from sqlalchemy import func as sqlfunc
+        from app.models.retail import SpaceMeasurement
+        space_ids = [s.id for s in db.query(Space).filter(Space.floor_id == id).all()]
+        if space_ids:
+            space_total = 0
+            for sid in space_ids:
+                latest = db.query(SpaceMeasurement).filter(
+                    SpaceMeasurement.space_id == sid, SpaceMeasurement.valid_to == None
+                ).order_by(SpaceMeasurement.valid_from.desc()).first()
+                if latest: space_total += float(latest.area_sqm or 0)
+            if data.area_sqm < space_total:
+                raise HTTPException(400, f"Floor area ({data.area_sqm} m²) cannot be smaller than the total space area ({space_total:.1f} m²).")
+    for k, v in data.dict().items(): setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_floors", id)
+    return obj
+
 @router.delete("/floors/{id}")
 def delete_floor(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
     obj = db.query(Floor).filter(Floor.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
-    db.delete(obj); db.commit(); return {"ok": True}
+    space_count = db.query(Space).filter(Space.floor_id == id).count()
+    if space_count > 0:
+        raise HTTPException(400, f"Cannot delete: this floor has {space_count} space(s). Remove them first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_floors", id)
+    return {"ok": True}
 
 
 # ── SPACES ────────────────────────────────────────────────────────────────────
@@ -396,11 +442,29 @@ def create_space(floor_id: int, data: SpaceCreate, db: Session = Depends(get_db)
     db.commit(); db.refresh(obj)
     return _space_with_area(obj)
 
+@router.put("/spaces/{id}")
+def update_space(id: int, data: SpaceCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
+    obj = db.query(Space).filter(Space.id == id).options(joinedload(Space.measurements)).first()
+    if not obj: raise HTTPException(404, "Not found")
+    for k, v in data.dict(exclude={"initial_measurement"}).items():
+        setattr(obj, k, v)
+    if data.initial_measurement:
+        from app.models.retail import SpaceMeasurement
+        db.add(SpaceMeasurement(space_id=obj.id, **data.initial_measurement.dict()))
+    db.commit()
+    audit(db, u, "UPDATE", "re_spaces", id)
+    return _space_with_area(obj)
+
 @router.delete("/spaces/{id}")
 def delete_space(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
     obj = db.query(Space).filter(Space.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
-    db.delete(obj); db.commit(); return {"ok": True}
+    ro_count = db.query(RentalObjectSpace).filter(RentalObjectSpace.space_id == id).count()
+    if ro_count > 0:
+        raise HTTPException(400, f"Cannot delete: this space is linked to {ro_count} rental object(s). Remove them first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_spaces", id)
+    return {"ok": True}
 
 
 # ── BUSINESS PARTNERS ─────────────────────────────────────────────────────────
@@ -623,15 +687,24 @@ def settle_cost_collector(id: int, db: Session = Depends(get_db), u=Depends(requ
 # ── INVOICES ──────────────────────────────────────────────────────────────────
 
 @router.get("/invoices", response_model=List[InvoiceOut])
-def list_invoices(contract_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    q = db.query(Invoice)
+def list_invoices(contract_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    contract_ids_q = db.query(Contract.id).filter(Contract.business_entity_id.in_(be_ids)) if be_ids else []
+    q = db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids_q))
     if contract_id: q = q.filter(Invoice.contract_id == contract_id)
-    return q.all()
+    return q.order_by(Invoice.due_date.desc()).all()
 
 @router.post("/invoices", response_model=InvoiceOut)
-def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
+def create_invoice(data: InvoiceCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    # Verify contract belongs to org
+    contract = db.query(Contract).filter(Contract.id == data.contract_id, Contract.business_entity_id.in_(
+        db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id)
+    )).first()
+    if not contract: raise HTTPException(404, "Contract not found")
     obj = Invoice(**data.dict())
-    db.add(obj); db.commit(); db.refresh(obj); return obj
+    db.add(obj); db.commit(); db.refresh(obj)
+    audit(db, u, "CREATE", "re_invoices", obj.id)
+    return obj
 
 @router.patch("/invoices/{id}/pay")
 def mark_invoice_paid(id: int, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
@@ -639,7 +712,33 @@ def mark_invoice_paid(id: int, db: Session = Depends(get_db), u=Depends(require_
     if not obj: raise HTTPException(404, "Not found")
     obj.status = "paid"
     obj.paid_date = date.today()
-    db.commit(); return {"ok": True}
+    db.commit()
+    audit(db, u, "UPDATE", "re_invoices", obj.id)
+    return {"ok": True}
+
+@router.put("/invoices/{id}", response_model=InvoiceOut)
+def update_invoice(id: int, data: InvoiceCreate, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    obj = db.query(Invoice).join(Contract).filter(
+        Invoice.id == id,
+        Contract.business_entity_id.in_(db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id))
+    ).first()
+    if not obj: raise HTTPException(404, "Not found")
+    for k, v in data.dict().items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_invoices", obj.id)
+    return obj
+
+@router.delete("/invoices/{id}")
+def delete_invoice(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
+    obj = db.query(Invoice).join(Contract).filter(
+        Invoice.id == id,
+        Contract.business_entity_id.in_(db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id))
+    ).first()
+    if not obj: raise HTTPException(404, "Not found")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_invoices", id)
+    return {"ok": True}
 
 
 # ── MAINTENANCE ───────────────────────────────────────────────────────────────
