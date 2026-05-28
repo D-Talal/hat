@@ -40,7 +40,7 @@ def _commercial_contract_ids(db, org):
     ]
     if not be_ids:
         return []
-    from app.models.retail import Building, Floor, Space, RentalObject, ContractObject
+    from app.models.retail import Building, RentalObject, ContractObject
     # contracts are linked via ContractObject → RentalObject → Space → Floor → Building → BusinessEntity
     # Simpler: filter contracts that have at least one ContractObject whose rental_object is in our org
     # But rental_objects don't have direct org_id — use the BE chain
@@ -49,9 +49,7 @@ def _commercial_contract_ids(db, org):
         r[0] for r in db.query(Contract.id)
         .join(ContractObject, ContractObject.contract_id == Contract.id)
         .join(RentalObject, RentalObject.id == ContractObject.rental_object_id)
-        .join(Space, Space.id == RentalObject.space_id)
-        .join(Floor, Floor.id == Space.floor_id)
-        .join(Building, Building.id == Floor.building_id)
+        .join(Building, Building.id == RentalObject.building_id)
         .filter(Building.business_entity_id.in_(be_ids))
         .all()
     ]
@@ -68,15 +66,13 @@ def _org_invoice_q(db, org, *filters):
 
 def _org_rental_object_q(db, org):
     """Query rental objects filtered by org via BE chain."""
-    from app.models.retail import Building, Floor, Space
+    from app.models.retail import Building
     be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
     if not be_ids:
         return db.query(RentalObject).filter(RentalObject.id == -1)
     return (
         db.query(RentalObject)
-        .join(Space, Space.id == RentalObject.space_id)
-        .join(Floor, Floor.id == Space.floor_id)
-        .join(Building, Building.id == Floor.building_id)
+        .join(Building, Building.id == RentalObject.building_id)
         .filter(Building.business_entity_id.in_(be_ids))
     )
 
