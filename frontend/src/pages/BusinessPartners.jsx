@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
+import GeoSelect from '../components/shared/GeoSelect';
 import { useLanguage } from '../context/LanguageContext';
 
 const ROLES = ['master_tenant', 'guarantor', 'landlord', 'vendor', 'contact_person'];
