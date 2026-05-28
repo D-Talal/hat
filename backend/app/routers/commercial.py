@@ -7,6 +7,17 @@ from datetime import date, datetime
 from app.database import get_db
 from app.core.deps import get_current_user, get_current_org
 from app.core.permissions import require_permission
+from app.core.validators import (
+    validate_non_empty_string, validate_email, validate_positive_float,
+    validate_area, validate_year, validate_currency_code, validate_date_range,
+    validate_phone, validate_floor_number, validate_space_code,
+    validate_contract_number, validate_condition_amount,
+    validate_ipc_index, validate_markup_rate, validate_continent,
+    validate_enum,
+    VALID_CONTRACT_TYPES, VALID_PAYMENT_TIMINGS, VALID_DAY_COUNT_METHODS,
+    VALID_CONDITION_TYPES, VALID_FREQUENCIES, VALID_BP_ROLES,
+    VALID_SPACE_STATUSES, VALID_USAGE_TYPES,
+)
 from app.models.audit import AuditLog
 from app.models.retail import (
     BusinessEntity, Building, Floor, Space, SpaceMeasurement,
@@ -40,6 +51,22 @@ class BusinessEntityCreate(BaseModel):
     annual_revenue: Optional[float] = 0
     currency: Optional[str] = "USD"
 
+    @field_validator('name')
+    @classmethod
+    def v_name(cls, v): return validate_non_empty_string(v, 'Name')
+
+    @field_validator('currency')
+    @classmethod
+    def v_currency(cls, v): return validate_currency_code(v)
+
+    @field_validator('continent')
+    @classmethod
+    def v_continent(cls, v): return validate_continent(v)
+
+    @field_validator('annual_revenue')
+    @classmethod
+    def v_revenue(cls, v): return validate_positive_float(v, 'Annual revenue')
+
 class BusinessEntityOut(BusinessEntityCreate):
     id: int
     created_at: datetime
@@ -54,6 +81,22 @@ class BuildingCreate(BaseModel):
     total_area_sqm: Optional[float] = None
     construction_year: Optional[int] = None
 
+    @field_validator('name')
+    @classmethod
+    def v_name(cls, v): return validate_non_empty_string(v, 'Building name')
+
+    @field_validator('total_area_sqm')
+    @classmethod
+    def v_area(cls, v): return validate_area(v)
+
+    @field_validator('construction_year')
+    @classmethod
+    def v_year(cls, v): return validate_year(v)
+
+    @field_validator('continent')
+    @classmethod
+    def v_continent(cls, v): return validate_continent(v)
+
 class BuildingOut(BuildingCreate):
     id: int
     business_entity_id: int
@@ -64,6 +107,14 @@ class FloorCreate(BaseModel):
     floor_number: int
     name: Optional[str] = None
     area_sqm: Optional[float] = None
+
+    @field_validator('floor_number')
+    @classmethod
+    def v_floor_num(cls, v): return validate_floor_number(v)
+
+    @field_validator('area_sqm')
+    @classmethod
+    def v_area(cls, v): return validate_area(v)
 
 class FloorOut(FloorCreate):
     id: int
@@ -76,11 +127,23 @@ class MeasurementCreate(BaseModel):
     area_sqm: float
     note: Optional[str] = None
 
+    @field_validator('area_sqm')
+    @classmethod
+    def v_area(cls, v): return validate_area(v)
+
 class SpaceCreate(BaseModel):
     space_code: str
     description: Optional[str] = None
     status: Optional[str] = "available"
     initial_measurement: Optional[MeasurementCreate] = None
+
+    @field_validator('space_code')
+    @classmethod
+    def v_code(cls, v): return validate_space_code(v)
+
+    @field_validator('status')
+    @classmethod
+    def v_status(cls, v): return validate_enum(v, VALID_SPACE_STATUSES, 'space status')
 
 class BPRoleCreate(BaseModel):
     role: str
@@ -99,6 +162,18 @@ class BusinessPartnerCreate(BaseModel):
     country: Optional[str] = None
     tax_id: Optional[str] = None
     roles: Optional[List[BPRoleCreate]] = []
+
+    @field_validator('company_name')
+    @classmethod
+    def v_company(cls, v): return validate_non_empty_string(v, 'Company name')
+
+    @field_validator('email')
+    @classmethod
+    def v_email(cls, v): return validate_email(v)
+
+    @field_validator('phone')
+    @classmethod
+    def v_phone(cls, v): return validate_phone(v)
 
 class BPRoleOut(BaseModel):
     id: int
@@ -140,6 +215,31 @@ class ContractCreate(BaseModel):
     pro_rata_enabled: Optional[bool] = True
     notes: Optional[str] = None
     rental_object_ids: Optional[List[int]] = []
+
+    @field_validator('contract_number')
+    @classmethod
+    def v_num(cls, v): return validate_contract_number(v)
+
+    @field_validator('contract_type')
+    @classmethod
+    def v_type(cls, v): return validate_enum(v, VALID_CONTRACT_TYPES, 'contract type')
+
+    @field_validator('payment_timing')
+    @classmethod
+    def v_payment(cls, v): return validate_enum(v, VALID_PAYMENT_TIMINGS, 'payment timing')
+
+    @field_validator('day_count_method')
+    @classmethod
+    def v_day_count(cls, v): return validate_enum(v, VALID_DAY_COUNT_METHODS, 'day count method')
+
+    @model_validator(mode='after')
+    def v_dates(self):
+        validate_date_range(self.start_date, self.absolute_end_date, 'Start date', 'End date')
+        validate_date_range(self.start_date, self.probable_end_date, 'Start date', 'Probable end date')
+        validate_date_range(self.start_date, self.first_end_date, 'Start date', 'First end date')
+        if self.signing_date and self.start_date and self.signing_date > self.start_date:
+            pass  # signing before or on start is normal, after is unusual but allowed
+        return self
 
 class ContractPatch(BaseModel):
     status: Optional[str] = None
@@ -185,6 +285,43 @@ class ConditionCreate(BaseModel):
     markup_rate: Optional[float] = None
     notes: Optional[str] = None
 
+    @field_validator('condition_type')
+    @classmethod
+    def v_type(cls, v): return validate_enum(v, VALID_CONDITION_TYPES, 'condition type')
+
+    @field_validator('amount')
+    @classmethod
+    def v_amount(cls, v): return validate_condition_amount(v)
+
+    @field_validator('currency')
+    @classmethod
+    def v_currency(cls, v): return validate_currency_code(v)
+
+    @field_validator('frequency')
+    @classmethod
+    def v_freq(cls, v): return validate_enum(v, VALID_FREQUENCIES, 'frequency')
+
+    @field_validator('payment_timing')
+    @classmethod
+    def v_timing(cls, v): return validate_enum(v, VALID_PAYMENT_TIMINGS, 'payment timing')
+
+    @field_validator('ipc_base_index')
+    @classmethod
+    def v_ipc(cls, v): return validate_ipc_index(v)
+
+    @field_validator('markup_rate')
+    @classmethod
+    def v_markup(cls, v): return validate_markup_rate(v)
+
+    @model_validator(mode='after')
+    def v_dates(self):
+        validate_date_range(self.valid_from, self.valid_to, 'Valid from', 'Valid to')
+        if self.condition_type == 'base_rent' and (self.amount is None or self.amount == 0):
+            raise ValueError('Base rent amount must be greater than 0')
+        if self.ipc_enabled and not self.ipc_base_index:
+            raise ValueError('IPC base index is required when IPC is enabled')
+        return self
+
 class ConditionOut(ConditionCreate):
     id: int
     created_at: datetime
@@ -198,6 +335,22 @@ class RentalObjectCreate(BaseModel):
     status: Optional[str] = "available"
     cost_center: Optional[str] = None
     im_key: Optional[str] = None
+
+    @field_validator('code')
+    @classmethod
+    def v_code(cls, v):
+        v = v.strip()
+        if not v: raise ValueError('Code is required')
+        if len(v) > 50: raise ValueError('Code must be under 50 characters')
+        return v
+
+    @field_validator('usage_type')
+    @classmethod
+    def v_usage(cls, v): return validate_enum(v, VALID_USAGE_TYPES, 'usage type')
+
+    @field_validator('status')
+    @classmethod
+    def v_status(cls, v): return validate_enum(v, VALID_SPACE_STATUSES, 'status')
     space_ids: Optional[List[int]] = []
 
 class RentalObjectOut(BaseModel):
@@ -259,6 +412,25 @@ class InvoiceCreate(BaseModel):
     period_from: Optional[date] = None
     period_to: Optional[date] = None
     description: Optional[str] = None
+
+    @field_validator('amount')
+    @classmethod
+    def v_amount(cls, v):
+        if v < 0: raise ValueError('Invoice amount cannot be negative')
+        return v
+
+    @field_validator('currency')
+    @classmethod
+    def v_currency(cls, v): return validate_currency_code(v)
+
+    @field_validator('condition_type')
+    @classmethod
+    def v_type(cls, v): return validate_enum(v, VALID_CONDITION_TYPES, 'condition type') if v else v
+
+    @model_validator(mode='after')
+    def v_period(self):
+        validate_date_range(self.period_from, self.period_to, 'Period from', 'Period to')
+        return self
 
 class InvoiceOut(InvoiceCreate):
     id: int
