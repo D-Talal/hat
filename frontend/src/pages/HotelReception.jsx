@@ -92,7 +92,7 @@ function BookingCard({ booking, onCheckin, onCheckout, onCancel, onDownloadPdf, 
             {booking.status === 'checked_out' && (
               <button onClick={() => onDownloadPdf?.(booking.id)}
                 style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #d0d5f5', background: '#eef0fd', color: '#4361ee', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 13 }}>
-                📄 Invoice
+                {th.stayInvoiceBtn}
               </button>
             )}
         {booking.status === 'checked_in' && showCheckout && (
