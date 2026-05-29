@@ -45,6 +45,9 @@ export const retail = {
 
 export const hotel = {
   stats: () => API.get('/hotel/stats'),
+  hotelPdf: {
+    stayInvoice: (bookingId) => API.get(`/pdf/hotel-stay/${bookingId}`, { responseType: 'blob' }),
+  },
   hotelReception: {
     get:      (hotelId) => API.get('/hotel/reception' + (hotelId ? `?hotel_id=${hotelId}` : '')),
     checkin:  (id)      => API.post(`/hotel/bookings/${id}/checkin`),
