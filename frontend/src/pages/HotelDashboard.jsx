@@ -81,6 +81,7 @@ const CustomTooltip = ({ active, payload, label }) => {
 
 export default function HotelDashboard() {
   const { t } = useLanguage();
+  const th = t.hotel;
   const [data, setData]         = useState(null);
   const [hotels, setHotels]     = useState([]);
   const [selectedHotel, setSelectedHotel] = useState('');
@@ -156,17 +157,17 @@ export default function HotelDashboard() {
 
       {/* Top KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>
-        <KPI label="Occupancy Tonight" value={fmtPct(data.occupancy_rate)}
+        <KPI label=th.occupancyTonight value={fmtPct(data.occupancy_rate)}
           sub={`${data.occupied_tonight} / ${data.total_rooms} rooms`}
           color={data.occupancy_rate >= 80 ? '#10b981' : data.occupancy_rate >= 60 ? '#f97316' : '#ef4444'}
           icon="🛏" />
-        <KPI label="ADR" value={fmt(data.adr)}
+        <KPI label=th.adr value={fmt(data.adr)}
           sub="Avg daily rate this month"
           color="#4361ee" icon="💰" />
-        <KPI label="RevPAR" value={fmt(data.revpar)}
+        <KPI label=th.revpar value={fmt(data.revpar)}
           sub="Revenue per available room"
           color="#8b5cf6" icon="📊" />
-        <KPI label="Revenue This Month" value={fmt(data.revenue_this_month)}
+        <KPI label=th.revenueThisMonth value={fmt(data.revenue_this_month)}
           sub={revTrend ? `${revTrend >= 0 ? '▲' : '▼'} ${Math.abs(revTrend)}% vs last month` : 'vs last month'}
           color={revTrend >= 0 ? '#10b981' : '#ef4444'} icon="💵" />
       </div>

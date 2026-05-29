@@ -70,7 +70,7 @@ function BookingCard({ booking, onCheckin, onCheckout, onCancel, loading }) {
               disabled={loading === booking.id}
               style={{ padding: '7px 16px', borderRadius: 8, border: 'none', background: '#4361ee', color: '#fff', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 13 }}
             >
-              {loading === booking.id ? '…' : '✓ Check In'}
+              {loading === booking.id ? '…' : ('✓ ' + th.checkInBtn)}
             </button>
             <button
               onClick={() => onCancel(booking.id)}
@@ -106,7 +106,7 @@ function BookingCard({ booking, onCheckin, onCheckout, onCancel, loading }) {
               disabled={loading === booking.id}
               style={{ padding: '6px 14px', borderRadius: 7, border: 'none', background: '#10b981', color: '#fff', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 13 }}
             >
-              {loading === booking.id ? '…' : 'Confirm'}
+              {loading === booking.id ? '…' : th.confirmCheckout}
             </button>
             <button onClick={() => setShowCheckout(false)}
               style={{ padding: '6px 10px', borderRadius: 7, border: '1.5px solid #e4e6ef', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 13 }}>
@@ -139,6 +139,7 @@ function Column({ title, icon, count, color, children, emptyMsg }) {
 
 export default function HotelReception() {
   const { t } = useLanguage();
+  const th = t.hotel;
   const [data, setData]       = useState(null);
   const [hotels, setHotels]   = useState([]);
   const [selectedHotel, setSelectedHotel] = useState('');
@@ -190,7 +191,7 @@ export default function HotelReception() {
   };
 
   const handleCancel = async (id) => {
-    if (!window.confirm('Cancel this booking?')) return;
+    if (!window.confirm(th.cancelBooking + '?')) return;
     setActionLoading(id);
     try {
       await API.post(`/hotel/bookings/${id}/cancel`);
@@ -216,7 +217,7 @@ export default function HotelReception() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, fontFamily: 'DM Serif Display, serif' }}>
-            🏨 Reception
+            {th.receptionTitle}
           </h1>
           <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ea4be' }}>{today}</p>
         </div>
@@ -244,7 +245,7 @@ export default function HotelReception() {
             <div style={{ background: '#fef2f2', border: '1.5px solid #fca5a5', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', gap: 12, alignItems: 'center' }}>
               <span style={{ fontSize: 22 }}>⚠️</span>
               <div>
-                <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{data.overdue.length} overdue checkout{data.overdue.length > 1 ? 's' : ''}</div>
+                <div style={{ fontWeight: 700, color: '#dc2626', fontSize: 14 }}>{data.overdue.length} {th.overdueCheckouts}{data.overdue.length > 1 ? 's' : ''}</div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>
                   {data.overdue.map(b => `Room ${b.room_number} (${b.guest_name})`).join(' · ')}
                 </div>
@@ -256,21 +257,21 @@ export default function HotelReception() {
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 20 }}>
 
             {/* Arrivals */}
-            <Column title="Arrivals" icon="✈️" count={data.arrivals?.length || 0} color="#4361ee" emptyMsg="No arrivals today">
+            <Column title={th.arrivals} icon="✈️" count={data.arrivals?.length || 0} color="#4361ee" emptyMsg={th.noArrivals}>
               {data.arrivals?.map(b => (
                 <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} loading={actionLoading} />
               ))}
             </Column>
 
             {/* In-house */}
-            <Column title="In House" icon="🛏" count={data.in_house?.length || 0} color="#10b981" emptyMsg="No guests currently in-house">
+            <Column title={th.inHouse} icon="🛏" count={data.in_house?.length || 0} color="#10b981" emptyMsg={th.noInHouse}>
               {data.in_house?.map(b => (
                 <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} loading={actionLoading} />
               ))}
             </Column>
 
             {/* Departures */}
-            <Column title="Departures" icon="🧳" count={data.departures?.length || 0} color="#f97316" emptyMsg="No departures today">
+            <Column title={th.departures} icon="🧳" count={data.departures?.length || 0} color="#f97316" emptyMsg={th.noDepartures}>
               {data.departures?.map(b => (
                 <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} loading={actionLoading} />
               ))}
