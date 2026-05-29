@@ -375,3 +375,79 @@ def get_reception(hotel_id: Optional[int] = None, db: Session = Depends(get_db),
         "overdue":    booking_list(overdue),
         "date":       str(today),
     }
+
+
+# ── BOOKING CALENDAR ──────────────────────────────────────────────────────────
+
+@router.get("/calendar")
+def get_calendar(
+    hotel_id: int,
+    start_date: str,
+    end_date:   str,
+    db: Session = Depends(get_db),
+    u=Depends(get_current_user),
+    org=Depends(get_current_org),
+):
+    """
+    Returns rooms + their bookings for a date range.
+    Used by the frontend calendar grid.
+    """
+    from datetime import date as date_type
+    try:
+        d_start = date_type.fromisoformat(start_date)
+        d_end   = date_type.fromisoformat(end_date)
+    except ValueError:
+        raise HTTPException(400, "Invalid date format — use YYYY-MM-DD")
+
+    hotel = db.query(Hotel).filter(Hotel.id == hotel_id, Hotel.org_id == org.id).first()
+    if not hotel:
+        raise HTTPException(404, "Hotel not found")
+
+    rooms = db.query(Room).filter(Room.hotel_id == hotel_id).order_by(Room.floor, Room.room_number).all()
+
+    bookings = (
+        db.query(Booking)
+        .join(Room)
+        .filter(
+            Room.hotel_id == hotel_id,
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+            Booking.check_in < d_end,
+            Booking.check_out > d_start,
+        )
+        .all()
+    )
+
+    # Build booking map: room_id -> list of bookings
+    booking_map: dict = {}
+    for b in bookings:
+        g = b.guest
+        entry = {
+            "id":          b.id,
+            "check_in":    str(b.check_in),
+            "check_out":   str(b.check_out),
+            "status":      b.status.value,
+            "guest_name":  f"{decrypt_field(g.first_name)} {decrypt_field(g.last_name)}" if g else "—",
+            "adults":      b.adults,
+            "children":    b.children,
+            "total_amount": float(b.total_amount or 0),
+        }
+        booking_map.setdefault(b.room_id, []).append(entry)
+
+    return {
+        "hotel":      {"id": hotel.id, "name": hotel.name},
+        "start_date": start_date,
+        "end_date":   end_date,
+        "rooms": [
+            {
+                "id":          r.id,
+                "room_number": r.room_number,
+                "room_type":   r.room_type,
+                "floor":       r.floor,
+                "capacity":    r.capacity,
+                "base_rate":   float(r.base_rate or 0),
+                "status":      r.status.value,
+                "bookings":    booking_map.get(r.id, []),
+            }
+            for r in rooms
+        ],
+    }
