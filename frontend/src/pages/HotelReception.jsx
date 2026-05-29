@@ -23,7 +23,7 @@ function StatusBadge({ status }) {
   return <span style={{ padding: '3px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: s.bg, color: s.text }}>{s.label}</span>;
 }
 
-function BookingCard({ booking, onCheckin, onCheckout, onCancel, loading }) {
+function BookingCard({ booking, onCheckin, onCheckout, onCancel, onDownloadPdf, loading }) {
   const [showCheckout, setShowCheckout] = useState(false);
   const [paidAmount, setPaidAmount] = useState(booking.paid_amount || 0);
   const balance = booking.total_amount - (paidAmount || 0);
@@ -89,6 +89,12 @@ function BookingCard({ booking, onCheckin, onCheckout, onCancel, loading }) {
             ↗ Check Out
           </button>
         )}
+            {booking.status === 'checked_out' && (
+              <button onClick={() => onDownloadPdf?.(booking.id)}
+                style={{ padding: '7px 14px', borderRadius: 8, border: '1.5px solid #d0d5f5', background: '#eef0fd', color: '#4361ee', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 13 }}>
+                📄 Invoice
+              </button>
+            )}
         {booking.status === 'checked_in' && showCheckout && (
           <div style={{ display: 'flex', gap: 8, alignItems: 'center', width: '100%', background: '#f0fdf4', borderRadius: 8, padding: '10px 12px' }}>
             <label style={{ fontSize: 12, color: '#374151', fontWeight: 600, whiteSpace: 'nowrap' }}>Amount paid:</label>
@@ -201,6 +207,18 @@ export default function HotelReception() {
     finally { setActionLoading(null); }
   };
 
+  const downloadStayInvoice = async (bookingId) => {
+    try {
+      const res = await API.get(`/pdf/hotel-stay/${bookingId}`, { responseType: 'blob' });
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `stay_STAY-${String(bookingId).padStart(5,'0')}.pdf`;
+      a.click();
+      window.URL.revokeObjectURL(url);
+    } catch { showToast('❌ Failed to download invoice'); }
+  };
+
   const today = new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
@@ -259,21 +277,21 @@ export default function HotelReception() {
             {/* Arrivals */}
             <Column title={th.arrivals} icon="✈️" count={data.arrivals?.length || 0} color="#4361ee" emptyMsg={th.noArrivals}>
               {data.arrivals?.map(b => (
-                <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} loading={actionLoading} />
+                <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} onDownloadPdf={downloadStayInvoice} loading={actionLoading} />
               ))}
             </Column>
 
             {/* In-house */}
             <Column title={th.inHouse} icon="🛏" count={data.in_house?.length || 0} color="#10b981" emptyMsg={th.noInHouse}>
               {data.in_house?.map(b => (
-                <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} loading={actionLoading} />
+                <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} onDownloadPdf={downloadStayInvoice} loading={actionLoading} />
               ))}
             </Column>
 
             {/* Departures */}
             <Column title={th.departures} icon="🧳" count={data.departures?.length || 0} color="#f97316" emptyMsg={th.noDepartures}>
               {data.departures?.map(b => (
-                <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} loading={actionLoading} />
+                <BookingCard key={b.id} booking={b} onCheckin={handleCheckin} onCheckout={handleCheckout} onCancel={handleCancel} onDownloadPdf={downloadStayInvoice} loading={actionLoading} />
               ))}
             </Column>
 
