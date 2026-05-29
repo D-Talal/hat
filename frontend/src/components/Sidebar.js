@@ -52,6 +52,7 @@ export default function Sidebar() {
       { path: '/commercial/csv-import',         label: language === 'fr' ? 'Import CSV'        : 'CSV Import',         icon: '📂', roles: ['admin','manager'] },
     ]},
     { section: t.nav.hospitality, items: [
+      { path: '/hotel/reception', label: language === 'fr' ? 'Réception'      : 'Reception',     icon: '🛎' },
       { path: '/hotel/dashboard', label: language === 'fr' ? 'Tableau de bord' : 'Dashboard',   icon: '📊' },
       { path: '/hotel/hotels',   label: t.nav.hotels,   icon: '▲' },
       { path: '/hotel/rooms',    label: t.nav.rooms,    icon: '⊡' },
