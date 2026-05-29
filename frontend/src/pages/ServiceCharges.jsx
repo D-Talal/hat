@@ -29,13 +29,19 @@ function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 20, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
 }
 
-function PGForm({ onSave, onClose }) {
+function PGForm({ onSave, onClose, initial }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [buildings, setBuildings] = useState([]);
   const [contractObjects, setContractObjects] = useState([]);
-  const [members, setMembers] = useState([]);
-  const [form, setForm] = useState({ building_id: '', code: '', name: '', charge_category: 'general' });
+  const [members, setMembers] = useState(initial?.members?.map(m => ({ ...m, label: `Member #${m.contract_object_id}` })) || []);
+  const [form, setForm] = useState({
+    building_id: initial?.building_id || '',
+    code: initial?.code || '',
+    name: initial?.name || '',
+    charge_category: initial?.charge_category || 'general'
+  });
+  const [error, setError] = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   useEffect(() => { API.get('/commercial/buildings').then(r => setBuildings(r.data || [])).catch(() => {}); }, []);
@@ -49,7 +55,17 @@ function PGForm({ onSave, onClose }) {
   };
   const setMember = (id, k, v) => setMembers(m => m.map(x => x.contract_object_id === id ? { ...x, [k]: v } : x));
 
-  const save = async () => { await API.post('/commercial/participation-groups', { ...form, members }); onSave(); onClose(); };
+  const save = async () => {
+    setError('');
+    try {
+      if (initial?.id) {
+        await API.put(`/commercial/participation-groups/${initial.id}`, { ...form, members });
+      } else {
+        await API.post('/commercial/participation-groups', { ...form, members });
+      }
+      onSave(); onClose();
+    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
+  };
 
   return (
     <>
@@ -109,20 +125,39 @@ function PGForm({ onSave, onClose }) {
       {members.length === 0 && <div style={{ color: 'var(--slate)', fontSize: 13, marginBottom: 16 }}>No members added yet.</div>}
 
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+        {error && <div style={{ color: '#dc2626', fontSize: 13, marginRight: 'auto' }}>{error}</div>}
         <button onClick={onClose} style={btnSecondary}>Cancel</button>
-        <button onClick={save} style={btnPrimary}>Create Group</button>
+        <button onClick={save} style={btnPrimary}>{initial ? 'Save Changes' : 'Create Group'}</button>
       </div>
     </>
   );
 }
 
-function CostCollectorForm({ pgId, onSave, onClose }) {
+function CostCollectorForm({ pgId, onSave, onClose, initial }) {
   const { t } = useLanguage();
   const tc = t.commercial;
-  const [form, setForm] = useState({ participation_group_id: pgId, charge_category: 'general', description: '', total_costs: '', ancillary_revenues: '', fiscal_year: new Date().getFullYear() });
+  const [form, setForm] = useState({
+    participation_group_id: pgId,
+    charge_category: initial?.charge_category || 'general',
+    description: initial?.description || '',
+    total_costs: initial?.total_costs || '',
+    ancillary_revenues: initial?.ancillary_revenues || '',
+    fiscal_year: initial?.fiscal_year || new Date().getFullYear()
+  });
+  const [error, setError] = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const netPool = (Number(form.total_costs) || 0) - (Number(form.ancillary_revenues) || 0);
-  const save = async () => { await API.post('/commercial/cost-collectors', { ...form, net_pool: netPool }); onSave(); onClose(); };
+  const save = async () => {
+    setError('');
+    try {
+      if (initial?.id) {
+        await API.put(`/commercial/cost-collectors/${initial.id}`, { ...form, net_pool: netPool });
+      } else {
+        await API.post('/commercial/cost-collectors', { ...form, net_pool: netPool });
+      }
+      onSave(); onClose();
+    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
+  };
   return (
     <>
       <div style={{ background: '#fff8e1', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#e65100' }}>
@@ -144,9 +179,10 @@ function CostCollectorForm({ pgId, onSave, onClose }) {
         </div>
       )}
       <Field label={tc.description}><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
-      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, alignItems: 'center' }}>
+        {error && <div style={{ color: '#dc2626', fontSize: 13, marginRight: 'auto' }}>{error}</div>}
         <button onClick={onClose} style={btnSecondary}>Cancel</button>
-        <button onClick={save} style={btnPrimary}>Create</button>
+        <button onClick={save} style={btnPrimary}>{initial ? 'Save Changes' : 'Create'}</button>
       </div>
     </>
   );
@@ -158,6 +194,7 @@ export default function ServiceCharges() {
   const [groups, setGroups] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);
+  const [editTarget, setEditTarget] = useState(null);
   const [selected, setSelected] = useState(null);
   const [confirm, setConfirm] = useState(null);
 
@@ -212,6 +249,7 @@ export default function ServiceCharges() {
                   </div>
                   <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                     <span style={{ background: cc.bg, color: cc.text, borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700, textTransform: 'capitalize' }}>{pg.charge_category}</span>
+                    <button onClick={() => { setEditTarget({ type: 'pg', item: pg }); setModal('edit-pg'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>✏️</button>
                     <button onClick={() => setConfirm(pg)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }}>🗑</button>
                   </div>
                 </div>
@@ -285,6 +323,8 @@ export default function ServiceCharges() {
                   <span style={{ background: cc.status === 'settled' ? '#f5f5f5' : '#e8f5e9', color: cc.status === 'settled' ? '#757575' : '#2e7d32', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{cc.status}</span>
                   {cc.status === 'released' && (
                     <button onClick={() => handleSettle(cc.id)} style={{ padding: '3px 10px', borderRadius: 6, border: '1.5px solid #2e7d32', background: 'white', color: '#2e7d32', cursor: 'pointer', fontSize: 11, fontFamily: 'DM Sans', fontWeight: 700 }}>Settle</button>
+                    <button onClick={() => { setEditTarget({ type: 'cc', item: cc }); setModal('edit-cc'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✏️</button>
+                    <button onClick={async () => { if (!window.confirm('Delete this cost collector?')) return; await API.delete(`/commercial/cost-collectors/${cc.id}`); load(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#dc2626', padding: '2px 4px' }}>🗑</button>
                   )}
                 </div>
               </div>
@@ -301,6 +341,19 @@ export default function ServiceCharges() {
       )}
 
       {confirm && (
+        {/* Edit PG modal */}
+        {modal === 'edit-pg' && editTarget?.type === 'pg' && (
+          <Modal title={`Edit — ${editTarget.item.code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
+            <PGForm initial={editTarget.item} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
+          </Modal>
+        )}
+        {/* Edit CC modal */}
+        {modal === 'edit-cc' && editTarget?.type === 'cc' && (
+          <Modal title={`Edit Cost Collector`} onClose={() => { setModal(null); setEditTarget(null); }}>
+            <CostCollectorForm initial={editTarget.item} pgId={editTarget.item.settlement_unit?.participation_group_id} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
+          </Modal>
+        )}
+
         <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete group <strong>{confirm.code}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
