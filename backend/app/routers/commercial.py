@@ -998,3 +998,250 @@ def commercial_stats(db: Session = Depends(get_db), u=Depends(get_current_user))
         "pending_invoices": pending_invoices,
         "total_revenue_collected": float(total_revenue),
     }
+
+
+# ── DEPOSIT CONTRACTS ─────────────────────────────────────────────────────────
+
+class DepositCreate(BaseModel):
+    main_contract_id: int
+    business_partner_id: int
+    calc_method: Optional[str] = "fixed"
+    months_of_rent: Optional[float] = None
+    amount: Optional[float] = None
+    currency: Optional[str] = "USD"
+    start_date: Optional[date] = None
+    end_date: Optional[date] = None
+    notes: Optional[str] = None
+
+    @field_validator('calc_method')
+    @classmethod
+    def v_method(cls, v): return validate_enum(v, {"fixed","months_of_rent"}, "calc method")
+
+    @field_validator('amount')
+    @classmethod
+    def v_amount(cls, v): return validate_positive_float(v, "Amount")
+
+    @field_validator('currency')
+    @classmethod
+    def v_cur(cls, v): return validate_currency_code(v)
+
+    @field_validator('months_of_rent')
+    @classmethod
+    def v_months(cls, v):
+        if v is not None and (v <= 0 or v > 36):
+            raise ValueError("Months of rent must be between 0 and 36")
+        return v
+
+    @model_validator(mode='after')
+    def v_calc(self):
+        if self.calc_method == "fixed" and not self.amount:
+            raise ValueError("Amount is required when calc method is 'fixed'")
+        if self.calc_method == "months_of_rent" and not self.months_of_rent:
+            raise ValueError("Months of rent is required when calc method is 'months_of_rent'")
+        validate_date_range(self.start_date, self.end_date, "Start date", "End date")
+        return self
+
+class DepositOut(DepositCreate):
+    id: int
+    deposit_number: Optional[str] = None
+    status: str
+    refunded_at: Optional[datetime] = None
+    created_at: datetime
+    class Config: from_attributes = True
+
+@router.get("/deposit-contracts")
+def list_deposits(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    cids = db.query(Contract.id).filter(Contract.business_entity_id.in_(be_ids)) if be_ids else []
+    items = db.query(DepositContract).filter(DepositContract.main_contract_id.in_(cids))        .options(joinedload(DepositContract.main_contract), joinedload(DepositContract.business_partner))        .order_by(DepositContract.created_at.desc()).all()
+    return items
+
+@router.post("/deposit-contracts", response_model=DepositOut)
+def create_deposit(data: DepositCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    contract = db.query(Contract).filter(Contract.id == data.main_contract_id, Contract.business_entity_id.in_(be_ids)).first()
+    if not contract: raise HTTPException(404, "Contract not found")
+    count = db.query(DepositContract).count()
+    obj = DepositContract(**data.dict(), deposit_number=f"DEP-{count+1:05d}")
+    db.add(obj); db.commit(); db.refresh(obj)
+    audit(db, u, "CREATE", "re_deposit_contracts", obj.id)
+    return obj
+
+@router.put("/deposit-contracts/{id}", response_model=DepositOut)
+def update_deposit(id: int, data: DepositCreate, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    obj = db.query(DepositContract).join(Contract).filter(DepositContract.id == id, Contract.business_entity_id.in_(be_ids)).first()
+    if not obj: raise HTTPException(404, "Not found")
+    for k, v in data.dict().items(): setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_deposit_contracts", id)
+    return obj
+
+@router.patch("/deposit-contracts/{id}/refund")
+def refund_deposit(id: int, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    obj = db.query(DepositContract).join(Contract).filter(DepositContract.id == id, Contract.business_entity_id.in_(be_ids)).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.status == "refunded": raise HTTPException(400, "Already refunded")
+    obj.status = "refunded"
+    from datetime import timezone
+    obj.refunded_at = datetime.now(timezone.utc)
+    db.commit()
+    audit(db, u, "UPDATE", "re_deposit_contracts", id)
+    return {"ok": True}
+
+@router.delete("/deposit-contracts/{id}")
+def delete_deposit(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    obj = db.query(DepositContract).join(Contract).filter(DepositContract.id == id, Contract.business_entity_id.in_(be_ids)).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.status == "active": raise HTTPException(400, "Cannot delete an active deposit. Refund it first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_deposit_contracts", id)
+    return {"ok": True}
+
+
+# ── VACANCY POSTINGS ──────────────────────────────────────────────────────────
+
+class VacancyCreate(BaseModel):
+    rental_object_id: int
+    period_from: date
+    period_to: date
+    market_rent: Optional[float] = None
+    cost_center: Optional[str] = None
+
+    @field_validator('market_rent')
+    @classmethod
+    def v_rent(cls, v): return validate_positive_float(v, "Market rent")
+
+    @model_validator(mode='after')
+    def v_dates(self):
+        validate_date_range(self.period_from, self.period_to, "Period from", "Period to")
+        return self
+
+class VacancyOut(VacancyCreate):
+    id: int
+    posted: bool
+    reversed: bool
+    created_at: datetime
+    class Config: from_attributes = True
+
+@router.get("/vacancy-postings")
+def list_vacancies(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    ro_ids = db.query(RentalObject.id).join(Building).filter(Building.business_entity_id.in_(be_ids)) if be_ids else []
+    return db.query(VacancyPosting)        .filter(VacancyPosting.rental_object_id.in_(ro_ids))        .options(joinedload(VacancyPosting.rental_object))        .order_by(VacancyPosting.period_from.desc()).all()
+
+@router.post("/vacancy-postings", response_model=VacancyOut)
+def create_vacancy(data: VacancyCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    obj = VacancyPosting(**data.dict())
+    db.add(obj); db.commit(); db.refresh(obj)
+    audit(db, u, "CREATE", "re_vacancy_postings", obj.id)
+    return obj
+
+@router.put("/vacancy-postings/{id}", response_model=VacancyOut)
+def update_vacancy(id: int, data: VacancyCreate, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    obj = db.query(VacancyPosting).filter(VacancyPosting.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.posted: raise HTTPException(400, "Cannot edit a posted vacancy. Reverse it first.")
+    for k, v in data.dict().items(): setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_vacancy_postings", id)
+    return obj
+
+@router.patch("/vacancy-postings/{id}/reverse")
+def reverse_vacancy(id: int, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    obj = db.query(VacancyPosting).filter(VacancyPosting.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    obj.reversed = True
+    db.commit()
+    audit(db, u, "UPDATE", "re_vacancy_postings", id)
+    return {"ok": True}
+
+@router.delete("/vacancy-postings/{id}")
+def delete_vacancy(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
+    obj = db.query(VacancyPosting).filter(VacancyPosting.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.posted and not obj.reversed:
+        raise HTTPException(400, "Cannot delete a posted vacancy. Reverse it first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_vacancy_postings", id)
+    return {"ok": True}
+
+
+# ── SALES DECLARATIONS ────────────────────────────────────────────────────────
+
+class SalesDeclarationCreate(BaseModel):
+    contract_id: int
+    sales_rule_id: int
+    rental_object_id: Optional[int] = None
+    period_from: date
+    period_to: date
+    declared_amount: float
+    sales_category: Optional[str] = None
+
+    @field_validator('declared_amount')
+    @classmethod
+    def v_amount(cls, v):
+        if v < 0: raise ValueError("Declared amount cannot be negative")
+        return v
+
+    @model_validator(mode='after')
+    def v_dates(self):
+        validate_date_range(self.period_from, self.period_to, "Period from", "Period to")
+        return self
+
+class SalesDeclarationOut(SalesDeclarationCreate):
+    id: int
+    calculated_rent: Optional[float] = None
+    posted: bool
+    posted_at: Optional[datetime] = None
+    submitted_at: Optional[datetime] = None
+    class Config: from_attributes = True
+
+@router.get("/sales-declarations")
+def list_sales_declarations(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    cids = db.query(Contract.id).filter(Contract.business_entity_id.in_(be_ids)) if be_ids else []
+    return db.query(SalesDeclaration)        .filter(SalesDeclaration.contract_id.in_(cids))        .options(joinedload(SalesDeclaration.contract), joinedload(SalesDeclaration.sales_rule))        .order_by(SalesDeclaration.period_from.desc()).all()
+
+@router.post("/sales-declarations", response_model=SalesDeclarationOut)
+def create_sales_declaration(data: SalesDeclarationCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    contract = db.query(Contract).filter(Contract.id == data.contract_id, Contract.business_entity_id.in_(be_ids)).first()
+    if not contract: raise HTTPException(404, "Contract not found")
+    # Calculate rent from sales rule
+    rule = db.query(SalesRule).filter(SalesRule.id == data.sales_rule_id).first()
+    if not rule: raise HTTPException(404, "Sales rule not found")
+    calculated = float(data.declared_amount) * (rule.rate_pct or 0) / 100
+    if rule.min_rent: calculated = max(calculated, float(rule.min_rent))
+    if rule.max_rent: calculated = min(calculated, float(rule.max_rent))
+    obj = SalesDeclaration(**data.dict(), calculated_rent=calculated)
+    db.add(obj); db.commit(); db.refresh(obj)
+    audit(db, u, "CREATE", "re_sales_declarations", obj.id)
+    return obj
+
+@router.put("/sales-declarations/{id}", response_model=SalesDeclarationOut)
+def update_sales_declaration(id: int, data: SalesDeclarationCreate, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    obj = db.query(SalesDeclaration).filter(SalesDeclaration.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.posted: raise HTTPException(400, "Cannot edit a posted declaration.")
+    for k, v in data.dict().items(): setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_sales_declarations", id)
+    return obj
+
+@router.delete("/sales-declarations/{id}")
+def delete_sales_declaration(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
+    obj = db.query(SalesDeclaration).filter(SalesDeclaration.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.posted: raise HTTPException(400, "Cannot delete a posted declaration.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_sales_declarations", id)
+    return {"ok": True}
+
+@router.get("/sales-rules")
+def list_sales_rules(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
+    cids = db.query(Contract.id).filter(Contract.business_entity_id.in_(be_ids)) if be_ids else []
+    return db.query(SalesRule).join(Condition).filter(Condition.contract_id.in_(cids)).all()
