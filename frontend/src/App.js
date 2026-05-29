@@ -8,6 +8,7 @@ import Dashboard from './pages/Dashboard';
 import RevenueMap from './pages/RevenueMap';
 import { HotelList, HotelRooms, HotelGuests, HotelBookings } from './pages/HotelPages';
 import HotelDashboard from './pages/HotelDashboard';
+import HotelReception from './pages/HotelReception';
 import UsersPage from './pages/UsersPage';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
@@ -97,6 +98,7 @@ function AppRoutes() {
       <Route path="/commercial/sales-declarations" element={<ProtectedRoute><AppLayout><SalesDeclarations /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/csv-import" element={<ProtectedRoute roles={['admin','manager']}><AppLayout><CsvImport /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/posting-engine" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><PostingEngine /></AppLayout></ProtectedRoute>} />
+      <Route path="/hotel/reception" element={<ProtectedRoute><AppLayout><HotelReception /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/dashboard" element={<ProtectedRoute><AppLayout><HotelDashboard /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/hotels" element={<ProtectedRoute><AppLayout><HotelList /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/rooms" element={<ProtectedRoute><AppLayout><HotelRooms /></AppLayout></ProtectedRoute>} />
