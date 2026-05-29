@@ -106,6 +106,7 @@ export const commercial = {
   participationGroups: {
     list: () => API.get('/commercial/participation-groups'),
     create: (d) => API.post('/commercial/participation-groups', d),
+    update: (id, d) => API.put(`/commercial/participation-groups/${id}`, d),
     delete: (id) => API.delete(`/commercial/participation-groups/${id}`),
   },
   costCollectors: {
@@ -115,6 +116,8 @@ export const commercial = {
   invoices: {
     list: (contractId) => API.get('/commercial/invoices' + (contractId ? `?contract_id=${contractId}` : '')),
     create: (d) => API.post('/commercial/invoices', d),
+    update: (id, d) => API.put(`/commercial/invoices/${id}`, d),
+    delete: (id) => API.delete(`/commercial/invoices/${id}`),
     pay: (id) => API.patch(`/commercial/invoices/${id}/pay`),
     downloadPdf: (id) => API.get(`/pdf/invoice/${id}`, { responseType: 'blob' }),
     downloadStatement: (contractId) => API.get(`/pdf/lease-statement/${contractId}`, { responseType: 'blob' }),
