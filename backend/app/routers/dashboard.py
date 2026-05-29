@@ -576,6 +576,7 @@ def get_hotel_dashboard(
     revenue_by_month = [{"month": f"{int(r.y)}-{int(r.m):02d}", "amount": round(float(r.amt or 0), 2)} for r in monthly]
 
     # ── Revenue by hotel ──────────────────────────────────────────────────────
+    from sqlalchemy import or_, and_
     rev_by_hotel = (
         db.query(
             Hotel.id, Hotel.name,
@@ -583,12 +584,15 @@ def get_hotel_dashboard(
             sqf.count(Booking.id).label("bookings"),
         )
         .outerjoin(Room, Room.hotel_id == Hotel.id)
-        .outerjoin(Booking, Booking.room_id == Room.id)
-        .filter(
-            Hotel.id.in_(hotel_ids),
-            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]) | (Booking.id == None),
-            Booking.check_in >= first_of_month | (Booking.id == None),
+        .outerjoin(
+            Booking,
+            and_(
+                Booking.room_id == Room.id,
+                Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]),
+                Booking.check_in >= first_of_month,
+            )
         )
+        .filter(Hotel.id.in_(hotel_ids))
         .group_by(Hotel.id, Hotel.name)
         .all()
     )
