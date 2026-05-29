@@ -256,6 +256,122 @@ def update_booking(id: int, data: BookingCreate, db: Session = Depends(get_db), 
 def delete_booking(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
     obj = db.query(Booking).join(Room).join(Hotel).filter(Booking.id == id, Hotel.org_id == org.id).first()
     if not obj: raise HTTPException(404, "Booking not found")
+    if obj.status == BookingStatus.checked_in:
+        raise HTTPException(400, "Cannot delete a booking in progress. Check out first.")
     obj.room.status = RoomStatus.available
     db.delete(obj); db.commit()
     return {"ok": True}
+
+
+# ── CHECK-IN ──────────────────────────────────────────────────────────────────
+
+@router.post("/bookings/{id}/checkin")
+def checkin_booking(id: int, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    booking = db.query(Booking).join(Room).join(Hotel).filter(Booking.id == id, Hotel.org_id == org.id).first()
+    if not booking: raise HTTPException(404, "Booking not found")
+    if booking.status != BookingStatus.confirmed:
+        raise HTTPException(400, f"Cannot check in: booking status is '{booking.status.value}' (must be 'confirmed')")
+    booking.status = BookingStatus.checked_in
+    booking.room.status = RoomStatus.occupied
+    db.commit()
+    audit(db, u, "UPDATE", "hotel_bookings", id)
+    return {"ok": True, "message": f"Guest checked in to room {booking.room.room_number}"}
+
+
+# ── CHECK-OUT ─────────────────────────────────────────────────────────────────
+
+class CheckoutRequest(BaseModel):
+    paid_amount: Optional[float] = None
+
+@router.post("/bookings/{id}/checkout")
+def checkout_booking(id: int, data: CheckoutRequest = CheckoutRequest(), db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    booking = db.query(Booking).join(Room).join(Hotel).filter(Booking.id == id, Hotel.org_id == org.id).first()
+    if not booking: raise HTTPException(404, "Booking not found")
+    if booking.status not in [BookingStatus.confirmed, BookingStatus.checked_in]:
+        raise HTTPException(400, f"Cannot check out: booking status is '{booking.status.value}'")
+    booking.status = BookingStatus.checked_out
+    booking.room.status = RoomStatus.available
+    if data.paid_amount is not None:
+        booking.paid_amount = data.paid_amount
+    db.commit()
+    audit(db, u, "UPDATE", "hotel_bookings", id)
+    return {
+        "ok": True,
+        "message": f"Guest checked out from room {booking.room.room_number}",
+        "booking_id": booking.id,
+        "total_amount": float(booking.total_amount or 0),
+        "paid_amount": float(booking.paid_amount or 0),
+        "balance": float((booking.total_amount or 0) - (booking.paid_amount or 0)),
+    }
+
+
+# ── CANCEL ────────────────────────────────────────────────────────────────────
+
+@router.post("/bookings/{id}/cancel")
+def cancel_booking(id: int, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    booking = db.query(Booking).join(Room).join(Hotel).filter(Booking.id == id, Hotel.org_id == org.id).first()
+    if not booking: raise HTTPException(404, "Booking not found")
+    if booking.status == BookingStatus.checked_in:
+        raise HTTPException(400, "Cannot cancel a booking in progress. Check out first.")
+    if booking.status == BookingStatus.checked_out:
+        raise HTTPException(400, "Cannot cancel a completed booking.")
+    booking.status = BookingStatus.cancelled
+    booking.room.status = RoomStatus.available
+    db.commit()
+    audit(db, u, "UPDATE", "hotel_bookings", id)
+    return {"ok": True}
+
+
+# ── TODAY'S RECEPTION VIEW ────────────────────────────────────────────────────
+
+@router.get("/reception")
+def get_reception(hotel_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    """Returns today's arrivals, in-house guests, and departures."""
+    from datetime import date as date_type
+    today = date_type.today()
+
+    hotel_q = db.query(Hotel).filter(Hotel.org_id == org.id)
+    if hotel_id:
+        hotel_q = hotel_q.filter(Hotel.id == hotel_id)
+    hotel_ids = [h.id for h in hotel_q.all()]
+    if not hotel_ids:
+        return {"arrivals": [], "in_house": [], "departures": [], "overdue": []}
+
+    def booking_list(q):
+        items = []
+        for b in q:
+            g = b.guest
+            items.append({
+                "id":           b.id,
+                "room_number":  b.room.room_number if b.room else "—",
+                "room_type":    b.room.room_type if b.room else "—",
+                "hotel_name":   b.room.hotel.name if b.room and b.room.hotel else "—",
+                "guest_name":   f"{decrypt_field(g.first_name)} {decrypt_field(g.last_name)}" if g else "—",
+                "guest_id":     g.id if g else None,
+                "check_in":     str(b.check_in),
+                "check_out":    str(b.check_out),
+                "adults":       b.adults,
+                "children":     b.children,
+                "total_amount": float(b.total_amount or 0),
+                "paid_amount":  float(b.paid_amount or 0),
+                "balance":      float((b.total_amount or 0) - (b.paid_amount or 0)),
+                "status":       b.status.value,
+                "special_requests": b.special_requests,
+                "nights":       (b.check_out - b.check_in).days if b.check_out and b.check_in else 0,
+            })
+        return items
+
+    base = db.query(Booking).join(Room).join(Hotel).filter(Hotel.id.in_(hotel_ids))
+
+    arrivals   = base.filter(Booking.check_in == today, Booking.status == BookingStatus.confirmed).all()
+    in_house   = base.filter(Booking.status == BookingStatus.checked_in).all()
+    departures = base.filter(Booking.check_out == today, Booking.status == BookingStatus.checked_in).all()
+    overdue    = base.filter(Booking.check_out < today, Booking.status == BookingStatus.checked_in).all()
+
+    return {
+        "arrivals":   booking_list(arrivals),
+        "in_house":   booking_list(in_house),
+        "departures": booking_list(departures),
+        "overdue":    booking_list(overdue),
+        "date":       str(today),
+    }
