@@ -544,3 +544,230 @@ def download_lease_statement(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename=lease_statement_{contract.contract_number or contract_id}.pdf"},
     )
+
+
+# ── ENDPOINT 3: Hotel Stay Invoice ────────────────────────────────────────────
+
+@router.get("/hotel-stay/{booking_id}")
+def download_stay_invoice(
+    booking_id: int,
+    db: Session = Depends(get_db),
+    u=Depends(get_current_user),
+    org=Depends(get_current_org),
+):
+    from app.models.hotel import Booking, Room, Hotel, Guest, BookingStatus
+    try:
+        from app.core.encryption import decrypt_field
+    except ImportError:
+        def decrypt_field(v): return v
+
+    # Load booking with all relations
+    booking = (
+        db.query(Booking)
+        .options(
+            joinedload(Booking.room).joinedload(Room.hotel),
+            joinedload(Booking.guest),
+        )
+        .filter(Booking.id == booking_id)
+        .first()
+    )
+    if not booking:
+        raise HTTPException(404, "Booking not found")
+
+    room  = booking.room
+    hotel = room.hotel if room else None
+    if not hotel or hotel.org_id != org.id:
+        raise HTTPException(403, "Access denied")
+
+    guest = booking.guest
+    st    = _styles()
+
+    # Decrypt guest PII
+    guest_name  = f"{decrypt_field(guest.first_name)} {decrypt_field(guest.last_name)}" if guest else "Guest"
+    guest_email = decrypt_field(guest.email) if guest and guest.email else None
+    guest_phone = decrypt_field(guest.phone) if guest and guest.phone else None
+
+    # Compute stay details
+    nights       = (booking.check_out - booking.check_in).days if booking.check_out and booking.check_in else 1
+    base_rate    = float(room.base_rate or 0) if room else 0.0
+    room_charges = base_rate * nights
+    total        = float(booking.total_amount or room_charges)
+    paid         = float(booking.paid_amount or 0)
+    balance      = total - paid
+    currency     = "USD"
+
+    # Status
+    status_label = (booking.status.value if booking.status else "confirmed").replace("_", " ").upper()
+    status_color = GREEN if booking.status and booking.status.value == "checked_out" else BLUE
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=18*mm, rightMargin=18*mm,
+        topMargin=18*mm, bottomMargin=18*mm,
+    )
+    story = []
+
+    invoice_num = f"STAY-{booking.id:05d}"
+    _header_block(story, st, "HOTEL STAY INVOICE", invoice_num, booking.check_out or date.today(), org.name)
+
+    # Hotel & Guest parties
+    hotel_info = [
+        org.name,
+        hotel.name,
+        hotel.address or "",
+        f"{hotel.city or ""} {hotel.country or ""}".strip(),
+    ]
+    hotel_info = [l for l in hotel_info if l]
+
+    guest_info = [guest_name]
+    if guest_email: guest_info.append(guest_email)
+    if guest_phone: guest_info.append(guest_phone)
+    if guest and guest.nationality: guest_info.append(guest.nationality)
+
+    _parties_block(story, st, hotel_info, guest_info)
+
+    # Stay summary card
+    stay_data = [
+        [Paragraph("ROOM", st["label"]),     Paragraph("TYPE", st["label"]),
+         Paragraph("CHECK-IN", st["label"]), Paragraph("CHECK-OUT", st["label"]),
+         Paragraph("NIGHTS", st["label"])],
+        [
+            Paragraph(room.room_number if room else "—", st["body"]),
+            Paragraph((room.room_type or "—").replace("_", " ").title() if room else "—", st["body"]),
+            Paragraph(_fmt_date(booking.check_in),  st["body"]),
+            Paragraph(_fmt_date(booking.check_out), st["body"]),
+            Paragraph(str(nights), st["bold"]),
+        ],
+    ]
+    stay_tbl = Table(stay_data, colWidths=[30*mm, 35*mm, 32*mm, 32*mm, 20*mm])
+    stay_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0), (-1,0), BLUE_LT),
+        ("FONTSIZE",      (0,0), (-1,-1), 9),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("TOPPADDING",    (0,0), (-1,-1), 8),
+        ("LEFTPADDING",   (0,0), (-1,-1), 8),
+        ("BOX",           (0,0), (-1,-1), 0.5, colors.HexColor("#d0d5f5")),
+        ("LINEBELOW",     (0,0), (-1,0), 0.5, colors.HexColor("#d0d5f5")),
+    ]))
+    story.append(stay_tbl)
+    story.append(Spacer(1, 14))
+
+    # Charges breakdown
+    story.append(Paragraph("CHARGES", st["h2"]))
+    charges = [
+        [Paragraph("DESCRIPTION", st["label"]),
+         Paragraph("UNIT PRICE", st["label"]),
+         Paragraph("QTY", st["label"]),
+         Paragraph("AMOUNT", st["label"])],
+        [
+            Paragraph(f"Room {room.room_number} — {(room.room_type or '').title()}" if room else "Room charge", st["body"]),
+            Paragraph(_fmt_amount(base_rate, currency), st["body_r"]),
+            Paragraph(f"{nights} night{'s' if nights != 1 else ''}", st["body"]),
+            Paragraph(_fmt_amount(room_charges, currency), st["body_r"]),
+        ],
+    ]
+
+    # Extra charges if total > room_charges
+    extra = total - room_charges
+    if abs(extra) > 0.01:
+        charges.append([
+            Paragraph("Additional charges", st["body"]),
+            Paragraph("", st["body"]),
+            Paragraph("", st["body"]),
+            Paragraph(_fmt_amount(extra, currency), st["body_r"]),
+        ])
+
+    # Total row
+    charges.append([
+        Paragraph("", st["body"]),
+        Paragraph("", st["body"]),
+        Paragraph("<b>TOTAL</b>", st["bold"]),
+        Paragraph(_fmt_amount(total, currency),
+                  ParagraphStyle("tot", fontName="Helvetica-Bold", fontSize=13, textColor=BLUE, alignment=TA_RIGHT)),
+    ])
+
+    col_w = [90*mm, 28*mm, 26*mm, 26*mm]
+    charges_tbl = Table(charges, colWidths=col_w)
+    n = len(charges)
+    charges_tbl.setStyle(TableStyle([
+        ("BACKGROUND",    (0,0),  (-1,0),   BLUE_LT),
+        ("BACKGROUND",    (0,n-1),(-1,n-1), colors.HexColor("#f8f9fc")),
+        ("LINEABOVE",     (0,n-1),(-1,n-1), 1.5, BLUE),
+        ("FONTSIZE",      (0,0),  (-1,-1),  9),
+        ("TOPPADDING",    (0,0),  (-1,-1),  7),
+        ("BOTTOMPADDING", (0,0),  (-1,-1),  7),
+        ("LEFTPADDING",   (0,0),  (-1,-1),  8),
+        ("LINEBELOW",     (0,0),  (-1,-2),  0.3, colors.HexColor("#e4e6ef")),
+        ("BOX",           (0,0),  (-1,-1),  0.5, colors.HexColor("#d0d5f5")),
+    ]))
+    story.append(charges_tbl)
+    story.append(Spacer(1, 14))
+
+    # Payment summary
+    pay_data = [
+        [
+            Table([
+                [Paragraph("TOTAL CHARGED", st["label"])],
+                [Paragraph(_fmt_amount(total, currency),
+                           ParagraphStyle("tp", fontName="Helvetica-Bold", fontSize=14, textColor=BLUE))],
+            ], colWidths=[55*mm]),
+            Table([
+                [Paragraph("AMOUNT PAID", st["label"])],
+                [Paragraph(_fmt_amount(paid, currency),
+                           ParagraphStyle("pp", fontName="Helvetica-Bold", fontSize=14, textColor=GREEN))],
+            ], colWidths=[55*mm]),
+            Table([
+                [Paragraph("BALANCE DUE", st["label"])],
+                [Paragraph(_fmt_amount(balance, currency),
+                           ParagraphStyle("bp", fontName="Helvetica-Bold", fontSize=14,
+                                          textColor=RED if balance > 0.01 else GREEN))],
+            ], colWidths=[55*mm]),
+        ]
+    ]
+    pay_tbl = Table(pay_data, colWidths=[58*mm, 58*mm, 58*mm])
+    pay_tbl.setStyle(TableStyle([
+        ("BOX",           (0,0), (0,0), 0.5, colors.HexColor("#d0d5f5")),
+        ("BOX",           (1,0), (1,0), 0.5, colors.HexColor("#6ee7b7")),
+        ("BOX",           (2,0), (2,0), 0.5, colors.HexColor("#fca5a5") if balance > 0.01 else colors.HexColor("#6ee7b7")),
+        ("BACKGROUND",    (0,0), (0,0), BLUE_LT),
+        ("BACKGROUND",    (1,0), (1,0), colors.HexColor("#ecfdf5")),
+        ("BACKGROUND",    (2,0), (2,0), colors.HexColor("#fef2f2") if balance > 0.01 else colors.HexColor("#ecfdf5")),
+        ("TOPPADDING",    (0,0), (-1,-1), 10),
+        ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+        ("LEFTPADDING",   (0,0), (-1,-1), 12),
+    ]))
+    story.append(pay_tbl)
+
+    # Special requests
+    if booking.special_requests:
+        story.append(Spacer(1, 12))
+        story.append(Paragraph("SPECIAL REQUESTS", st["label"]))
+        story.append(Paragraph(booking.special_requests, st["body"]))
+
+    # Thank you note
+    if balance <= 0.01:
+        story.append(Spacer(1, 16))
+        note = Table([[Paragraph(
+            f"Thank you for staying at <b>{hotel.name}</b>. Your stay has been fully settled. "
+            f"We hope to welcome you back soon!",
+            ParagraphStyle("tn", fontSize=9, textColor=DARK, leading=14)
+        )]], colWidths=[174*mm])
+        note.setStyle(TableStyle([
+            ("BACKGROUND",    (0,0), (-1,-1), colors.HexColor("#ecfdf5")),
+            ("BOX",           (0,0), (-1,-1), 0.5, colors.HexColor("#6ee7b7")),
+            ("TOPPADDING",    (0,0), (-1,-1), 10),
+            ("BOTTOMPADDING", (0,0), (-1,-1), 10),
+            ("LEFTPADDING",   (0,0), (-1,-1), 12),
+        ]))
+        story.append(note)
+
+    _footer(story, st, org.name)
+    doc.build(story)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=stay_{invoice_num}.pdf"},
+    )
