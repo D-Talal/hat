@@ -616,7 +616,7 @@ def download_stay_invoice(
         org.name,
         hotel.name,
         hotel.address or "",
-        f"{hotel.city or ""} {hotel.country or ""}".strip(),
+        ((hotel.city or "") + " " + (hotel.country or "")).strip(),
     ]
     hotel_info = [l for l in hotel_info if l]
 
