@@ -829,11 +829,32 @@ def create_participation_group(data: ParticipationGroupCreate, db: Session = Dep
     db.commit(); db.refresh(obj)
     audit(db, u, "CREATE", "re_participation_groups", obj.id); return obj
 
+@router.put("/participation-groups/{id}", response_model=ParticipationGroupOut)
+def update_participation_group(id: int, data: ParticipationGroupCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
+    obj = db.query(ParticipationGroup).filter(ParticipationGroup.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    for k, v in data.dict(exclude={"members"}).items():
+        setattr(obj, k, v)
+    # Sync members: delete existing then re-add
+    db.query(ParticipationGroupMember).filter(ParticipationGroupMember.participation_group_id == id).delete()
+    for m in (data.members or []):
+        db.add(ParticipationGroupMember(participation_group_id=id, **m.dict()))
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_participation_groups", id)
+    return obj
+
 @router.delete("/participation-groups/{id}")
 def delete_participation_group(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
     obj = db.query(ParticipationGroup).filter(ParticipationGroup.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
-    db.delete(obj); db.commit(); return {"ok": True}
+    cc_count = db.query(CostCollector).join(SettlementUnit).filter(
+        SettlementUnit.participation_group_id == id
+    ).count()
+    if cc_count > 0:
+        raise HTTPException(400, f"Cannot delete: this group has {cc_count} cost collector(s). Remove them first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_participation_groups", id)
+    return {"ok": True}
 
 
 # ── COST COLLECTORS ───────────────────────────────────────────────────────────
@@ -846,6 +867,28 @@ def create_cost_collector(data: CostCollectorCreate, db: Session = Depends(get_d
         if su: payload["settlement_unit_id"] = su.id
     obj = CostCollector(**payload)
     db.add(obj); db.commit(); db.refresh(obj); return obj
+
+@router.put("/cost-collectors/{id}", response_model=CostCollectorOut)
+def update_cost_collector(id: int, data: CostCollectorCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
+    obj = db.query(CostCollector).filter(CostCollector.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.status == "settled":
+        raise HTTPException(400, "Cannot edit a settled cost collector.")
+    for k, v in data.dict(exclude={"participation_group_id"}).items():
+        setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_cost_collectors", id)
+    return obj
+
+@router.delete("/cost-collectors/{id}")
+def delete_cost_collector(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
+    obj = db.query(CostCollector).filter(CostCollector.id == id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    if obj.status == "settled":
+        raise HTTPException(400, "Cannot delete a settled cost collector.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_cost_collectors", id)
+    return {"ok": True}
 
 @router.patch("/cost-collectors/{id}/settle")
 def settle_cost_collector(id: int, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
