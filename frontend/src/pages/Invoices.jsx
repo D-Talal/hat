@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
+import { CONDITION_TYPES as COND_TYPES_SHARED, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
@@ -94,7 +95,7 @@ function InvoiceForm({ onSave, onClose, initial, contracts }) {
         </Field>
         <Field label={tc.currency}>
           <select style={inputStyle} value={form.currency} onChange={set('currency')}>
-            {['USD','EUR','GBP','CAD','MAD','CHF'].map(c => <option key={c}>{c}</option>)}
+            {COMMON_CURRENCIES.slice(0,10).map(c => <option key={c}>{c}</option>)}
           </select>
         </Field>
       </div>

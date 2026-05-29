@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
+import { DAY_COUNT_METHODS, CONTRACT_TYPES, PAYMENT_TIMINGS } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
@@ -138,7 +139,9 @@ function ContractForm({ onSave, onClose, initial }) {
             <Field label={tc.dayCountMethod}>
               <select style={inputStyle} value={form.day_count_method} onChange={set('day_count_method')}>
                 <option value="act_365">Actual / 365</option>
-                <option value="30E_360">30E / 360</option>
+                <option value="act_360">Actual / 360</option>
+                <option value="act_act">Actual / Actual</option>
+                <option value="30_360">30 / 360</option>
               </select>
             </Field>
           </div>

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
+import { CONDITION_TYPES, FREQUENCIES, PAYMENT_TIMINGS, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
@@ -8,17 +9,7 @@ const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', ba
 const btnSecondary = { padding: '10px 20px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans' };
 const btnDanger    = { padding: '8px 16px', borderRadius: 8, border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 13 };
 
-const CONDITION_TYPES = {
-  base_rent:       { label: 'Base Rent',        color: '#1a237e', bg: '#e8eaf6' },
-  service_charge:  { label: 'Service Charge',   color: '#1b5e20', bg: '#e8f5e9' },
-  advance_payment: { label: 'Advance Payment',  color: '#e65100', bg: '#fff3e0' },
-  flat_rate:       { label: 'Flat Rate',        color: '#4a148c', bg: '#f3e5f5' },
-  sales_based:     { label: 'Sales-Based Rent', color: '#01579b', bg: '#e1f5fe' },
-  markup_fee:      { label: 'Markup Fee',       color: '#37474f', bg: '#eceff1' },
-  rent_free:       { label: 'Rent-Free',        color: '#c62828', bg: '#fce4ec' },
-  abatement:       { label: 'Abatement',        color: '#6a1b9a', bg: '#f3e5f5' },
-};
-const FREQUENCIES = { monthly: 'Monthly', quarterly: 'Quarterly', semi_annual: 'Semi-Annual', annual: 'Annual' };
+// Using shared constants from ../data/constants
 
 function Field({ label, children }) {
   return (
@@ -96,12 +87,12 @@ function ConditionForm({ onSave, onClose, initial }) {
             <Field label={tc.amount + " *"}><input style={inputStyle} type="number" value={form.amount} onChange={set('amount')} /></Field>
             <Field label="Currency">
               <select style={inputStyle} value={form.currency} onChange={set('currency')}>
-                {['USD','EUR','GBP','AED','CHF','CAD'].map(c => <option key={c}>{c}</option>)}
+                {COMMON_CURRENCIES.slice(0,8).map(c => <option key={c}>{c}</option>)}
               </select>
             </Field>
             <Field label={tc.frequency}>
               <select style={inputStyle} value={form.frequency} onChange={set('frequency')}>
-                {Object.entries(FREQUENCIES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
+                {Object.entries(FREQUENCIES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
               </select>
             </Field>
           </div>

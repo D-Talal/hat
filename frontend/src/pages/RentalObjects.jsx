@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
+import { USAGE_TYPES, SPACE_STATUSES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
@@ -73,7 +74,7 @@ function RentalObjectForm({ onSave, onClose, initial }) {
         <Field label="Code *"><input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. RO-A101" disabled={isEdit} /></Field>
         <Field label={tc.usageType}>
           <select style={inputStyle} value={form.usage_type} onChange={set('usage_type')}>
-            {['retail','office','storage','restaurant','kiosk','common_area'].map(u => <option key={u}>{u}</option>)}
+            {Object.entries(USAGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
         </Field>
         <Field label={tc.status}>

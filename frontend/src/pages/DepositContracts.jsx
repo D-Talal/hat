@@ -3,6 +3,7 @@ import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { CURRENCIES } from '../data/currencies';
+import { COMMON_CURRENCIES } from '../data/constants';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -90,8 +91,8 @@ function DepositForm({ onSave, onClose, initial, contracts, partners }) {
         )}
         <Field label="Currency">
           <select style={inputStyle} value={form.currency} onChange={set('currency')}>
-            {['USD','EUR','GBP','CAD','MAD','AED','SAR','QAR'].map(c => <option key={c}>{c}</option>)}
-            {CURRENCIES.filter(c => !['USD','EUR','GBP','CAD','MAD','AED','SAR','QAR'].includes(c.code)).map(c => (
+            {COMMON_CURRENCIES.map(c => <option key={c}>{c}</option>)}
+            {CURRENCIES.filter(c => !COMMON_CURRENCIES.includes(c.code)).map(c => (
               <option key={c.code} value={c.code}>{c.code} — {c.name}</option>
             ))}
           </select>

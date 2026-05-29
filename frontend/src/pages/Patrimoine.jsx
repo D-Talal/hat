@@ -4,13 +4,9 @@ import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import GeoSelect from '../components/shared/GeoSelect';
 import CurrencySelect from '../components/shared/CurrencySelect';
+import { SPACE_STATUSES, USAGE_TYPES } from '../data/constants';
 
-const SPACE_STATUS_COLORS = {
-  available:   { bg: '#e8f5e9', text: '#2e7d32' },
-  occupied:    { bg: '#e3f2fd', text: '#1565c0' },
-  maintenance: { bg: '#fff8e1', text: '#f57f17' },
-  vacant:      { bg: '#fce4ec', text: '#c62828' },
-};
+const SPACE_STATUS_COLORS = Object.fromEntries(Object.entries(SPACE_STATUSES).map(([k,v]) => [k, {bg: v.bg, text: v.text}]));
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box', outline: 'none' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
