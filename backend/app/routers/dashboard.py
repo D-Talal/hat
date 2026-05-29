@@ -8,7 +8,7 @@ from fastapi import APIRouter, Depends, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import func, extract
 from datetime import date, timedelta
-from typing import Literal
+from typing import Literal, Optional
 from app.database import get_db
 from app.core.deps import get_current_user, get_current_org
 from app.models.hotel import Hotel, Room, Booking, BookingStatus
@@ -415,3 +415,236 @@ def get_assets(
                 result["assets_by_country"].append({"country": country, "properties": 0, "hotels": r.count})
 
     return result
+
+
+# ─────────────────────────────────────────────────────────────
+# 5. HOTEL DASHBOARD
+# ─────────────────────────────────────────────────────────────
+
+@router.get("/hotel")
+def get_hotel_dashboard(
+    hotel_id: Optional[int] = None,
+    db: Session = Depends(get_db),
+    u=Depends(get_current_user),
+    org=Depends(get_current_org),
+):
+    """
+    Hotel-specific KPIs: occupancy, RevPAR, ADR, revenue breakdown,
+    upcoming arrivals/departures, room type distribution.
+    """
+    from sqlalchemy import func as sqf, case
+    from app.models.hotel import RoomStatus
+
+    today = date.today()
+    first_of_month = today.replace(day=1)
+    if first_of_month.month == 1:
+        last_month_start = first_of_month.replace(year=first_of_month.year - 1, month=12)
+    else:
+        last_month_start = first_of_month.replace(month=first_of_month.month - 1)
+
+    # ── Scope: one hotel or all org hotels ──────────────────────────────────
+    hotel_q = db.query(Hotel).filter(Hotel.org_id == org.id)
+    if hotel_id:
+        hotel_q = hotel_q.filter(Hotel.id == hotel_id)
+    hotels = hotel_q.all()
+    hotel_ids = [h.id for h in hotels]
+
+    if not hotel_ids:
+        return {
+            "hotels": [],
+            "total_rooms": 0, "occupied_tonight": 0, "occupancy_rate": 0.0,
+            "adr": 0.0, "revpar": 0.0,
+            "revenue_this_month": 0.0, "revenue_last_month": 0.0,
+            "arrivals_today": 0, "departures_today": 0,
+            "arrivals_tomorrow": 0,
+            "pending_checkouts": 0,
+            "revenue_by_month": [],
+            "revenue_by_hotel": [],
+            "room_type_stats": [],
+            "booking_status_counts": {},
+        }
+
+    # ── Rooms ────────────────────────────────────────────────────────────────
+    total_rooms = db.query(sqf.count(Room.id)).filter(Room.hotel_id.in_(hotel_ids)).scalar() or 0
+
+    # Tonight: confirmed bookings where check_in <= today < check_out
+    occupied_tonight = (
+        db.query(sqf.count(Booking.id))
+        .join(Room).filter(
+            Room.hotel_id.in_(hotel_ids),
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+            Booking.check_in <= today,
+            Booking.check_out > today,
+        ).scalar() or 0
+    )
+    occupancy_rate = round(occupied_tonight / total_rooms * 100, 1) if total_rooms else 0.0
+
+    # ── Revenue this month ───────────────────────────────────────────────────
+    def booking_rev(*filters):
+        return float(
+            db.query(sqf.coalesce(sqf.sum(Booking.total_amount), 0))
+            .join(Room).filter(Room.hotel_id.in_(hotel_ids), *filters).scalar() or 0
+        )
+
+    rev_this_month = booking_rev(
+        Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]),
+        Booking.check_in >= first_of_month,
+    )
+    rev_last_month = booking_rev(
+        Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]),
+        Booking.check_in >= last_month_start,
+        Booking.check_in < first_of_month,
+    )
+
+    # ── ADR (Average Daily Rate) — this month ────────────────────────────────
+    # ADR = total revenue / total room nights sold
+    nights_sold_q = (
+        db.query(
+            sqf.sum(
+                sqf.cast(Booking.check_out, sqf.Integer) -
+                sqf.cast(Booking.check_in, sqf.Integer)
+            )
+        )
+        .join(Room)
+        .filter(
+            Room.hotel_id.in_(hotel_ids),
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]),
+            Booking.check_in >= first_of_month,
+        )
+        .scalar()
+    )
+    # Simpler: count nights as (check_out - check_in) days per booking
+    bookings_month = (
+        db.query(Booking)
+        .join(Room)
+        .filter(
+            Room.hotel_id.in_(hotel_ids),
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]),
+            Booking.check_in >= first_of_month,
+        ).all()
+    )
+    total_nights = sum((b.check_out - b.check_in).days for b in bookings_month if b.check_out and b.check_in)
+    total_rev_month = sum(float(b.total_amount or 0) for b in bookings_month)
+    adr = round(total_rev_month / total_nights, 2) if total_nights else 0.0
+    days_in_month = (today - first_of_month).days + 1
+    revpar = round(adr * (occupied_tonight / total_rooms), 2) if total_rooms else 0.0
+
+    # ── Arrivals & Departures ────────────────────────────────────────────────
+    tomorrow = today + timedelta(days=1)
+
+    arrivals_today = db.query(sqf.count(Booking.id)).join(Room).filter(
+        Room.hotel_id.in_(hotel_ids),
+        Booking.check_in == today,
+        Booking.status == BookingStatus.confirmed,
+    ).scalar() or 0
+
+    departures_today = db.query(sqf.count(Booking.id)).join(Room).filter(
+        Room.hotel_id.in_(hotel_ids),
+        Booking.check_out == today,
+        Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in]),
+    ).scalar() or 0
+
+    arrivals_tomorrow = db.query(sqf.count(Booking.id)).join(Room).filter(
+        Room.hotel_id.in_(hotel_ids),
+        Booking.check_in == tomorrow,
+        Booking.status == BookingStatus.confirmed,
+    ).scalar() or 0
+
+    pending_checkouts = db.query(sqf.count(Booking.id)).join(Room).filter(
+        Room.hotel_id.in_(hotel_ids),
+        Booking.check_out <= today,
+        Booking.status == BookingStatus.checked_in,
+    ).scalar() or 0
+
+    # ── Revenue by month (last 12 months) ────────────────────────────────────
+    monthly = (
+        db.query(
+            extract("year",  Booking.check_in).label("y"),
+            extract("month", Booking.check_in).label("m"),
+            sqf.sum(Booking.total_amount).label("amt"),
+        )
+        .join(Room)
+        .filter(
+            Room.hotel_id.in_(hotel_ids),
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]),
+            Booking.check_in >= today - timedelta(days=365),
+        )
+        .group_by("y", "m")
+        .order_by("y", "m")
+        .all()
+    )
+    revenue_by_month = [{"month": f"{int(r.y)}-{int(r.m):02d}", "amount": round(float(r.amt or 0), 2)} for r in monthly]
+
+    # ── Revenue by hotel ──────────────────────────────────────────────────────
+    rev_by_hotel = (
+        db.query(
+            Hotel.id, Hotel.name,
+            sqf.coalesce(sqf.sum(Booking.total_amount), 0).label("revenue"),
+            sqf.count(Booking.id).label("bookings"),
+        )
+        .outerjoin(Room, Room.hotel_id == Hotel.id)
+        .outerjoin(Booking, Booking.room_id == Room.id)
+        .filter(
+            Hotel.id.in_(hotel_ids),
+            Booking.status.in_([BookingStatus.confirmed, BookingStatus.checked_in, BookingStatus.checked_out]) | (Booking.id == None),
+            Booking.check_in >= first_of_month | (Booking.id == None),
+        )
+        .group_by(Hotel.id, Hotel.name)
+        .all()
+    )
+    revenue_by_hotel = [
+        {"hotel_id": r.id, "name": r.name, "revenue": float(r.revenue or 0), "bookings": int(r.bookings or 0)}
+        for r in rev_by_hotel
+    ]
+
+    # ── Room type distribution ────────────────────────────────────────────────
+    room_types = (
+        db.query(
+            Room.room_type,
+            sqf.count(Room.id).label("total"),
+            sqf.sum(case((Room.status == RoomStatus.occupied, 1), else_=0)).label("occupied"),
+            sqf.avg(Room.base_rate).label("avg_rate"),
+        )
+        .filter(Room.hotel_id.in_(hotel_ids), Room.room_type != None)
+        .group_by(Room.room_type)
+        .all()
+    )
+    room_type_stats = [
+        {
+            "type": r.room_type,
+            "total": int(r.total or 0),
+            "occupied": int(r.occupied or 0),
+            "occupancy_rate": round(int(r.occupied or 0) / int(r.total or 1) * 100, 1),
+            "avg_rate": round(float(r.avg_rate or 0), 2),
+        }
+        for r in room_types
+    ]
+
+    # ── Booking status counts ─────────────────────────────────────────────────
+    status_counts = (
+        db.query(Booking.status, sqf.count(Booking.id).label("cnt"))
+        .join(Room)
+        .filter(Room.hotel_id.in_(hotel_ids))
+        .group_by(Booking.status)
+        .all()
+    )
+    booking_status_counts = {str(r.status.value): int(r.cnt) for r in status_counts}
+
+    return {
+        "hotels": [{"id": h.id, "name": h.name, "star_rating": h.star_rating, "total_rooms": h.total_rooms} for h in hotels],
+        "total_rooms":         total_rooms,
+        "occupied_tonight":    occupied_tonight,
+        "occupancy_rate":      occupancy_rate,
+        "adr":                 adr,
+        "revpar":              revpar,
+        "revenue_this_month":  round(rev_this_month, 2),
+        "revenue_last_month":  round(rev_last_month, 2),
+        "arrivals_today":      arrivals_today,
+        "departures_today":    departures_today,
+        "arrivals_tomorrow":   arrivals_tomorrow,
+        "pending_checkouts":   pending_checkouts,
+        "revenue_by_month":    revenue_by_month,
+        "revenue_by_hotel":    revenue_by_hotel,
+        "room_type_stats":     room_type_stats,
+        "booking_status_counts": booking_status_counts,
+    }
