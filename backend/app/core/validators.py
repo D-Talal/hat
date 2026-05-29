@@ -139,7 +139,7 @@ def validate_continent(v: Optional[str]) -> Optional[str]:
 VALID_CONTRACT_TYPES    = {"lease_out", "lease_in"}
 VALID_CONTRACT_STATUSES = {"draft", "released", "terminated", "expired"}
 VALID_PAYMENT_TIMINGS   = {"in_advance", "in_arrears"}
-VALID_DAY_COUNT_METHODS = {"act_365", "act_360", "act_act", "30_360"}
+VALID_DAY_COUNT_METHODS = {"act_365", "act_360", "act_act", "30_360", "30E_360"}  # 30E_360 accepted as alias
 VALID_CONDITION_TYPES   = {"base_rent", "service_charge", "advance_payment", "flat_rate", "sales_based", "markup_fee", "rent_free", "abatement"}
 VALID_FREQUENCIES       = {"monthly", "quarterly", "semi_annual", "annual"}
 VALID_BP_ROLES          = {"master_tenant", "guarantor", "landlord", "vendor", "contact_person"}
