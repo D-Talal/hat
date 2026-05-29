@@ -45,6 +45,12 @@ export const retail = {
 
 export const hotel = {
   stats: () => API.get('/hotel/stats'),
+  hotelReception: {
+    get:      (hotelId) => API.get('/hotel/reception' + (hotelId ? `?hotel_id=${hotelId}` : '')),
+    checkin:  (id)      => API.post(`/hotel/bookings/${id}/checkin`),
+    checkout: (id, amt) => API.post(`/hotel/bookings/${id}/checkout`, { paid_amount: amt }),
+    cancel:   (id)      => API.post(`/hotel/bookings/${id}/cancel`),
+  },
   hotels: { list: () => API.get('/hotel/hotels'), create: (d) => API.post('/hotel/hotels', d), update: (id, d) => API.put(`/hotel/hotels/${id}`, d), delete: (id) => API.delete(`/hotel/hotels/${id}`) },
   rooms: { list: () => API.get('/hotel/rooms'), create: (d) => API.post('/hotel/rooms', d), update: (id, d) => API.put(`/hotel/rooms/${id}`, d), delete: (id) => API.delete(`/hotel/rooms/${id}`) },
   guests: { list: () => API.get('/hotel/guests'), create: (d) => API.post('/hotel/guests', d), update: (id, d) => API.put(`/hotel/guests/${id}`, d), delete: (id) => API.delete(`/hotel/guests/${id}`) },
