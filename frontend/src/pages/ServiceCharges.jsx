@@ -322,9 +322,11 @@ export default function ServiceCharges() {
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
                   <span style={{ background: cc.status === 'settled' ? '#f5f5f5' : '#e8f5e9', color: cc.status === 'settled' ? '#757575' : '#2e7d32', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{cc.status}</span>
                   {cc.status === 'released' && (
-                    <button onClick={() => handleSettle(cc.id)} style={{ padding: '3px 10px', borderRadius: 6, border: '1.5px solid #2e7d32', background: 'white', color: '#2e7d32', cursor: 'pointer', fontSize: 11, fontFamily: 'DM Sans', fontWeight: 700 }}>Settle</button>
-                    <button onClick={() => { setEditTarget({ type: 'cc', item: cc }); setModal('edit-cc'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✏️</button>
-                    <button onClick={async () => { if (!window.confirm('Delete this cost collector?')) return; await API.delete(`/commercial/cost-collectors/${cc.id}`); load(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#dc2626', padding: '2px 4px' }}>🗑</button>
+                    <>
+                      <button onClick={() => handleSettle(cc.id)} style={{ padding: '3px 10px', borderRadius: 6, border: '1.5px solid #2e7d32', background: 'white', color: '#2e7d32', cursor: 'pointer', fontSize: 11, fontFamily: 'DM Sans', fontWeight: 700 }}>Settle</button>
+                      <button onClick={() => { setEditTarget({ type: 'cc', item: cc }); setModal('edit-cc'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }}>✏️</button>
+                      <button onClick={async () => { if (!window.confirm('Delete this cost collector?')) return; await API.delete(`/commercial/cost-collectors/${cc.id}`); load(); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 14, color: '#dc2626', padding: '2px 4px' }}>🗑</button>
+                    </>
                   )}
                 </div>
               </div>
@@ -340,20 +342,20 @@ export default function ServiceCharges() {
         </Modal>
       )}
 
-      {confirm && (
-        {/* Edit PG modal */}
-        {modal === 'edit-pg' && editTarget?.type === 'pg' && (
-          <Modal title={`Edit — ${editTarget.item.code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-            <PGForm initial={editTarget.item} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
-          </Modal>
-        )}
-        {/* Edit CC modal */}
-        {modal === 'edit-cc' && editTarget?.type === 'cc' && (
-          <Modal title={`Edit Cost Collector`} onClose={() => { setModal(null); setEditTarget(null); }}>
-            <CostCollectorForm initial={editTarget.item} pgId={editTarget.item.settlement_unit?.participation_group_id} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
-          </Modal>
-        )}
+      {/* Edit PG modal */}
+      {modal === 'edit-pg' && editTarget?.type === 'pg' && (
+        <Modal title={`Edit — ${editTarget.item.code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
+          <PGForm initial={editTarget.item} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
+        </Modal>
+      )}
+      {/* Edit CC modal */}
+      {modal === 'edit-cc' && editTarget?.type === 'cc' && (
+        <Modal title={`Edit Cost Collector`} onClose={() => { setModal(null); setEditTarget(null); }}>
+          <CostCollectorForm initial={editTarget.item} pgId={editTarget.item.settlement_unit?.participation_group_id} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
+        </Modal>
+      )}
 
+      {confirm && (
         <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete group <strong>{confirm.code}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
