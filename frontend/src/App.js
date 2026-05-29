@@ -90,10 +90,10 @@ function AppRoutes() {
       <Route path="/commercial/conditions" element={<ProtectedRoute><AppLayout><Conditions /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/rental-objects" element={<ProtectedRoute><AppLayout><RentalObjects /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/service-charges" element={<ProtectedRoute><AppLayout><ServiceCharges /></AppLayout></ProtectedRoute>} />
+      <Route path="/commercial/invoices" element={<ProtectedRoute><AppLayout><Invoices /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/deposit-contracts" element={<ProtectedRoute><AppLayout><DepositContracts /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/vacancy-postings" element={<ProtectedRoute><AppLayout><VacancyPostings /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/sales-declarations" element={<ProtectedRoute><AppLayout><SalesDeclarations /></AppLayout></ProtectedRoute>} />
-      <Route path="/commercial/invoices" element={<ProtectedRoute><AppLayout><Invoices /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/csv-import" element={<ProtectedRoute roles={['admin','manager']}><AppLayout><CsvImport /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/posting-engine" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><PostingEngine /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/hotels" element={<ProtectedRoute><AppLayout><HotelList /></AppLayout></ProtectedRoute>} />
