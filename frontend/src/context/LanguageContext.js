@@ -43,6 +43,8 @@ const translations = {
     },
     commercial: {
       // Patrimoine
+      companyCodes: 'Company Codes', companyCode: 'Company Code', companyName: 'Company Name',
+      newCompanyCode: 'New Company Code', noCompanyCodes: 'No company codes yet.',
       patrimoineTitle: 'Patrimoine', patrimoineSub: 'Architectural view — Business Entity → Building → Floor → Space',
       businessEntities: 'Business Entities', buildings: 'Buildings', floors: 'Floors', spaces: 'Spaces',
       newBusinessEntity: 'New Business Entity', newBuilding: 'New Building', newFloor: 'New Floor', newSpace: 'New Space',
@@ -247,7 +249,9 @@ const translations = {
     },
     commercial: {
       // Patrimoine
-      patrimoineTitle: 'Patrimoine', patrimoineSub: 'Vue architecturale — Entité juridique → Bâtiment → Étage → Espace',
+      companyCodes: 'Codes société', companyCode: 'Code société', companyName: 'Nom de la société',
+      newCompanyCode: 'Nouveau code société', noCompanyCodes: 'Aucun code société.',
+            patrimoineTitle: 'Patrimoine', patrimoineSub: 'Vue architecturale — Entité juridique → Bâtiment → Étage → Espace',
       businessEntities: 'Entités juridiques', buildings: 'Bâtiments', floors: 'Étages', spaces: 'Espaces',
       newBusinessEntity: 'Nouvelle entité juridique', newBuilding: 'Nouveau bâtiment',
       newFloor: 'Nouvel étage', newSpace: 'Nouvel espace',
