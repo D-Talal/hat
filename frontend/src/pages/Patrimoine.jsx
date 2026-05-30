@@ -40,6 +40,12 @@ function ActionBtns({ onEdit, onDelete }) {
 
 // ── LOCAL API HELPERS ──────────────────────────────────────────────────────────
 const loc = {
+  companyCodes: {
+    list:   ()      => API.get('/commercial/company-codes'),
+    create: (d)     => API.post('/commercial/company-codes', d),
+    update: (id, d) => API.put(`/commercial/company-codes/${id}`, d),
+    delete: (id)    => API.delete(`/commercial/company-codes/${id}`),
+  },
   businessEntities: {
     list:   ()       => API.get('/commercial/business-entities'),
     create: (d)      => API.post('/commercial/business-entities', d),
@@ -66,13 +72,60 @@ const loc = {
   },
 };
 
+
+// ── COMPANY CODE FORM ─────────────────────────────────────────────────────────
+function CompanyCodeForm({ onSave, onClose, t, initial }) {
+  const tc = t.commercial;
+  const [form, setForm] = useState({
+    code:        initial?.code        || '',
+    name:        initial?.name        || '',
+    currency:    initial?.currency    || 'USD',
+    country:     initial?.country     || '',
+    description: initial?.description || '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [error, setError]   = useState('');
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+
+  const save = async () => {
+    if (!form.code.trim() || !form.name.trim()) { setError('Code and name are required'); return; }
+    setSaving(true); setError('');
+    try {
+      if (initial) await loc.companyCodes.update(initial.id, form);
+      else         await loc.companyCodes.create(form);
+      onSave(); onClose();
+    } catch (e) { setError(e.response?.data?.detail || t.common.error); }
+    finally { setSaving(false); }
+  };
+
+  return (
+    <>
+      {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
+        <Field label={tc.companyCode + ' Code *'}><input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. CC01" autoFocus style={{ ...inputStyle, textTransform: 'uppercase' }} /></Field>
+        <Field label={tc.companyName || 'Company Name *'}><input style={inputStyle} value={form.name} onChange={set('name')} /></Field>
+      </div>
+      <Field label={tc.currency}>
+        <CurrencySelect value={form.currency} onChange={v => setForm(f => ({ ...f, currency: v }))} />
+      </Field>
+      <Field label={tc.country}><input style={inputStyle} value={form.country} onChange={set('country')} /></Field>
+      <Field label={tc.description || 'Description'}><textarea style={{ ...inputStyle, minHeight: 60, resize: 'vertical' }} value={form.description} onChange={set('description')} /></Field>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
+        <button onClick={onClose} style={btnSecondary}>{t.common.cancel}</button>
+        <button onClick={save} style={btnPrimary} disabled={saving}>{saving ? '…' : (initial ? t.common.save : t.common.create)}</button>
+      </div>
+    </>
+  );
+}
+
 // ── BUSINESS ENTITY FORM ──────────────────────────────────────────────────────
-function BusinessEntityForm({ onSave, onClose, t, initial }) {
+function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId }) {
   const tc = t.commercial;
   const [form, setForm] = useState({
     name: initial?.name || '', legal_name: initial?.legal_name || '',
     tax_id: initial?.tax_id || '', address: initial?.address || '',
     currency: initial?.currency || 'USD',
+    company_code_id: initial?.company_code_id || companyCodeId || null,
     continent: initial?.continent || '', country: initial?.country || '', city: initial?.city || '',
   });
   const [saving, setSaving] = useState(false);
@@ -253,6 +306,8 @@ export default function Patrimoine() {
   const { t } = useLanguage();
   const tc = t.commercial;
 
+  const [companyCodes, setCompanyCodes]         = useState([]);
+  const [selectedCC, setSelectedCC]             = useState(null);
   const [entities, setEntities]                 = useState([]);
   const [selectedBE, setSelectedBE]             = useState(null);
   const [buildings, setBuildings]               = useState([]);
@@ -266,12 +321,14 @@ export default function Patrimoine() {
   const [confirm, setConfirm]                   = useState(null);
   const [apiError, setApiError]                 = useState('');
 
-  const loadEntities  = useCallback(async () => { setLoading(true); try { const r = await loc.businessEntities.list(); setEntities(r.data); } catch { setEntities([]); } finally { setLoading(false); } }, []);
+  const loadCompanyCodes = useCallback(async () => { try { const r = await loc.companyCodes.list(); setCompanyCodes(r.data || []); } catch { setCompanyCodes([]); } }, []);
+  const loadEntities  = useCallback(async (ccId) => { setLoading(true); try { const r = await loc.businessEntities.list(); setEntities((r.data || []).filter(e => !ccId || e.company_code_id === ccId)); } catch { setEntities([]); } finally { setLoading(false); } }, []);
   const loadBuildings = useCallback(async (id) => { try { const r = await loc.buildings.list(id); setBuildings(r.data); } catch { setBuildings([]); } }, []);
   const loadFloors    = useCallback(async (id) => { try { const r = await loc.floors.list(id); setFloors(r.data); } catch { setFloors([]); } }, []);
   const loadSpaces    = useCallback(async (id) => { try { const r = await loc.spaces.list(id); setSpaces(r.data); } catch { setSpaces([]); } }, []);
 
-  useEffect(() => { loadEntities(); }, [loadEntities]);
+  useEffect(() => { loadCompanyCodes(); }, [loadCompanyCodes]);
+  useEffect(() => { if (selectedCC) loadEntities(selectedCC.id); else setEntities([]); }, [selectedCC, loadEntities]);
   useEffect(() => { if (selectedBE) { loadBuildings(selectedBE.id); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } }, [selectedBE, loadBuildings]);
   useEffect(() => { if (selectedBuilding) { loadFloors(selectedBuilding.id); setSelectedFloor(null); setSpaces([]); } }, [selectedBuilding, loadFloors]);
   useEffect(() => { if (selectedFloor) loadSpaces(selectedFloor.id); }, [selectedFloor, loadSpaces]);
@@ -280,7 +337,11 @@ export default function Patrimoine() {
     if (!confirm) return;
     setApiError('');
     try {
-      if (confirm.type === 'be') {
+      if (confirm.type === 'cc') {
+        await loc.companyCodes.delete(confirm.id);
+        if (selectedCC?.id === confirm.id) { setSelectedCC(null); setEntities([]); }
+        loadCompanyCodes();
+      } else if (confirm.type === 'be') {
         await loc.businessEntities.delete(confirm.id);
         if (selectedBE?.id === confirm.id) { setSelectedBE(null); setBuildings([]); setFloors([]); setSpaces([]); }
         loadEntities();
@@ -303,6 +364,7 @@ export default function Patrimoine() {
   };
 
   const openEdit = (type, item) => { setEditTarget({ type, item }); setModal('edit'); };
+  const resetToCC = () => { setSelectedCC(null); setEntities([]); setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); };
 
   const cardStyle = (selected) => ({
     padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
@@ -311,7 +373,7 @@ export default function Patrimoine() {
     display: 'flex', justifyContent: 'space-between', alignItems: 'center',
   });
 
-  const cols = selectedBE ? (selectedBuilding ? (selectedFloor ? '1fr 1fr 1fr 2fr' : '1fr 1fr 1fr') : '1fr 1fr') : '1fr';
+  const cols = selectedCC ? (selectedBE ? (selectedBuilding ? (selectedFloor ? '180px 1fr 1fr 1fr 2fr' : '180px 1fr 1fr 1fr') : '180px 1fr 1fr') : '180px 1fr') : '280px';
 
   return (
     <div className="animate-fade">
@@ -349,8 +411,27 @@ export default function Patrimoine() {
 
       <div style={{ display: 'grid', gridTemplateColumns: cols, gap: 16 }}>
 
-        {/* ── Business Entities ── */}
+        {/* ── Company Codes ── */}
         <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+            <span style={{ fontFamily: 'DM Serif Display', fontSize: 16 }}>{tc.companyCodes || 'Company Codes'}</span>
+            <button onClick={() => { setEditTarget(null); setModal('cc'); }} style={btnAdd}>+ {t.common.add}</button>
+          </div>
+          {companyCodes.map(cc => (
+            <div key={cc.id} style={cardStyle(selectedCC?.id === cc.id)} onClick={() => setSelectedCC(cc)}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 14 }}>{cc.code}</div>
+                <div style={{ fontSize: 12, color: 'var(--slate)', marginTop: 3 }}>{cc.name}</div>
+                <div style={{ fontSize: 11, color: '#9ea4be', marginTop: 2 }}>{cc.currency}{cc.country ? ` · ${cc.country}` : ''}</div>
+              </div>
+              <ActionBtns onEdit={() => openEdit('cc', cc)} onDelete={() => setConfirm({ type: 'cc', id: cc.id, label: cc.code })} />
+            </div>
+          ))}
+          {companyCodes.length === 0 && <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 13 }}>No company codes yet.</div>}
+        </div>
+
+        {/* ── Business Entities ── */}
+        {selectedCC && <div>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
             <span style={{ fontFamily: 'DM Serif Display', fontSize: 16 }}>{tc.businessEntities}</span>
             <button onClick={() => { setEditTarget(null); setModal('be'); }} style={btnAdd}>+ {t.common.add}</button>
@@ -366,7 +447,7 @@ export default function Patrimoine() {
             </div>
           ))}
           {entities.length === 0 && !loading && <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 13 }}>{tc.noEntities}</div>}
-        </div>
+        </div>}
 
         {/* ── Buildings ── */}
         {selectedBE && (
@@ -441,7 +522,7 @@ export default function Patrimoine() {
       {/* ── Create modals ── */}
       {modal === 'be' && !editTarget && (
         <Modal title={tc.newBusinessEntity} onClose={() => setModal(null)}>
-          <BusinessEntityForm onSave={loadEntities} onClose={() => setModal(null)} t={t} />
+          <BusinessEntityForm onSave={() => loadEntities(selectedCC?.id)} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} />
         </Modal>
       )}
       {modal === 'building' && !editTarget && selectedBE && (
@@ -461,6 +542,11 @@ export default function Patrimoine() {
       )}
 
       {/* ── Edit modals ── */}
+      {modal === 'edit' && editTarget?.type === 'cc' && (
+        <Modal title={`Edit — ${editTarget.item.code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
+          <CompanyCodeForm initial={editTarget.item} onSave={() => { loadCompanyCodes(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} />
+        </Modal>
+      )}
       {modal === 'edit' && editTarget?.type === 'be' && (
         <Modal title={`Edit — ${editTarget.item.name}`} onClose={() => { setModal(null); setEditTarget(null); }}>
           <BusinessEntityForm initial={editTarget.item} onSave={() => { loadEntities(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} />
