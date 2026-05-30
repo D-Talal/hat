@@ -20,6 +20,7 @@ from app.core.validators import (
 )
 from app.models.audit import AuditLog
 from app.models.retail import (
+    CompanyCode,
     BusinessEntity, Building, Floor, Space, SpaceMeasurement,
     RentalObject, RentalObjectSpace,
     BusinessPartner, BusinessPartnerRole,
@@ -42,6 +43,7 @@ def audit(db, user, action, resource, rid=None, details=None, org_id=None):
 
 class BusinessEntityCreate(BaseModel):
     name: str
+    company_code_id: Optional[int] = None
     legal_name: Optional[str] = None
     tax_id: Optional[str] = None
     country: Optional[str] = None
@@ -457,6 +459,71 @@ class MaintenanceOut(MaintenanceCreate):
 
 
 # ── BUSINESS ENTITIES ─────────────────────────────────────────────────────────
+
+# ── COMPANY CODES ─────────────────────────────────────────────────────────────
+
+class CompanyCodeCreate(BaseModel):
+    code:        str
+    name:        str
+    currency:    Optional[str] = "USD"
+    country:     Optional[str] = None
+    description: Optional[str] = None
+
+    @field_validator('code')
+    @classmethod
+    def v_code(cls, v):
+        v = v.strip().upper()
+        if not v: raise ValueError('Code is required')
+        if len(v) > 20: raise ValueError('Code must be under 20 characters')
+        return v
+
+    @field_validator('name')
+    @classmethod
+    def v_name(cls, v): return validate_non_empty_string(v, 'Name')
+
+    @field_validator('currency')
+    @classmethod
+    def v_currency(cls, v): return validate_currency_code(v)
+
+class CompanyCodeOut(CompanyCodeCreate):
+    id: int
+    org_id: Optional[int] = None
+    created_at: datetime
+    class Config: from_attributes = True
+
+@router.get("/company-codes", response_model=List[CompanyCodeOut])
+def list_company_codes(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    return db.query(CompanyCode).filter(CompanyCode.org_id == org.id).order_by(CompanyCode.code).all()
+
+@router.post("/company-codes", response_model=CompanyCodeOut)
+def create_company_code(data: CompanyCodeCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    if db.query(CompanyCode).filter(CompanyCode.org_id == org.id, CompanyCode.code == data.code).first():
+        raise HTTPException(400, f"Company code '{data.code}' already exists")
+    obj = CompanyCode(**data.dict(), org_id=org.id)
+    db.add(obj); db.commit(); db.refresh(obj)
+    audit(db, u, "CREATE", "re_company_codes", obj.id)
+    return obj
+
+@router.put("/company-codes/{id}", response_model=CompanyCodeOut)
+def update_company_code(id: int, data: CompanyCodeCreate, db: Session = Depends(get_db), u=Depends(require_permission("update")), org=Depends(get_current_org)):
+    obj = db.query(CompanyCode).filter(CompanyCode.id == id, CompanyCode.org_id == org.id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    for k, v in data.dict().items(): setattr(obj, k, v)
+    db.commit(); db.refresh(obj)
+    audit(db, u, "UPDATE", "re_company_codes", id)
+    return obj
+
+@router.delete("/company-codes/{id}")
+def delete_company_code(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete")), org=Depends(get_current_org)):
+    obj = db.query(CompanyCode).filter(CompanyCode.id == id, CompanyCode.org_id == org.id).first()
+    if not obj: raise HTTPException(404, "Not found")
+    be_count = db.query(BusinessEntity).filter(BusinessEntity.company_code_id == id).count()
+    if be_count > 0:
+        raise HTTPException(400, f"Cannot delete: {be_count} business entit{'ies' if be_count>1 else 'y'} linked to this company code. Reassign them first.")
+    db.delete(obj); db.commit()
+    audit(db, u, "DELETE", "re_company_codes", id)
+    return {"ok": True}
+
 
 @router.get("/business-entities", response_model=List[BusinessEntityOut])
 def list_business_entities(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
