@@ -38,11 +38,27 @@ class MaintenanceStatus(str, enum.Enum):
     open = "open"; in_progress = "in_progress"; closed = "closed"
 
 
+class CompanyCode(Base):
+    __tablename__ = "re_company_codes"
+    __table_args__ = {'extend_existing': True}
+    id           = Column(Integer, primary_key=True, index=True)
+    org_id       = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    code         = Column(String(20), nullable=False)
+    name         = Column(String(255), nullable=False)
+    currency     = Column(String(10), default="USD")
+    country      = Column(String(100))
+    description  = Column(String(500))
+    created_at   = Column(DateTime(timezone=True), server_default=func.now())
+
+    business_entities = relationship("BusinessEntity", back_populates="company_code")
+
+
 class BusinessEntity(Base):
     __tablename__ = "re_business_entities"
     __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
-    org_id = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    org_id           = Column(Integer, ForeignKey("organizations.id"), nullable=True, index=True)
+    company_code_id  = Column(Integer, ForeignKey("re_company_codes.id"), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     legal_name = Column(String(255))
     tax_id = Column(String(100))
@@ -54,6 +70,7 @@ class BusinessEntity(Base):
     currency = Column(String(10), default="USD")
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
+    company_code = relationship("CompanyCode", back_populates="business_entities")
     buildings = relationship("Building", back_populates="business_entity")
 
 
