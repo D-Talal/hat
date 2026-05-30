@@ -123,6 +123,8 @@ def startup():
             "ALTER TABLE hotel_guests ALTER COLUMN nationality TYPE TEXT",
             "ALTER TABLE audit_logs ADD COLUMN IF NOT EXISTS org_id INTEGER REFERENCES organizations(id)",
             "ALTER TABLE users ADD COLUMN IF NOT EXISTS must_change_password BOOLEAN DEFAULT false",
+            "CREATE TABLE IF NOT EXISTS re_company_codes (id SERIAL PRIMARY KEY, org_id INTEGER REFERENCES organizations(id), code VARCHAR(20) NOT NULL, name VARCHAR(255) NOT NULL, currency VARCHAR(10) DEFAULT 'USD', country VARCHAR(100), description VARCHAR(500), created_at TIMESTAMPTZ DEFAULT now())",
+            "ALTER TABLE re_business_entities ADD COLUMN IF NOT EXISTS company_code_id INTEGER REFERENCES re_company_codes(id)",
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_validated BOOLEAN DEFAULT false",
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255)",
             "UPDATE organizations SET is_validated = true WHERE slug = 'default' OR slug = 'propmanager'",
