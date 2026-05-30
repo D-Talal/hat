@@ -520,6 +520,11 @@ export default function Patrimoine() {
       </div>
 
       {/* ── Create modals ── */}
+      {modal === 'cc' && !editTarget && (
+        <Modal title={tc.newCompanyCode || 'New Company Code'} onClose={() => setModal(null)}>
+          <CompanyCodeForm onSave={() => { loadCompanyCodes(); setModal(null); }} onClose={() => setModal(null)} t={t} />
+        </Modal>
+      )}
       {modal === 'be' && !editTarget && (
         <Modal title={tc.newBusinessEntity} onClose={() => setModal(null)}>
           <BusinessEntityForm onSave={() => loadEntities(selectedCC?.id)} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} />
