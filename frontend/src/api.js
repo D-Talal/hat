@@ -64,6 +64,12 @@ export default API;
 
 export const commercial = {
   stats: () => API.get('/commercial/stats'),
+  companyCodes: {
+    list:   ()      => API.get('/commercial/company-codes'),
+    create: (d)     => API.post('/commercial/company-codes', d),
+    update: (id, d) => API.put(`/commercial/company-codes/${id}`, d),
+    delete: (id)    => API.delete(`/commercial/company-codes/${id}`),
+  },
   businessEntities: {
     list: () => API.get('/commercial/business-entities'),
     create: (d) => API.post('/commercial/business-entities', d),
