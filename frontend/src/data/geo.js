@@ -139,3 +139,29 @@ export const getCities = (country) => COUNTRIES[country]?.cities || [];
 
 /** Get continent for a given country */
 export const getContinentForCountry = (country) => COUNTRIES[country]?.continent || '';
+
+/** States/Provinces for US and Canada */
+export const STATES = {
+  "United States": [
+    "Alabama","Alaska","Arizona","Arkansas","California","Colorado","Connecticut",
+    "Delaware","Florida","Georgia","Hawaii","Idaho","Illinois","Indiana","Iowa",
+    "Kansas","Kentucky","Louisiana","Maine","Maryland","Massachusetts","Michigan",
+    "Minnesota","Mississippi","Missouri","Montana","Nebraska","Nevada",
+    "New Hampshire","New Jersey","New Mexico","New York","North Carolina",
+    "North Dakota","Ohio","Oklahoma","Oregon","Pennsylvania","Rhode Island",
+    "South Carolina","South Dakota","Tennessee","Texas","Utah","Vermont",
+    "Virginia","Washington","West Virginia","Wisconsin","Wyoming",
+    "District of Columbia"
+  ],
+  "Canada": [
+    "Alberta","British Columbia","Manitoba","New Brunswick",
+    "Newfoundland and Labrador","Northwest Territories","Nova Scotia","Nunavut",
+    "Ontario","Prince Edward Island","Quebec","Saskatchewan","Yukon"
+  ],
+};
+
+/** Get states/provinces for a given country (returns [] if not applicable) */
+export const getStates = (country) => STATES[country] || [];
+
+/** Whether a country has states/provinces */
+export const hasStates = (country) => !!STATES[country];
