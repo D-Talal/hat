@@ -1,28 +1,77 @@
 /**
  * GeoSelect — cascading continent/country/state/city dropdowns
- * Props: value={continent,country,state,city}, onChange(field, value), style
+ * Props: value={continent,country,state,city}, onChange(field, value)
+ *
+ * IMPORTANT: always pass `state` in the value object, even if empty string.
+ * Example: value={{ continent: form.continent, country: form.country, state: form.state, city: form.city }}
  */
-import { useState, useEffect } from 'react';
-import { CONTINENTS, getCountriesByContinent, getCountries, getCities, getContinentForCountry, getStates, hasStates } from '../../data/geo';
+import { useEffect, useRef } from 'react';
+import {
+  CONTINENTS,
+  getCountriesByContinent,
+  getCountries,
+  getCities,
+  getContinentForCountry,
+  getStates,
+} from '../../data/geo';
 
-const sel = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box', background: 'white' };
-const lbl = { display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 6 };
+const sel = {
+  width: '100%', padding: '10px 12px', borderRadius: 8,
+  border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14,
+  boxSizing: 'border-box', background: 'white',
+};
+const lbl = {
+  display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase',
+  letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 6,
+};
 
-export default function GeoSelect({ value = {}, onChange, showContinent = true, showCity = true, required = {} }) {
-  const { continent = '', country = '', state = '', city = '' } = value;
+export default function GeoSelect({
+  value = {},
+  onChange,
+  showContinent = true,
+  showCity = true,
+  required = {},
+}) {
+  const continent = value.continent || '';
+  const country   = value.country   || '';
+  const state     = value.state     || '';
+  const city      = value.city      || '';
 
-  // When country changes externally, infer continent
+  // Track previous country to only reset state/city on REAL country changes,
+  // not on initial mount (which caused the "state gets wiped" bug).
+  const prevCountryRef = useRef(country);
+  const mountedRef = useRef(false);
+
   useEffect(() => {
-    if (country && !continent) {
-      const inferred = getContinentForCountry(country);
-      if (inferred) onChange('continent', inferred);
+    if (!mountedRef.current) {
+      // First render: just infer continent if missing, don't touch state/city
+      mountedRef.current = true;
+      if (country && !continent) {
+        const inferred = getContinentForCountry(country);
+        if (inferred) onChange('continent', inferred);
+      }
+      prevCountryRef.current = country;
+      return;
+    }
+
+    // Subsequent renders: only act if country actually changed
+    if (country !== prevCountryRef.current) {
+      prevCountryRef.current = country;
+      // Reset state and city when country changes
+      onChange('state', '');
+      onChange('city', '');
+      // Infer continent
+      if (!continent && country) {
+        const inferred = getContinentForCountry(country);
+        if (inferred) onChange('continent', inferred);
+      }
     }
   }, [country]);
 
-  const countries  = continent ? getCountriesByContinent(continent) : getCountries();
-  const cities     = country ? getCities(country) : [];
-  const states     = country ? getStates(country) : [];
-  const showState  = states.length > 0;
+  const countries = continent ? getCountriesByContinent(continent) : getCountries();
+  const cities    = country ? getCities(country) : [];
+  const states    = country ? getStates(country) : [];
+  const showState = states.length > 0;
 
   const handleContinent = (v) => {
     onChange('continent', v);
@@ -32,9 +81,8 @@ export default function GeoSelect({ value = {}, onChange, showContinent = true, 
   };
 
   const handleCountry = (v) => {
+    // Set country — the useEffect above will handle clearing state/city
     onChange('country', v);
-    onChange('state', '');
-    onChange('city', '');
     if (!continent && v) {
       onChange('continent', getContinentForCountry(v));
     }
@@ -42,10 +90,9 @@ export default function GeoSelect({ value = {}, onChange, showContinent = true, 
 
   const handleState = (v) => {
     onChange('state', v);
-    onChange('city', '');
+    // Don't reset city on state change — city list comes from country, not state
   };
 
-  // Compute grid columns dynamically
   const colCount = [showContinent, true, showState, showCity].filter(Boolean).length;
   const gridCols = Array(colCount).fill('1fr').join(' ');
 
@@ -91,10 +138,20 @@ export default function GeoSelect({ value = {}, onChange, showContinent = true, 
               <option value="__other__">Other (type below)</option>
             </select>
           ) : (
-            <input style={sel} value={city} onChange={e => onChange('city', e.target.value)} placeholder="City name" />
+            <input
+              style={sel}
+              value={city}
+              onChange={e => onChange('city', e.target.value)}
+              placeholder="City name"
+            />
           )}
           {city === '__other__' && (
-            <input style={{ ...sel, marginTop: 6 }} placeholder="Enter city name" onChange={e => onChange('city', e.target.value)} autoFocus />
+            <input
+              style={{ ...sel, marginTop: 6 }}
+              placeholder="Enter city name"
+              onChange={e => onChange('city', e.target.value)}
+              autoFocus
+            />
           )}
         </div>
       )}
