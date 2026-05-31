@@ -436,8 +436,15 @@ export default function Patrimoine() {
   const { t } = useLanguage();
   const tc = t.commercial;
 
-  const [companyCodes,     setCompanyCodes]     = useState([]);
-  const [selectedCC,       setSelectedCC]       = useState(null);
+  // ── Top-level state ──
+  const [companyCodes, setCompanyCodes] = useState([]);
+  const [selectedCC,   setSelectedCC]   = useState(null);
+  const [modal,        setModal]        = useState(null);
+  const [editTarget,   setEditTarget]   = useState(null);
+  const [confirm,      setConfirm]      = useState(null);
+  const [apiError,     setApiError]     = useState('');
+
+  // ── Detail panel state — lives under selected CC, fully reset on CC change ──
   const [entities,         setEntities]         = useState([]);
   const [selectedBE,       setSelectedBE]       = useState(null);
   const [buildings,        setBuildings]        = useState([]);
@@ -445,47 +452,99 @@ export default function Patrimoine() {
   const [floors,           setFloors]           = useState([]);
   const [selectedFloor,    setSelectedFloor]    = useState(null);
   const [spaces,           setSpaces]           = useState([]);
-  const [modal,            setModal]            = useState(null);
-  const [editTarget,       setEditTarget]       = useState(null);
-  const [loading,          setLoading]          = useState(false);
-  const [confirm,          setConfirm]          = useState(null);
-  const [apiError,         setApiError]         = useState('');
+  const [loadingBE,        setLoadingBE]        = useState(false);
 
-  const loadCompanyCodes = useCallback(async () => { try { const r = await loc.companyCodes.list(); setCompanyCodes(r.data || []); } catch { setCompanyCodes([]); } }, []);
-  const loadEntities     = useCallback(async (ccId) => { setLoading(true); try { const r = await loc.businessEntities.list(); setEntities((r.data || []).filter(e => !ccId || e.company_code_id === ccId)); } catch { setEntities([]); } finally { setLoading(false); } }, []);
-  const loadBuildings    = useCallback(async (id) => { try { const r = await loc.buildings.list(id); setBuildings(r.data); } catch { setBuildings([]); } }, []);
-  const loadFloors       = useCallback(async (id) => { try { const r = await loc.floors.list(id); setFloors(r.data); } catch { setFloors([]); } }, []);
-  const loadSpaces       = useCallback(async (id) => { try { const r = await loc.spaces.list(id); setSpaces(r.data); } catch { setSpaces([]); } }, []);
+  // ── Loaders ──
+  const loadCompanyCodes = useCallback(async () => {
+    try { const r = await loc.companyCodes.list(); setCompanyCodes(r.data || []); } catch { setCompanyCodes([]); }
+  }, []);
+
+  const loadEntities = useCallback(async (ccId) => {
+    setLoadingBE(true);
+    try { const r = await loc.businessEntities.list(); setEntities((r.data || []).filter(e => e.company_code_id === ccId)); }
+    catch { setEntities([]); }
+    finally { setLoadingBE(false); }
+  }, []);
+
+  const loadBuildings = useCallback(async (beId) => {
+    try { const r = await loc.buildings.list(beId); setBuildings(r.data || []); } catch { setBuildings([]); }
+  }, []);
+
+  const loadFloors = useCallback(async (bId) => {
+    try { const r = await loc.floors.list(bId); setFloors(r.data || []); } catch { setFloors([]); }
+  }, []);
+
+  const loadSpaces = useCallback(async (fId) => {
+    try { const r = await loc.spaces.list(fId); setSpaces(r.data || []); } catch { setSpaces([]); }
+  }, []);
 
   useEffect(() => { loadCompanyCodes(); }, [loadCompanyCodes]);
-  useEffect(() => { if (selectedCC) loadEntities(selectedCC.id); else setEntities([]); }, [selectedCC, loadEntities]);
-  useEffect(() => { if (selectedBE) { loadBuildings(selectedBE.id); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } }, [selectedBE, loadBuildings]);
-  useEffect(() => { if (selectedBuilding) { loadFloors(selectedBuilding.id); setSelectedFloor(null); setSpaces([]); } }, [selectedBuilding, loadFloors]);
-  useEffect(() => { if (selectedFloor) loadSpaces(selectedFloor.id); }, [selectedFloor, loadSpaces]);
 
+  // ── When CC changes: reset EVERYTHING below ──
+  const selectCC = (cc) => {
+    if (selectedCC?.id === cc.id) return; // already selected
+    setSelectedCC(cc);
+    setSelectedBE(null);
+    setBuildings([]);
+    setSelectedBuilding(null);
+    setFloors([]);
+    setSelectedFloor(null);
+    setSpaces([]);
+    setEntities([]);
+    loadEntities(cc.id);
+  };
+
+  // ── When BE changes: reset buildings and below ──
+  const selectBE = (be) => {
+    if (selectedBE?.id === be.id) { setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); return; }
+    setSelectedBE(be);
+    setSelectedBuilding(null);
+    setFloors([]);
+    setSelectedFloor(null);
+    setSpaces([]);
+    loadBuildings(be.id);
+  };
+
+  // ── When Building changes: reset floors and below ──
+  const selectBuilding = (b) => {
+    if (selectedBuilding?.id === b.id) { setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); return; }
+    setSelectedBuilding(b);
+    setSelectedFloor(null);
+    setSpaces([]);
+    loadFloors(b.id);
+  };
+
+  // ── When Floor changes: reset spaces ──
+  const selectFloor = (f) => {
+    if (selectedFloor?.id === f.id) { setSelectedFloor(null); setSpaces([]); return; }
+    setSelectedFloor(f);
+    loadSpaces(f.id);
+  };
+
+  // ── Delete handler ──
   const handleDelete = async () => {
     if (!confirm) return;
     setApiError('');
     try {
       if (confirm.type === 'cc') {
         await loc.companyCodes.delete(confirm.id);
-        if (selectedCC?.id === confirm.id) { setSelectedCC(null); setEntities([]); }
+        if (selectedCC?.id === confirm.id) { setSelectedCC(null); setEntities([]); setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); }
         loadCompanyCodes();
       } else if (confirm.type === 'be') {
         await loc.businessEntities.delete(confirm.id);
-        if (selectedBE?.id === confirm.id) { setSelectedBE(null); setBuildings([]); setFloors([]); setSpaces([]); }
-        loadEntities();
+        if (selectedBE?.id === confirm.id) { setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); }
+        if (selectedCC) loadEntities(selectedCC.id);
       } else if (confirm.type === 'building') {
         await loc.buildings.delete(confirm.id);
-        if (selectedBuilding?.id === confirm.id) { setSelectedBuilding(null); setFloors([]); setSpaces([]); }
-        loadBuildings(selectedBE.id);
+        if (selectedBuilding?.id === confirm.id) { setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); }
+        if (selectedBE) loadBuildings(selectedBE.id);
       } else if (confirm.type === 'floor') {
         await loc.floors.delete(confirm.id);
         if (selectedFloor?.id === confirm.id) { setSelectedFloor(null); setSpaces([]); }
-        loadFloors(selectedBuilding.id);
+        if (selectedBuilding) loadFloors(selectedBuilding.id);
       } else if (confirm.type === 'space') {
         await loc.spaces.delete(confirm.id);
-        loadSpaces(selectedFloor.id);
+        if (selectedFloor) loadSpaces(selectedFloor.id);
       }
     } catch (e) { setApiError(e.response?.data?.detail || t.common.error); }
     setConfirm(null);
@@ -493,37 +552,38 @@ export default function Patrimoine() {
 
   const openEdit = (type, item) => { setEditTarget({ type, item }); setModal('edit'); };
 
-  // ── CARD STYLES ──
-  const panelCard = (selected) => ({
-    padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
-    border: `2px solid ${selected ? 'var(--gold)' : 'var(--border)'}`,
-    background: selected ? '#fffbf0' : 'white', transition: 'all .15s',
-    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
-    boxShadow: selected ? '0 2px 8px rgba(212,175,55,.2)' : 'none',
-  });
-
-  // ── COMPUTED AREA STATS ──
+  // ── Computed stats ──
   const floorsAreaSum  = floors.reduce((acc, f) => acc + (parseFloat(f.area_sqm) || 0), 0);
   const spacesAreaSum  = spaces.reduce((acc, s) => acc + (parseFloat(s.current_area_sqm) || 0), 0);
   const spacesByStatus = spaces.reduce((acc, s) => { acc[s.status] = (acc[s.status] || 0) + 1; return acc; }, {});
 
-  // ── BREADCRUMB PATH ──
-  const breadcrumbs = [
-    selectedCC     && { label: selectedCC.code,             onClick: () => { setSelectedCC(null); setEntities([]); setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } },
-    selectedBE     && { label: selectedBE.name,             onClick: () => { setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } },
-    selectedBuilding && { label: selectedBuilding.name,     onClick: () => { setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } },
-    selectedFloor  && { label: `Floor ${selectedFloor.floor_number}${selectedFloor.name ? ` — ${selectedFloor.name}` : ''}`, onClick: null },
-  ].filter(Boolean);
+  // ── Styles ──
+  const sideItem = (active) => ({
+    padding: '10px 14px', borderRadius: 10, marginBottom: 6, cursor: 'pointer',
+    border: `2px solid ${active ? 'var(--gold)' : 'transparent'}`,
+    background: active ? '#fffbf0' : 'transparent',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    transition: 'all .12s',
+  });
 
-  // ── DEPTH LEVEL for responsive grid ──
-  // Always show: CC panel. Then conditionally: BE, Building, Floors, Spaces
-  const depth = [true, !!selectedCC, !!selectedBE, !!selectedBuilding, !!selectedFloor].filter(Boolean).length;
-  // Use a side-panel layout: fixed-width left panels + main content area
-  const panelW = 220;
+  const panelCard = (active) => ({
+    padding: '12px 14px', borderRadius: 10, marginBottom: 8, cursor: 'pointer',
+    border: `2px solid ${active ? 'var(--gold)' : 'var(--border)'}`,
+    background: active ? '#fffbf0' : 'white', transition: 'all .15s',
+    display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+    boxShadow: active ? '0 2px 8px rgba(212,175,55,.2)' : 'none',
+  });
+
+  // ── Determine what the right panel should show ──
+  // 4 possible views: empty, entities list, buildings+, floors+spaces
+  const view = !selectedCC ? 'empty'
+    : !selectedBE ? 'entities'
+    : !selectedBuilding ? 'buildings'
+    : 'floors';
 
   return (
     <div className="animate-fade">
-      <PageHeader title={tc.patrimoineTitle || 'Patrimoine'} sub={tc.patrimoineSub || 'Hierarchical property management'} />
+      <PageHeader title={tc.patrimoineTitle || 'Patrimoine'} sub={tc.patrimoineSub || 'Gestion hiérarchique du patrimoine'} />
 
       {apiError && (
         <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#dc2626', marginBottom: 16 }}>
@@ -532,25 +592,6 @@ export default function Patrimoine() {
         </div>
       )}
 
-      {/* ── Breadcrumb trail ── */}
-      {breadcrumbs.length > 0 && (
-        <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap', fontSize: 13, color: 'var(--slate)' }}>
-          <span style={{ cursor: 'pointer', color: 'var(--slate)' }} onClick={() => { setSelectedCC(null); setEntities([]); setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); }}>
-            🏢 All
-          </span>
-          {breadcrumbs.map((b, i) => (
-            <React.Fragment key={i}>
-              <span style={{ color: '#ccc' }}>›</span>
-              <span
-                style={{ cursor: b.onClick ? 'pointer' : 'default', color: i === breadcrumbs.length - 1 ? 'var(--ink)' : 'var(--gold)', fontWeight: i === breadcrumbs.length - 1 ? 700 : 400 }}
-                onClick={b.onClick || undefined}
-              >{b.label}</span>
-            </React.Fragment>
-          ))}
-        </div>
-      )}
-
-      {/* ── Confirm delete ── */}
       {confirm && (
         <div style={{ background: '#fff5f5', border: '1.5px solid #fca5a5', borderRadius: 10, padding: '14px 16px', marginBottom: 14 }}>
           <div style={{ fontSize: 13, marginBottom: 10, color: '#7f1d1d' }}>
@@ -563,137 +604,211 @@ export default function Patrimoine() {
         </div>
       )}
 
-      {/* ── MAIN LAYOUT: side panels + content ── */}
-      <div style={{ display: 'flex', gap: 16, alignItems: 'flex-start' }}>
+      {/* ── Breadcrumb ── */}
+      {selectedCC && (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 16, fontSize: 13, flexWrap: 'wrap' }}>
+          <span style={{ cursor: 'pointer', color: 'var(--gold)' }} onClick={() => { setSelectedCC(null); setEntities([]); setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); }}>
+            🏦 Tous
+          </span>
+          <span style={{ color: '#ccc' }}>›</span>
+          <span
+            style={{ cursor: selectedBE ? 'pointer' : 'default', color: selectedBE ? 'var(--gold)' : 'var(--ink)', fontWeight: selectedBE ? 400 : 700 }}
+            onClick={selectedBE ? () => { setSelectedBE(null); setBuildings([]); setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } : undefined}
+          >
+            {selectedCC.code} — {selectedCC.name}
+          </span>
+          {selectedBE && <>
+            <span style={{ color: '#ccc' }}>›</span>
+            <span
+              style={{ cursor: selectedBuilding ? 'pointer' : 'default', color: selectedBuilding ? 'var(--gold)' : 'var(--ink)', fontWeight: selectedBuilding ? 400 : 700 }}
+              onClick={selectedBuilding ? () => { setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); } : undefined}
+            >
+              {selectedBE.name}
+            </span>
+          </>}
+          {selectedBuilding && <>
+            <span style={{ color: '#ccc' }}>›</span>
+            <span
+              style={{ cursor: selectedFloor ? 'pointer' : 'default', color: selectedFloor ? 'var(--gold)' : 'var(--ink)', fontWeight: selectedFloor ? 400 : 700 }}
+              onClick={selectedFloor ? () => { setSelectedFloor(null); setSpaces([]); } : undefined}
+            >
+              {selectedBuilding.name}
+            </span>
+          </>}
+          {selectedFloor && <>
+            <span style={{ color: '#ccc' }}>›</span>
+            <span style={{ color: 'var(--ink)', fontWeight: 700 }}>Étage {selectedFloor.floor_number}{selectedFloor.name ? ` — ${selectedFloor.name}` : ''}</span>
+          </>}
+        </div>
+      )}
 
-        {/* ── Panel 1: Company Codes ── */}
-        <div style={{ width: panelW, flexShrink: 0 }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-            <div style={{ fontFamily: 'DM Serif Display', fontSize: 15, color: 'var(--ink)' }}>
-              🏦 {tc.companyCodes || 'Company Codes'}
-            </div>
+      {/* ── MASTER / DETAIL LAYOUT ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 0, minHeight: 500, border: '1.5px solid var(--border)', borderRadius: 14, overflow: 'hidden', background: 'white' }}>
+
+        {/* ── LEFT SIDEBAR: Company Codes ── */}
+        <div style={{ borderRight: '1.5px solid var(--border)', background: '#fafafa', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '14px 16px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontFamily: 'DM Serif Display', fontSize: 14, color: 'var(--ink)' }}>🏦 Company Codes</span>
             <button onClick={() => { setEditTarget(null); setModal('cc'); }} style={btnAdd}>+</button>
           </div>
-          {companyCodes.map(cc => (
-            <div key={cc.id} style={panelCard(selectedCC?.id === cc.id)} onClick={() => setSelectedCC(selectedCC?.id === cc.id ? null : cc)}>
-              <div style={{ minWidth: 0 }}>
-                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink)' }}>{cc.code}</div>
-                <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{cc.name}</div>
-                <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>
-                  {[cc.currency, cc.country].filter(Boolean).join(' · ')}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '10px 8px' }}>
+            {companyCodes.length === 0 && (
+              <div style={{ textAlign: 'center', padding: '32px 16px', color: 'var(--slate)', fontSize: 12 }}>Aucun code société</div>
+            )}
+            {companyCodes.map(cc => (
+              <div key={cc.id} style={sideItem(selectedCC?.id === cc.id)} onClick={() => selectCC(cc)}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--ink)' }}>{cc.code}</div>
+                  <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cc.name}</div>
+                  {cc.country && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 1 }}>{cc.country}{cc.state ? `, ${cc.state}` : ''}</div>}
                 </div>
+                <ActionBtns onEdit={() => openEdit('cc', cc)} onDelete={() => setConfirm({ type: 'cc', id: cc.id, label: cc.code })} />
               </div>
-              <ActionBtns onEdit={() => openEdit('cc', cc)} onDelete={() => setConfirm({ type: 'cc', id: cc.id, label: cc.code })} />
-            </div>
-          ))}
-          {companyCodes.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--slate)', fontSize: 12 }}>No company codes yet.</div>}
+            ))}
+          </div>
         </div>
 
-        {/* ── Panel 2: Business Entities ── */}
-        {selectedCC && (
-          <div style={{ width: panelW, flexShrink: 0 }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-              <div style={{ fontFamily: 'DM Serif Display', fontSize: 15, color: 'var(--ink)' }}>
-                🏛 {tc.businessEntities || 'Entities'}
-              </div>
-              <button onClick={() => { setEditTarget(null); setModal('be'); }} style={btnAdd}>+</button>
+        {/* ── RIGHT PANEL: changes based on selection ── */}
+        <div style={{ display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+
+          {/* Empty state */}
+          {view === 'empty' && (
+            <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--slate)', gap: 12 }}>
+              <div style={{ fontSize: 52 }}>🏦</div>
+              <div style={{ fontFamily: 'DM Serif Display', fontSize: 18 }}>Sélectionnez un Company Code</div>
+              <div style={{ fontSize: 13, maxWidth: 280, textAlign: 'center', lineHeight: 1.5 }}>Choisissez un code société dans la liste pour explorer son patrimoine</div>
             </div>
-            {loading
-              ? <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 12 }}>{t.common.loading}</div>
-              : entities.map(be => (
-                  <div key={be.id} style={panelCard(selectedBE?.id === be.id)} onClick={() => setSelectedBE(selectedBE?.id === be.id ? null : be)}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 700, fontSize: 13 }}>{be.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                        {[be.city, be.state, be.country].filter(Boolean).join(', ')}
-                      </div>
-                      {be.currency && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>{be.currency}</div>}
-                    </div>
-                    <ActionBtns onEdit={() => openEdit('be', be)} onDelete={() => setConfirm({ type: 'be', id: be.id, label: be.name })} />
-                  </div>
-                ))
-            }
-            {entities.length === 0 && !loading && <div style={{ textAlign: 'center', padding: 24, color: 'var(--slate)', fontSize: 12 }}>{tc.noEntities || 'No entities'}</div>}
-          </div>
-        )}
+          )}
 
-        {/* ── Right content area: Buildings + detail ── */}
-        {selectedBE && (
-          <div style={{ flex: 1, minWidth: 0 }}>
-
-            {/* Buildings grid */}
-            <div style={{ marginBottom: 20 }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                <div style={{ fontFamily: 'DM Serif Display', fontSize: 15 }}>
-                  🏗 {tc.buildings || 'Buildings'}
-                </div>
-                <button onClick={() => { setEditTarget(null); setModal('building'); }} style={btnAdd}>+ {t.common.add}</button>
+          {/* ── ENTITIES LIST ── */}
+          {view === 'entities' && (
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', background: '#fafafa' }}>
+                <span style={{ fontFamily: 'DM Serif Display', fontSize: 14 }}>🏛 Entités — <span style={{ color: 'var(--gold)' }}>{selectedCC.code}</span></span>
+                <button onClick={() => { setEditTarget(null); setModal('be'); }} style={btnAdd}>+ Ajouter</button>
               </div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
-                {buildings.map(b => {
-                  const sel = selectedBuilding?.id === b.id;
-                  const floorSum = sel ? floorsAreaSum : 0;
-                  return (
+              <div style={{ padding: 20 }}>
+                {loadingBE && <div style={{ color: 'var(--slate)', fontSize: 13, padding: 20, textAlign: 'center' }}>{t.common.loading}</div>}
+                {!loadingBE && entities.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--slate)' }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>🏛</div>
+                    <div style={{ fontFamily: 'DM Serif Display', fontSize: 16, marginBottom: 6 }}>Aucune entité</div>
+                    <div style={{ fontSize: 13 }}>Ajoutez une entité à ce code société</div>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 12 }}>
+                  {entities.map(be => (
+                    <div key={be.id}
+                      onClick={() => selectBE(be)}
+                      style={{ padding: '16px 18px', borderRadius: 12, border: '1.5px solid var(--border)', cursor: 'pointer', background: 'white', transition: 'all .15s', boxShadow: '0 1px 4px rgba(0,0,0,.04)' }}
+                      onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--gold)'; e.currentTarget.style.boxShadow = '0 4px 12px rgba(212,175,55,.15)'; }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.boxShadow = '0 1px 4px rgba(0,0,0,.04)'; }}
+                    >
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
+                        <div style={{ fontWeight: 700, fontSize: 15, color: 'var(--ink)' }}>{be.name}</div>
+                        <ActionBtns onEdit={() => openEdit('be', be)} onDelete={() => setConfirm({ type: 'be', id: be.id, label: be.name })} />
+                      </div>
+                      {be.legal_name && <div style={{ fontSize: 12, color: 'var(--slate)', marginBottom: 4 }}>{be.legal_name}</div>}
+                      <div style={{ fontSize: 12, color: 'var(--slate)', display: 'flex', flexDirection: 'column', gap: 2 }}>
+                        {[be.city, be.state, be.country].filter(Boolean).length > 0 && <span>📍 {[be.city, be.state, be.country].filter(Boolean).join(', ')}</span>}
+                        {be.currency && <span>💱 {be.currency}</span>}
+                        {be.tax_id && <span>🔢 {be.tax_id}</span>}
+                      </div>
+                      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>Voir les bâtiments →</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* ── BUILDINGS VIEW ── */}
+          {view === 'buildings' && (
+            <div style={{ flex: 1, overflow: 'auto' }}>
+              {/* Entities sub-nav */}
+              <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)', background: '#fafafa', display: 'flex', gap: 8, alignItems: 'center', overflowX: 'auto' }}>
+                <span style={{ fontSize: 12, color: 'var(--slate)', whiteSpace: 'nowrap' }}>Entité :</span>
+                {entities.map(be => (
+                  <button key={be.id}
+                    onClick={() => selectBE(be)}
+                    style={{
+                      padding: '5px 12px', borderRadius: 8, border: `1.5px solid ${selectedBE?.id === be.id ? 'var(--gold)' : 'var(--border)'}`,
+                      background: selectedBE?.id === be.id ? '#fffbf0' : 'white',
+                      fontFamily: 'DM Sans', fontSize: 12, fontWeight: selectedBE?.id === be.id ? 700 : 400,
+                      cursor: 'pointer', whiteSpace: 'nowrap', color: 'var(--ink)',
+                    }}
+                  >{be.name}</button>
+                ))}
+                <button onClick={() => { setEditTarget(null); setModal('be'); }} style={{ ...btnAdd, fontSize: 11, padding: '4px 10px', marginLeft: 4, whiteSpace: 'nowrap' }}>+ Entité</button>
+              </div>
+
+              <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontFamily: 'DM Serif Display', fontSize: 14 }}>🏗 Bâtiments — <span style={{ color: 'var(--gold)' }}>{selectedBE.name}</span></span>
+                <button onClick={() => { setEditTarget(null); setModal('building'); }} style={btnAdd}>+ Ajouter</button>
+              </div>
+              <div style={{ padding: 20 }}>
+                {buildings.length === 0 && (
+                  <div style={{ textAlign: 'center', padding: 40, color: 'var(--slate)' }}>
+                    <div style={{ fontSize: 36, marginBottom: 12 }}>🏗</div>
+                    <div style={{ fontFamily: 'DM Serif Display', fontSize: 16, marginBottom: 6 }}>Aucun bâtiment</div>
+                    <div style={{ fontSize: 13 }}>Ajoutez un bâtiment à cette entité</div>
+                  </div>
+                )}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12 }}>
+                  {buildings.map(b => (
                     <div key={b.id}
-                      onClick={() => setSelectedBuilding(sel ? null : b)}
-                      style={{
-                        padding: '14px 16px', borderRadius: 12, cursor: 'pointer', transition: 'all .15s',
-                        border: `2px solid ${sel ? 'var(--gold)' : 'var(--border)'}`,
-                        background: sel ? '#fffbf0' : 'white',
-                        boxShadow: sel ? '0 4px 16px rgba(212,175,55,.2)' : '0 1px 4px rgba(0,0,0,.04)',
-                      }}>
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                      onClick={() => selectBuilding(b)}
+                      style={{ padding: '16px 18px', borderRadius: 12, border: `2px solid ${selectedBuilding?.id === b.id ? 'var(--gold)' : 'var(--border)'}`, cursor: 'pointer', background: selectedBuilding?.id === b.id ? '#fffbf0' : 'white', transition: 'all .15s', boxShadow: selectedBuilding?.id === b.id ? '0 4px 16px rgba(212,175,55,.2)' : '0 1px 4px rgba(0,0,0,.04)' }}>
+                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 8 }}>
                         <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{b.name}</div>
                         <ActionBtns onEdit={() => openEdit('building', b)} onDelete={() => setConfirm({ type: 'building', id: b.id, label: b.name })} />
                       </div>
-                      <div style={{ fontSize: 12, color: 'var(--slate)', marginTop: 6, display: 'flex', flexDirection: 'column', gap: 3 }}>
-                        {b.total_area_sqm && <span>📐 {b.total_area_sqm.toLocaleString()} m² total</span>}
+                      <div style={{ fontSize: 12, color: 'var(--slate)', display: 'flex', flexDirection: 'column', gap: 3 }}>
+                        {b.total_area_sqm && <span>📐 {b.total_area_sqm.toLocaleString()} m²</span>}
                         {b.construction_year && <span>📅 {b.construction_year}</span>}
-                        {[b.city, b.country].filter(Boolean).length > 0 && <span>📍 {[b.city, b.country].filter(Boolean).join(', ')}</span>}
+                        {[b.city, b.state, b.country].filter(Boolean).length > 0 && <span>📍 {[b.city, b.state, b.country].filter(Boolean).join(', ')}</span>}
+                      </div>
+                      <div style={{ marginTop: 12, fontSize: 12, color: 'var(--gold)', fontWeight: 600 }}>
+                        {selectedBuilding?.id === b.id ? '▼ Voir les étages' : '→ Voir les étages'}
                       </div>
                     </div>
-                  );
-                })}
+                  ))}
+                </div>
               </div>
-              {buildings.length === 0 && <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 13 }}>{tc.noBuildings || 'No buildings'}</div>}
             </div>
+          )}
 
-            {/* ── Floors + Spaces detail ── */}
-            {selectedBuilding && (
-              <div style={{ display: 'grid', gridTemplateColumns: '240px 1fr', gap: 16 }}>
+          {/* ── FLOORS + SPACES VIEW ── */}
+          {view === 'floors' && (
+            <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '220px 1fr', minHeight: 0 }}>
 
-                {/* Floors panel */}
-                <div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                    <div style={{ fontFamily: 'DM Serif Display', fontSize: 15 }}>🏢 {tc.floors || 'Floors'}</div>
-                    <button onClick={() => { setEditTarget(null); setModal('floor'); }} style={btnAdd}>+</button>
-                  </div>
+              {/* Floors list */}
+              <div style={{ borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: '#fafafa' }}>
+                <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <span style={{ fontFamily: 'DM Serif Display', fontSize: 13 }}>🏢 Étages</span>
+                  <button onClick={() => { setEditTarget(null); setModal('floor'); }} style={{ ...btnAdd, padding: '4px 10px', fontSize: 11 }}>+</button>
+                </div>
 
-                  {/* Building area summary */}
-                  {selectedBuilding.total_area_sqm && (
-                    <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '10px 12px', marginBottom: 12, fontSize: 12 }}>
-                      <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>Bâtiment: {selectedBuilding.total_area_sqm.toLocaleString()} m²</div>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <div style={{ flex: 1, height: 6, borderRadius: 3, background: '#e5e7eb', overflow: 'hidden' }}>
-                          <div style={{
-                            height: '100%', borderRadius: 3,
-                            background: floorsAreaSum > selectedBuilding.total_area_sqm ? '#dc2626' : 'var(--gold)',
-                            width: `${Math.min(100, (floorsAreaSum / selectedBuilding.total_area_sqm) * 100)}%`,
-                            transition: 'width .3s',
-                          }} />
-                        </div>
-                        <span style={{ color: floorsAreaSum > selectedBuilding.total_area_sqm ? '#dc2626' : 'var(--slate)', whiteSpace: 'nowrap' }}>
-                          {floorsAreaSum.toLocaleString()} / {selectedBuilding.total_area_sqm.toLocaleString()} m²
-                        </span>
-                      </div>
-                      {floorsAreaSum > selectedBuilding.total_area_sqm && (
-                        <div style={{ color: '#dc2626', fontSize: 11, marginTop: 4 }}>⚠️ Superficie dépassée!</div>
-                      )}
+                {/* Building area bar */}
+                {selectedBuilding.total_area_sqm && (
+                  <div style={{ padding: '8px 12px', borderBottom: '1px solid var(--border)', fontSize: 11 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 4, color: 'var(--slate)' }}>
+                      <span>Superficie</span>
+                      <span style={{ color: floorsAreaSum > selectedBuilding.total_area_sqm ? '#dc2626' : 'var(--ink)', fontWeight: 600 }}>
+                        {floorsAreaSum.toLocaleString()} / {selectedBuilding.total_area_sqm.toLocaleString()} m²
+                      </span>
                     </div>
-                  )}
+                    <div style={{ height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', borderRadius: 2, background: floorsAreaSum > selectedBuilding.total_area_sqm ? '#dc2626' : 'var(--gold)', width: `${Math.min(100, (floorsAreaSum / selectedBuilding.total_area_sqm) * 100)}%`, transition: 'width .3s' }} />
+                    </div>
+                    {floorsAreaSum > selectedBuilding.total_area_sqm && <div style={{ color: '#dc2626', fontSize: 10, marginTop: 3 }}>⚠️ Dépassement!</div>}
+                  </div>
+                )}
 
+                <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
+                  {floors.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--slate)', fontSize: 12 }}>Aucun étage</div>}
                   {floors.map(f => (
-                    <div key={f.id} style={panelCard(selectedFloor?.id === f.id)} onClick={() => setSelectedFloor(selectedFloor?.id === f.id ? null : f)}>
+                    <div key={f.id} style={{ ...panelCard(selectedFloor?.id === f.id), marginBottom: 6 }} onClick={() => selectFloor(f)}>
                       <div>
                         <div style={{ fontWeight: 700, fontSize: 13 }}>Étage {f.floor_number}{f.name ? ` — ${f.name}` : ''}</div>
                         <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2 }}>{f.area_sqm ? `${f.area_sqm.toLocaleString()} m²` : '—'}</div>
@@ -701,80 +816,83 @@ export default function Patrimoine() {
                       <ActionBtns onEdit={() => openEdit('floor', f)} onDelete={() => setConfirm({ type: 'floor', id: f.id, label: `Floor ${f.floor_number}` })} />
                     </div>
                   ))}
-                  {floors.length === 0 && <div style={{ textAlign: 'center', padding: 24, color: 'var(--slate)', fontSize: 12 }}>{tc.noFloors || 'No floors'}</div>}
                 </div>
 
-                {/* Spaces panel */}
-                {selectedFloor && (
-                  <div>
-                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
-                      <div style={{ fontFamily: 'DM Serif Display', fontSize: 15 }}>📦 {tc.spaces || 'Spaces'}</div>
-                      <button onClick={() => { setEditTarget(null); setModal('space'); }} style={btnAdd}>+ {t.common.add}</button>
-                    </div>
+                {/* Back to buildings */}
+                <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)' }}>
+                  <button
+                    onClick={() => { setSelectedBuilding(null); setFloors([]); setSelectedFloor(null); setSpaces([]); }}
+                    style={{ width: '100%', padding: '7px 0', borderRadius: 8, border: '1.5px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 12, color: 'var(--slate)' }}
+                  >← Retour aux bâtiments</button>
+                </div>
+              </div>
 
-                    {/* Floor area summary + status stats */}
-                    <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 14 }}>
-                      {selectedFloor.area_sqm && (
-                        <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '8px 12px', fontSize: 12, flex: '1 1 auto' }}>
-                          <div style={{ fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>Étage: {selectedFloor.area_sqm.toLocaleString()} m²</div>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                            <div style={{ flex: 1, height: 6, borderRadius: 3, background: '#e5e7eb', overflow: 'hidden' }}>
-                              <div style={{
-                                height: '100%', borderRadius: 3,
-                                background: spacesAreaSum > selectedFloor.area_sqm ? '#dc2626' : '#22c55e',
-                                width: `${Math.min(100, (spacesAreaSum / selectedFloor.area_sqm) * 100)}%`,
-                                transition: 'width .3s',
-                              }} />
-                            </div>
-                            <span style={{ color: spacesAreaSum > selectedFloor.area_sqm ? '#dc2626' : 'var(--slate)', whiteSpace: 'nowrap' }}>
-                              {spacesAreaSum.toLocaleString()} / {selectedFloor.area_sqm.toLocaleString()} m²
-                            </span>
-                          </div>
-                          {spacesAreaSum > selectedFloor.area_sqm && (
-                            <div style={{ color: '#dc2626', fontSize: 11, marginTop: 4 }}>⚠️ Superficie dépassée!</div>
-                          )}
-                        </div>
-                      )}
-                      {spaces.length > 0 && (
-                        <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '8px 12px', fontSize: 12, display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                          {Object.entries(spacesByStatus).map(([status, count]) => {
-                            const c = SPACE_STATUS_COLORS[status] || { bg: '#f5f5f5', text: '#666' };
-                            return <span key={status} style={{ background: c.bg, color: c.text, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{count} {status}</span>;
-                          })}
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Space cards grid */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 10 }}>
-                      {spaces.map(s => (
-                        <Card key={s.id} style={{ padding: '14px 16px', borderRadius: 10 }}>
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{s.space_code}</div>
-                            <ActionBtns onEdit={() => openEdit('space', s)} onDelete={() => setConfirm({ type: 'space', id: s.id, label: s.space_code })} />
-                          </div>
-                          <div style={{ marginTop: 6 }}><Badge status={s.status} /></div>
-                          {s.description && <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 6 }}>{s.description}</div>}
-                          {s.current_area_sqm && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, color: 'var(--ink)' }}>📐 {s.current_area_sqm.toLocaleString()} m²</div>}
-                        </Card>
-                      ))}
-                    </div>
-                    {spaces.length === 0 && <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 13 }}>{tc.noSpaces || 'No spaces'}</div>}
+              {/* Spaces */}
+              <div style={{ display: 'flex', flexDirection: 'column', overflow: 'auto' }}>
+                {!selectedFloor ? (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: 'var(--slate)', gap: 10 }}>
+                    <div style={{ fontSize: 36 }}>📦</div>
+                    <div style={{ fontFamily: 'DM Serif Display', fontSize: 15 }}>Sélectionnez un étage</div>
+                    <div style={{ fontSize: 12 }}>Les espaces s'afficheront ici</div>
                   </div>
+                ) : (
+                  <>
+                    <div style={{ padding: '12px 18px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8, background: '#fafafa' }}>
+                      <span style={{ fontFamily: 'DM Serif Display', fontSize: 13 }}>
+                        📦 Espaces — Étage {selectedFloor.floor_number}{selectedFloor.name ? ` · ${selectedFloor.name}` : ''}
+                      </span>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                        {/* Status badges */}
+                        {Object.entries(spacesByStatus).map(([status, count]) => {
+                          const c = SPACE_STATUS_COLORS[status] || { bg: '#f5f5f5', text: '#666' };
+                          return <span key={status} style={{ background: c.bg, color: c.text, borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{count} {status}</span>;
+                        })}
+                        <button onClick={() => { setEditTarget(null); setModal('space'); }} style={btnAdd}>+ Espace</button>
+                      </div>
+                    </div>
+
+                    {/* Floor area bar */}
+                    {selectedFloor.area_sqm && (
+                      <div style={{ padding: '8px 18px', borderBottom: '1px solid var(--border)', fontSize: 11, display: 'flex', alignItems: 'center', gap: 10 }}>
+                        <span style={{ color: 'var(--slate)', whiteSpace: 'nowrap' }}>Superficie étage :</span>
+                        <div style={{ flex: 1, height: 4, borderRadius: 2, background: '#e5e7eb', overflow: 'hidden' }}>
+                          <div style={{ height: '100%', borderRadius: 2, background: spacesAreaSum > selectedFloor.area_sqm ? '#dc2626' : '#22c55e', width: `${Math.min(100, (spacesAreaSum / selectedFloor.area_sqm) * 100)}%`, transition: 'width .3s' }} />
+                        </div>
+                        <span style={{ color: spacesAreaSum > selectedFloor.area_sqm ? '#dc2626' : 'var(--slate)', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                          {spacesAreaSum.toLocaleString()} / {selectedFloor.area_sqm.toLocaleString()} m²
+                        </span>
+                        {spacesAreaSum > selectedFloor.area_sqm && <span style={{ color: '#dc2626' }}>⚠️</span>}
+                      </div>
+                    )}
+
+                    <div style={{ flex: 1, overflowY: 'auto', padding: 16 }}>
+                      {spaces.length === 0 && (
+                        <div style={{ textAlign: 'center', padding: 40, color: 'var(--slate)' }}>
+                          <div style={{ fontSize: 32, marginBottom: 8 }}>📦</div>
+                          <div style={{ fontFamily: 'DM Serif Display', fontSize: 15, marginBottom: 4 }}>Aucun espace</div>
+                          <div style={{ fontSize: 12 }}>Ajoutez des espaces à cet étage</div>
+                        </div>
+                      )}
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 10 }}>
+                        {spaces.map(s => (
+                          <Card key={s.id} style={{ padding: '14px 16px', borderRadius: 10 }}>
+                            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{s.space_code}</div>
+                              <ActionBtns onEdit={() => openEdit('space', s)} onDelete={() => setConfirm({ type: 'space', id: s.id, label: s.space_code })} />
+                            </div>
+                            <div style={{ marginTop: 6 }}><Badge status={s.status} /></div>
+                            {s.description && <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 6 }}>{s.description}</div>}
+                            {s.current_area_sqm && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, color: 'var(--ink)' }}>📐 {s.current_area_sqm.toLocaleString()} m²</div>}
+                          </Card>
+                        ))}
+                      </div>
+                    </div>
+                  </>
                 )}
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Placeholder when nothing selected */}
-        {!selectedCC && companyCodes.length > 0 && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 60, color: 'var(--slate)', textAlign: 'center' }}>
-            <div style={{ fontSize: 48, marginBottom: 16 }}>🏦</div>
-            <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 8 }}>Sélectionnez un Company Code</div>
-            <div style={{ fontSize: 13 }}>Cliquez sur un code société pour explorer sa hiérarchie</div>
-          </div>
-        )}
+            </div>
+          )}
+        </div>
       </div>
 
       {/* ── Create modals ── */}
@@ -785,7 +903,7 @@ export default function Patrimoine() {
       )}
       {modal === 'be' && !editTarget && (
         <Modal title={tc.newBusinessEntity || 'New Business Entity'} onClose={() => setModal(null)}>
-          <BusinessEntityForm onSave={() => loadEntities(selectedCC?.id)} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} existingItems={entities} />
+          <BusinessEntityForm onSave={() => { if (selectedCC) loadEntities(selectedCC.id); setModal(null); }} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} existingItems={entities} />
         </Modal>
       )}
       {modal === 'building' && !editTarget && selectedBE && (
@@ -795,26 +913,12 @@ export default function Patrimoine() {
       )}
       {modal === 'floor' && !editTarget && selectedBuilding && (
         <Modal title={tc.newFloor || 'New Floor'} onClose={() => setModal(null)}>
-          <FloorForm
-            buildingId={selectedBuilding.id}
-            onSave={() => loadFloors(selectedBuilding.id)}
-            onClose={() => setModal(null)}
-            t={t}
-            buildingTotalSqm={selectedBuilding.total_area_sqm}
-            existingFloors={floors}
-          />
+          <FloorForm buildingId={selectedBuilding.id} onSave={() => loadFloors(selectedBuilding.id)} onClose={() => setModal(null)} t={t} buildingTotalSqm={selectedBuilding.total_area_sqm} existingFloors={floors} />
         </Modal>
       )}
       {modal === 'space' && !editTarget && selectedFloor && (
         <Modal title={tc.newSpace || 'New Space'} onClose={() => setModal(null)}>
-          <SpaceForm
-            floorId={selectedFloor.id}
-            onSave={() => loadSpaces(selectedFloor.id)}
-            onClose={() => setModal(null)}
-            t={t}
-            floorAreaSqm={selectedFloor.area_sqm}
-            existingSpaces={spaces}
-          />
+          <SpaceForm floorId={selectedFloor.id} onSave={() => loadSpaces(selectedFloor.id)} onClose={() => setModal(null)} t={t} floorAreaSqm={selectedFloor.area_sqm} existingSpaces={spaces} />
         </Modal>
       )}
 
@@ -826,38 +930,22 @@ export default function Patrimoine() {
       )}
       {modal === 'edit' && editTarget?.type === 'be' && (
         <Modal title={`Edit — ${editTarget.item.name}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <BusinessEntityForm initial={editTarget.item} onSave={() => { loadEntities(selectedCC?.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingItems={entities} />
+          <BusinessEntityForm initial={editTarget.item} onSave={() => { if (selectedCC) loadEntities(selectedCC.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingItems={entities} />
         </Modal>
       )}
       {modal === 'edit' && editTarget?.type === 'building' && (
         <Modal title={`Edit — ${editTarget.item.name}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <BuildingForm initial={editTarget.item} beId={selectedBE?.id} onSave={() => { loadBuildings(selectedBE.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingBuildings={buildings} />
+          <BuildingForm initial={editTarget.item} beId={selectedBE?.id} onSave={() => { if (selectedBE) loadBuildings(selectedBE.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingBuildings={buildings} />
         </Modal>
       )}
       {modal === 'edit' && editTarget?.type === 'floor' && (
         <Modal title={`Edit — Floor ${editTarget.item.floor_number}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <FloorForm
-            initial={editTarget.item}
-            buildingId={selectedBuilding?.id}
-            onSave={() => { loadFloors(selectedBuilding.id); setModal(null); setEditTarget(null); }}
-            onClose={() => { setModal(null); setEditTarget(null); }}
-            t={t}
-            buildingTotalSqm={selectedBuilding?.total_area_sqm}
-            existingFloors={floors}
-          />
+          <FloorForm initial={editTarget.item} buildingId={selectedBuilding?.id} onSave={() => { if (selectedBuilding) loadFloors(selectedBuilding.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} buildingTotalSqm={selectedBuilding?.total_area_sqm} existingFloors={floors} />
         </Modal>
       )}
       {modal === 'edit' && editTarget?.type === 'space' && (
         <Modal title={`Edit — ${editTarget.item.space_code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <SpaceForm
-            initial={editTarget.item}
-            floorId={selectedFloor?.id}
-            onSave={() => { loadSpaces(selectedFloor.id); setModal(null); setEditTarget(null); }}
-            onClose={() => { setModal(null); setEditTarget(null); }}
-            t={t}
-            floorAreaSqm={selectedFloor?.area_sqm}
-            existingSpaces={spaces}
-          />
+          <SpaceForm initial={editTarget.item} floorId={selectedFloor?.id} onSave={() => { if (selectedFloor) loadSpaces(selectedFloor.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} floorAreaSqm={selectedFloor?.area_sqm} existingSpaces={spaces} />
         </Modal>
       )}
     </div>
