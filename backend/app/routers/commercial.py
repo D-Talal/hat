@@ -47,6 +47,7 @@ class BusinessEntityCreate(BaseModel):
     legal_name: Optional[str] = None
     tax_id: Optional[str] = None
     country: Optional[str] = None
+    state: Optional[str] = None
     city: Optional[str] = None
     continent: Optional[str] = None
     address: Optional[str] = None
@@ -78,6 +79,7 @@ class BuildingCreate(BaseModel):
     name: str
     address: Optional[str] = None
     city: Optional[str] = None
+    state: Optional[str] = None
     country: Optional[str] = None
     continent: Optional[str] = None
     total_area_sqm: Optional[float] = None
@@ -467,6 +469,7 @@ class CompanyCodeCreate(BaseModel):
     name:        str
     currency:    Optional[str] = "USD"
     country:     Optional[str] = None
+    state:       Optional[str] = None
     description: Optional[str] = None
 
     @field_validator('code')
