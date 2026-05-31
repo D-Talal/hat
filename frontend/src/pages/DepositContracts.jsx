@@ -3,6 +3,7 @@ import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { CURRENCIES } from '../data/currencies';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { COMMON_CURRENCIES } from '../data/constants';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
@@ -24,7 +25,7 @@ function Field({ label, children }) {
   );
 }
 
-function DepositForm({ onSave, onClose, initial, contracts, partners }) {
+function DepositForm({ onSave, onClose, initial, contracts, partners, existingDeposits = [] }) {
   const [form, setForm] = useState({
     main_contract_id:    initial?.main_contract_id    || '',
     business_partner_id: initial?.business_partner_id || '',
@@ -40,8 +41,17 @@ function DepositForm({ onSave, onClose, initial, contracts, partners }) {
   const [error, setError] = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  // Check: same contract + same partner combination already exists
+  const contractPartnerDup = !initial?.id && form.main_contract_id && form.business_partner_id
+    ? existingDeposits.find(d =>
+        String(d.main_contract_id) === String(form.main_contract_id) &&
+        String(d.business_partner_id) === String(form.business_partner_id)
+      )
+    : null;
+
   const save = async () => {
     if (!form.main_contract_id || !form.business_partner_id) { setError('Contract and business partner are required'); return; }
+    if (contractPartnerDup) { setError(`Un dépôt existe déjà pour cette combinaison contrat + partenaire (${contractPartnerDup.deposit_number || `#${contractPartnerDup.id}`}).`); return; }
     setSaving(true); setError('');
     try {
       const payload = {
@@ -73,6 +83,11 @@ function DepositForm({ onSave, onClose, initial, contracts, partners }) {
             <option value="">— Select —</option>
             {partners.map(p => <option key={p.id} value={p.id}>{p.company_name}</option>)}
           </select>
+          {contractPartnerDup && (
+            <div style={{ background: '#fffbeb', border: '1px solid #f59e0b', borderRadius: 7, padding: '7px 12px', fontSize: 12, color: '#92400e', marginTop: 4, display: 'flex', gap: 6 }}>
+              ⚠️ Un dépôt existe déjà pour ce contrat + garant.
+            </div>
+          )}
         </Field>
         <Field label="Calculation Method">
           <select style={inputStyle} value={form.calc_method} onChange={set('calc_method')}>
@@ -242,7 +257,7 @@ export default function DepositContracts() {
 
       {modal === 'form' && (
         <Modal title={selected ? `Edit — ${selected.deposit_number}` : 'New Deposit Contract'} onClose={() => setModal(null)}>
-          <DepositForm onSave={() => { load(); setModal(null); }} onClose={() => setModal(null)} initial={selected} contracts={contracts} partners={partners} />
+          <DepositForm onSave={() => { load(); setModal(null); }} onClose={() => setModal(null)} initial={selected} contracts={contracts} partners={partners} existingDeposits={items} />
         </Modal>
       )}
 

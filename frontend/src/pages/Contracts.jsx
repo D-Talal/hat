@@ -3,6 +3,7 @@ import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { DAY_COUNT_METHODS, CONTRACT_TYPES, PAYMENT_TIMINGS } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -45,13 +46,14 @@ function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 24, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
 }
 
-function ContractForm({ onSave, onClose, initial }) {
+function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [partners, setPartners] = useState([]);
   const [entities, setEntities] = useState([]);
   const [rentalObjects, setRentalObjects] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState([]);
+  const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     contract_number: initial?.contract_number || '',
     business_partner_id: initial?.business_partner_id || '',
@@ -72,6 +74,13 @@ function ContractForm({ onSave, onClose, initial }) {
   });
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
+  // Only check contract_number duplicate if manually entered (not auto-generated)
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
+    fields: ['contract_number'],
+    labels: { contract_number: 'Numéro de contrat' },
+    editingId: initial?.id,
+  });
+
   useEffect(() => {
     Promise.all([API.get('/commercial/business-partners'), API.get('/commercial/business-entities'), API.get('/commercial/rental-objects')])
       .then(([bp, be, ro]) => { setPartners(bp.data || []); setEntities(be.data || []); setRentalObjects(ro.data || []); })
@@ -81,18 +90,30 @@ function ContractForm({ onSave, onClose, initial }) {
   const toggleObject = id => setSelectedObjects(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
   const save = async () => {
-    if (initial?.id) await API.patch(`/commercial/contracts/${initial.id}`, { probable_end_date: form.probable_end_date, absolute_end_date: form.absolute_end_date, notes: form.notes });
-    else await API.post('/commercial/contracts', { ...form, rental_object_ids: selectedObjects });
-    onSave(); onClose();
+    setFormError('');
+    // Only check duplicate on manual contract_number (non-empty, non-edit)
+    if (!initial?.id && form.contract_number.trim()) {
+      const dupErr = checkDuplicate(form);
+      if (dupErr) { setFormError(dupErr); return; }
+    }
+    try {
+      if (initial?.id) await API.patch(`/commercial/contracts/${initial.id}`, { probable_end_date: form.probable_end_date, absolute_end_date: form.absolute_end_date, notes: form.notes });
+      else await API.post('/commercial/contracts', { ...form, rental_object_ids: selectedObjects });
+      onSave(); onClose();
+    } catch (e) { setFormError(e.response?.data?.detail || 'Error'); }
   };
 
   const isEdit = !!initial?.id;
 
   return (
     <>
+      {formError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{formError}</div>}
       <SectionTitle>Contract Information</SectionTitle>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={tc.contractNumber}><input style={inputStyle} value={form.contract_number} onChange={set('contract_number')} placeholder="Auto-generated if empty" disabled={isEdit} /></Field>
+        <Field label={tc.contractNumber}>
+          <input style={inputStyle} value={form.contract_number} onChange={set('contract_number')} placeholder="Auto-generated if empty" disabled={isEdit} />
+          {!isEdit && form.contract_number && <DuplicateWarning value={form.contract_number} field="contract_number" />}
+        </Field>
         <Field label={tc.contractType}>
           <select style={inputStyle} value={form.contract_type} onChange={set('contract_type')} disabled={isEdit}>
             <option value="lease_out">Lease Out (LO) — Landlord → Tenant</option>
@@ -468,7 +489,7 @@ export default function Contracts() {
 
       {(modal === 'new' || modal === 'edit') && (
         <Modal title={modal === 'edit' ? `${t.common.edit} — ${selected?.contract_number || "#"+selected?.id}` : tc.newContract} onClose={() => setModal(null)}>
-          <ContractForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} />
+          <ContractForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} existingItems={contracts} />
         </Modal>
       )}
 

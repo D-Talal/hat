@@ -5,6 +5,7 @@ import { useLanguage } from '../context/LanguageContext';
 import GeoSelect from '../components/shared/GeoSelect';
 import CurrencySelect from '../components/shared/CurrencySelect';
 import { SPACE_STATUSES, USAGE_TYPES } from '../data/constants';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 
 const SPACE_STATUS_COLORS = Object.fromEntries(
   Object.entries(SPACE_STATUSES).map(([k, v]) => [k, { bg: v.bg, text: v.text }])
@@ -78,7 +79,7 @@ const loc = {
 };
 
 // ── COMPANY CODE FORM ──────────────────────────────────────────────────────
-function CompanyCodeForm({ onSave, onClose, t, initial }) {
+function CompanyCodeForm({ onSave, onClose, t, initial, existingItems = [] }) {
   const tc = t.commercial;
   const [form, setForm] = useState({
     code:        initial?.code        || '',
@@ -93,8 +94,16 @@ function CompanyCodeForm({ onSave, onClose, t, initial }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const setGeo = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
+    fields: ['code', 'name'],
+    labels: { code: 'Code', name: 'Nom' },
+    editingId: initial?.id,
+  });
+
   const save = async () => {
     if (!form.code.trim() || !form.name.trim()) { setError('Code and name are required'); return; }
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
     setSaving(true); setError('');
     try {
       const payload = { code: form.code, name: form.name, currency: form.currency, country: form.country, description: form.description };
@@ -111,9 +120,11 @@ function CompanyCodeForm({ onSave, onClose, t, initial }) {
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 2fr', gap: 16 }}>
         <Field label={(tc.companyCode || 'Company Code') + ' *'}>
           <input style={{ ...inputStyle, textTransform: 'uppercase' }} value={form.code} onChange={set('code')} placeholder="e.g. CC01" autoFocus />
+          <DuplicateWarning value={form.code} field="code" />
         </Field>
         <Field label={(tc.companyName || 'Company Name') + ' *'}>
           <input style={inputStyle} value={form.name} onChange={set('name')} />
+          <DuplicateWarning value={form.name} field="name" />
         </Field>
       </div>
       <Field label={tc.currency}>
@@ -138,7 +149,7 @@ function CompanyCodeForm({ onSave, onClose, t, initial }) {
 }
 
 // ── BUSINESS ENTITY FORM ──────────────────────────────────────────────────
-function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId }) {
+function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId, existingItems = [] }) {
   const tc = t.commercial;
   const [form, setForm] = useState({
     name: initial?.name || '', legal_name: initial?.legal_name || '',
@@ -153,8 +164,17 @@ function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const setGeo = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
+    fields: ['name'],
+    labels: { name: 'Nom' },
+    editingId: initial?.id,
+    scope: 'ce Company Code',
+  });
+
   const save = async () => {
     if (!form.name.trim()) { setError(tc.name + ' is required'); return; }
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
     setSaving(true); setError('');
     try {
       if (initial) await loc.businessEntities.update(initial.id, form);
@@ -168,7 +188,10 @@ function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId }) {
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={tc.name + ' *'}><input style={inputStyle} value={form.name} onChange={set('name')} autoFocus /></Field>
+        <Field label={tc.name + ' *'}>
+          <input style={inputStyle} value={form.name} onChange={set('name')} autoFocus />
+          <DuplicateWarning value={form.name} field="name" />
+        </Field>
         <Field label={tc.legalName}><input style={inputStyle} value={form.legal_name} onChange={set('legal_name')} /></Field>
         <Field label={tc.taxId}><input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} /></Field>
       </div>
@@ -201,8 +224,17 @@ function BuildingForm({ beId, onSave, onClose, t, initial, existingBuildings = [
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const setGeo = (field, val) => setForm(f => ({ ...f, [field]: val }));
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingBuildings, {
+    fields: ['name'],
+    labels: { name: 'Nom' },
+    editingId: initial?.id,
+    scope: 'cette entité',
+  });
+
   const save = async () => {
     if (!form.name.trim()) { setError(tc.name + ' is required'); return; }
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
     setSaving(true); setError('');
     try {
       const payload = { ...form, total_area_sqm: form.total_area_sqm ? parseFloat(form.total_area_sqm) : null, construction_year: form.construction_year ? parseInt(form.construction_year) : null };
@@ -217,7 +249,10 @@ function BuildingForm({ beId, onSave, onClose, t, initial, existingBuildings = [
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={tc.name + ' *'}><input style={inputStyle} value={form.name} onChange={set('name')} autoFocus /></Field>
+        <Field label={tc.name + ' *'}>
+          <input style={inputStyle} value={form.name} onChange={set('name')} autoFocus />
+          <DuplicateWarning value={form.name} field="name" />
+        </Field>
         <Field label={(tc.totalArea || 'Total Area') + ' (m²)'}><input style={inputStyle} type="number" min="0" step="0.01" value={form.total_area_sqm} onChange={set('total_area_sqm')} /></Field>
         <Field label={tc.constructionYear || 'Construction Year'}><input style={inputStyle} type="number" min="1800" max="2100" value={form.construction_year} onChange={set('construction_year')} /></Field>
       </div>
@@ -241,6 +276,19 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
   const [error, setError]   = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  // Duplicate check on floor_number (must be unique per building)
+  const { checkDuplicate: checkDupNum, DuplicateWarning: WarnNum } = useDuplicateCheck(existingFloors, {
+    fields: ['floor_number'],
+    labels: { floor_number: 'Numéro d\'étage' },
+    editingId: initial?.id,
+    scope: 'ce bâtiment',
+  });
+  // Duplicate check on name (optional but warn if same)
+  const { DuplicateWarning: WarnName } = useDuplicateCheck(
+    existingFloors.filter(f => f.name),
+    { fields: ['name'], labels: { name: 'Nom' }, editingId: initial?.id, scope: 'ce bâtiment' }
+  );
+
   // Sum of all other floors' areas
   const otherFloorsSum = existingFloors
     .filter(f => f.id !== initial?.id)
@@ -251,6 +299,8 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
 
   const save = async () => {
     if (form.floor_number === '') { setError('Floor number is required'); return; }
+    const dupErr = checkDupNum({ floor_number: String(form.floor_number) });
+    if (dupErr) { setError(dupErr); return; }
     if (areaExceeds) { setError(`La somme des superficies des étages (${totalUsed.toLocaleString()} m²) dépasse la superficie totale du bâtiment (${parseFloat(buildingTotalSqm).toLocaleString()} m²).`); return; }
     setSaving(true); setError('');
     try {
@@ -266,8 +316,14 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-        <Field label={(tc.floorNumber || 'Floor #') + ' *'}><input style={inputStyle} type="number" value={form.floor_number} onChange={set('floor_number')} autoFocus /></Field>
-        <Field label={tc.floorName || 'Name'}><input style={inputStyle} value={form.name} onChange={set('name')} /></Field>
+        <Field label={(tc.floorNumber || 'Floor #') + ' *'}>
+          <input style={inputStyle} type="number" value={form.floor_number} onChange={set('floor_number')} autoFocus />
+          <WarnNum value={String(form.floor_number)} field="floor_number" />
+        </Field>
+        <Field label={tc.floorName || 'Name'}>
+          <input style={inputStyle} value={form.name} onChange={set('name')} />
+          {form.name && <WarnName value={form.name} field="name" />}
+        </Field>
         <Field label={(tc.areaSqm || 'Area') + ' (m²)'}><input style={inputStyle} type="number" min="0" step="0.01" value={form.area_sqm} onChange={set('area_sqm')} /></Field>
       </div>
       {buildingTotalSqm && (
@@ -294,6 +350,13 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
   const [error, setError]   = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingSpaces, {
+    fields: ['space_code'],
+    labels: { space_code: 'Code espace' },
+    editingId: initial?.id,
+    scope: 'cet étage',
+  });
+
   // Sum of existing spaces (excluding current if editing)
   const otherSpacesSum = existingSpaces
     .filter(s => s.id !== initial?.id)
@@ -304,6 +367,8 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
 
   const save = async () => {
     if (!form.space_code.trim()) { setError('Space code is required'); return; }
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
     if (areaExceeds) { setError(`La somme des superficies des espaces (${totalUsed.toLocaleString()} m²) dépasse la superficie de l'étage (${parseFloat(floorAreaSqm).toLocaleString()} m²).`); return; }
     setSaving(true); setError('');
     try {
@@ -319,7 +384,10 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={(tc.spaceCode || 'Space Code') + ' *'}><input style={inputStyle} value={form.space_code} onChange={set('space_code')} placeholder="e.g. A-101" autoFocus /></Field>
+        <Field label={(tc.spaceCode || 'Space Code') + ' *'}>
+          <input style={inputStyle} value={form.space_code} onChange={set('space_code')} placeholder="e.g. A-101" autoFocus />
+          <DuplicateWarning value={form.space_code} field="space_code" />
+        </Field>
         <Field label={tc.status || 'Status'}>
           <select style={inputStyle} value={form.status} onChange={set('status')}>
             {['available','occupied','maintenance','vacant'].map(s => <option key={s}>{s}</option>)}
@@ -711,17 +779,17 @@ export default function Patrimoine() {
       {/* ── Create modals ── */}
       {modal === 'cc' && !editTarget && (
         <Modal title={tc.newCompanyCode || 'New Company Code'} onClose={() => setModal(null)}>
-          <CompanyCodeForm onSave={() => { loadCompanyCodes(); setModal(null); }} onClose={() => setModal(null)} t={t} />
+          <CompanyCodeForm onSave={() => { loadCompanyCodes(); setModal(null); }} onClose={() => setModal(null)} t={t} existingItems={companyCodes} />
         </Modal>
       )}
       {modal === 'be' && !editTarget && (
         <Modal title={tc.newBusinessEntity || 'New Business Entity'} onClose={() => setModal(null)}>
-          <BusinessEntityForm onSave={() => loadEntities(selectedCC?.id)} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} />
+          <BusinessEntityForm onSave={() => loadEntities(selectedCC?.id)} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} existingItems={entities} />
         </Modal>
       )}
       {modal === 'building' && !editTarget && selectedBE && (
         <Modal title={tc.newBuilding || 'New Building'} onClose={() => setModal(null)}>
-          <BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} />
+          <BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} existingBuildings={buildings} />
         </Modal>
       )}
       {modal === 'floor' && !editTarget && selectedBuilding && (
@@ -752,17 +820,17 @@ export default function Patrimoine() {
       {/* ── Edit modals ── */}
       {modal === 'edit' && editTarget?.type === 'cc' && (
         <Modal title={`Edit — ${editTarget.item.code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <CompanyCodeForm initial={editTarget.item} onSave={() => { loadCompanyCodes(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} />
+          <CompanyCodeForm initial={editTarget.item} onSave={() => { loadCompanyCodes(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingItems={companyCodes} />
         </Modal>
       )}
       {modal === 'edit' && editTarget?.type === 'be' && (
         <Modal title={`Edit — ${editTarget.item.name}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <BusinessEntityForm initial={editTarget.item} onSave={() => { loadEntities(selectedCC?.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} />
+          <BusinessEntityForm initial={editTarget.item} onSave={() => { loadEntities(selectedCC?.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingItems={entities} />
         </Modal>
       )}
       {modal === 'edit' && editTarget?.type === 'building' && (
         <Modal title={`Edit — ${editTarget.item.name}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <BuildingForm initial={editTarget.item} beId={selectedBE?.id} onSave={() => { loadBuildings(selectedBE.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} />
+          <BuildingForm initial={editTarget.item} beId={selectedBE?.id} onSave={() => { loadBuildings(selectedBE.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} existingBuildings={buildings} />
         </Modal>
       )}
       {modal === 'edit' && editTarget?.type === 'floor' && (

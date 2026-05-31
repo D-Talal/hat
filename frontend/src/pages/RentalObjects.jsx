@@ -3,6 +3,7 @@ import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { USAGE_TYPES, SPACE_STATUSES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -28,12 +29,13 @@ function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 20, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
 }
 
-function RentalObjectForm({ onSave, onClose, initial }) {
+function RentalObjectForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [buildings, setBuildings] = useState([]);
   const [spaces, setSpaces] = useState([]);
   const [selectedSpaces, setSelectedSpaces] = useState([]);
+  const [error, setError] = useState('');
   const [form, setForm] = useState({
     building_id: initial?.building_id || '',
     code: initial?.code || '',
@@ -46,6 +48,12 @@ function RentalObjectForm({ onSave, onClose, initial }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const isEdit = !!initial?.id;
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
+    fields: ['code'],
+    labels: { code: 'Code' },
+    editingId: initial?.id,
+  });
+
   useEffect(() => { API.get('/commercial/buildings').then(r => setBuildings(r.data || [])).catch(() => {}); }, []);
   useEffect(() => {
     if (form.building_id && !isEdit) {
@@ -54,13 +62,20 @@ function RentalObjectForm({ onSave, onClose, initial }) {
   }, [form.building_id, isEdit]);
 
   const save = async () => {
-    if (isEdit) await API.put(`/commercial/rental-objects/${initial.id}`, { ...form, space_ids: selectedSpaces });
-    else await API.post('/commercial/rental-objects', { ...form, space_ids: selectedSpaces });
-    onSave(); onClose();
+    if (!form.code.trim()) { setError('Code is required'); return; }
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
+    setError('');
+    try {
+      if (isEdit) await API.put(`/commercial/rental-objects/${initial.id}`, { ...form, space_ids: selectedSpaces });
+      else await API.post('/commercial/rental-objects', { ...form, space_ids: selectedSpaces });
+      onSave(); onClose();
+    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
   };
 
   return (
     <>
+      {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ background: '#e3f2fd', borderRadius: 10, padding: '10px 14px', marginBottom: 16, fontSize: 13, color: '#1565c0' }}>
         ℹ A Rental Object (Usage View) groups one or more physical Spaces.
       </div>
@@ -71,7 +86,10 @@ function RentalObjectForm({ onSave, onClose, initial }) {
             {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </Field>
-        <Field label="Code *"><input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. RO-A101" disabled={isEdit} /></Field>
+        <Field label="Code *">
+          <input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. RO-A101" disabled={isEdit} />
+          {!isEdit && <DuplicateWarning value={form.code} field="code" />}
+        </Field>
         <Field label={tc.usageType}>
           <select style={inputStyle} value={form.usage_type} onChange={set('usage_type')}>
             {Object.entries(USAGE_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
@@ -204,7 +222,7 @@ export default function RentalObjects() {
 
       {(modal === 'new' || modal === 'edit') && (
         <Modal title={modal === 'edit' ? `Edit — ${selected?.code}` : tc.newRentalObject} onClose={() => setModal(null)}>
-          <RentalObjectForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} />
+          <RentalObjectForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} existingItems={objects} />
         </Modal>
       )}
 

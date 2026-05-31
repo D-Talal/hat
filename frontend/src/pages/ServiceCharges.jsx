@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -29,7 +30,7 @@ function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 20, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
 }
 
-function PGForm({ onSave, onClose, initial }) {
+function PGForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [buildings, setBuildings] = useState([]);
@@ -44,6 +45,12 @@ function PGForm({ onSave, onClose, initial }) {
   const [error, setError] = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
+    fields: ['code', 'name'],
+    labels: { code: 'Code', name: 'Nom' },
+    editingId: initial?.id,
+  });
+
   useEffect(() => { API.get('/commercial/buildings').then(r => setBuildings(r.data || [])).catch(() => {}); }, []);
   useEffect(() => {
     if (form.building_id) API.get(`/commercial/buildings/${form.building_id}/contract-objects`).then(r => setContractObjects(r.data || [])).catch(() => setContractObjects([]));
@@ -57,6 +64,8 @@ function PGForm({ onSave, onClose, initial }) {
 
   const save = async () => {
     setError('');
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
     try {
       if (initial?.id) {
         await API.put(`/commercial/participation-groups/${initial.id}`, { ...form, members });
@@ -79,8 +88,14 @@ function PGForm({ onSave, onClose, initial }) {
             {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
           </select>
         </Field>
-        <Field label="Code *"><input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. PG-GEN-01" /></Field>
-        <Field label={tc.name}><input style={inputStyle} value={form.name} onChange={set('name')} /></Field>
+        <Field label="Code *">
+          <input style={inputStyle} value={form.code} onChange={set('code')} placeholder="e.g. PG-GEN-01" />
+          <DuplicateWarning value={form.code} field="code" />
+        </Field>
+        <Field label={tc.name}>
+          <input style={inputStyle} value={form.name} onChange={set('name')} />
+          {form.name && <DuplicateWarning value={form.name} field="name" />}
+        </Field>
         <Field label={tc.chargeCategory}>
           <select style={inputStyle} value={form.charge_category} onChange={set('charge_category')}>
             {CHARGE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
@@ -274,7 +289,7 @@ export default function ServiceCharges() {
       {/* New PG */}
       {modal === 'new' && (
         <Modal title="New Participation Group" onClose={() => setModal(null)}>
-          <PGForm onSave={load} onClose={() => setModal(null)} />
+          <PGForm onSave={load} onClose={() => setModal(null)} existingItems={groups} />
         </Modal>
       )}
 
@@ -345,7 +360,7 @@ export default function ServiceCharges() {
       {/* Edit PG modal */}
       {modal === 'edit-pg' && editTarget?.type === 'pg' && (
         <Modal title={`Edit — ${editTarget.item.code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
-          <PGForm initial={editTarget.item} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} />
+          <PGForm initial={editTarget.item} onSave={() => { load(); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} existingItems={groups} />
         </Modal>
       )}
       {/* Edit CC modal */}

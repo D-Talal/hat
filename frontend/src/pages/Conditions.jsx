@@ -3,6 +3,7 @@ import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { CONDITION_TYPES, FREQUENCIES, PAYMENT_TIMINGS, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -23,10 +24,11 @@ function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 20, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
 }
 
-function ConditionForm({ onSave, onClose, initial }) {
+function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [contracts, setContracts] = useState([]);
+  const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     contract_id: initial?.contract_id || '',
     condition_type: initial?.condition_type || 'base_rent',
@@ -46,20 +48,39 @@ function ConditionForm({ onSave, onClose, initial }) {
   });
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.type === 'checkbox' ? e.target.checked : e.target.value }));
 
+  // Check condition_code duplicate within the same contract
+  const sameContractItems = existingItems.filter(c =>
+    String(c.contract_id) === String(form.contract_id || initial?.contract_id)
+  );
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(sameContractItems, {
+    fields: ['condition_code'],
+    labels: { condition_code: 'Code condition' },
+    editingId: initial?.id,
+    scope: 'ce contrat',
+  });
+
   useEffect(() => {
     if (!initial?.contract_id) API.get('/commercial/contracts?status=released').then(r => setContracts(r.data || [])).catch(() => {});
   }, [initial]);
 
   const save = async () => {
-    if (initial?.id) await API.put(`/commercial/conditions/${initial.id}`, form);
-    else await API.post('/commercial/conditions', form);
-    onSave(); onClose();
+    setFormError('');
+    if (form.condition_code.trim()) {
+      const dupErr = checkDuplicate(form);
+      if (dupErr) { setFormError(dupErr); return; }
+    }
+    try {
+      if (initial?.id) await API.put(`/commercial/conditions/${initial.id}`, form);
+      else await API.post('/commercial/conditions', form);
+      onSave(); onClose();
+    } catch (e) { setFormError(e.response?.data?.detail || 'Error'); }
   };
 
   const isEdit = !!initial?.id;
 
   return (
     <>
+      {formError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{formError}</div>}
       <SectionTitle>Condition Details</SectionTitle>
       {!isEdit && (
         <Field label="Contract (Released only)">
@@ -75,7 +96,10 @@ function ConditionForm({ onSave, onClose, initial }) {
             {Object.entries(CONDITION_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
           </select>
         </Field>
-        <Field label={tc.conditionCode}><input style={inputStyle} value={form.condition_code} onChange={set('condition_code')} placeholder="e.g. *40, A500" /></Field>
+        <Field label={tc.conditionCode}>
+          <input style={inputStyle} value={form.condition_code} onChange={set('condition_code')} placeholder="e.g. *40, A500" />
+          {form.condition_code && form.contract_id && <DuplicateWarning value={form.condition_code} field="condition_code" />}
+        </Field>
         <Field label={tc.validFrom + " *"}><input style={inputStyle} type="date" value={form.valid_from} onChange={set('valid_from')} /></Field>
         <Field label={tc.validTo}><input style={inputStyle} type="date" value={form.valid_to} onChange={set('valid_to')} /></Field>
       </div>
@@ -243,7 +267,7 @@ export default function Conditions() {
 
       {(modal === 'new' || modal === 'edit') && (
         <Modal title={modal === 'edit' ? `Edit Condition` : tc.newCondition} onClose={() => setModal(null)}>
-          <ConditionForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} />
+          <ConditionForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} existingItems={conditions} />
         </Modal>
       )}
 

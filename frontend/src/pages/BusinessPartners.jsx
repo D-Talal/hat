@@ -3,6 +3,7 @@ import API from '../api';
 import { PageHeader, Card, Modal } from '../components/UI';
 import GeoSelect from '../components/shared/GeoSelect';
 import { useLanguage } from '../context/LanguageContext';
+import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 
 const ROLES = ['master_tenant', 'guarantor', 'landlord', 'vendor', 'contact_person'];
 const ROLE_LABELS = {
@@ -27,7 +28,7 @@ function Field({ label, children }) {
   );
 }
 
-function BPForm({ onSave, onClose, initial }) {
+function BPForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [form, setForm] = useState({
@@ -51,19 +52,40 @@ function BPForm({ onSave, onClose, initial }) {
   const removeRole = i => setRoles(r => r.filter((_, idx) => idx !== i));
   const setRole = (i, k, v) => setRoles(r => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
 
+  const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
+    fields: ['company_name', 'tax_id'],
+    labels: { company_name: 'Nom de société', tax_id: 'Tax ID' },
+    editingId: initial?.id,
+  });
+
+  const [error, setError] = useState('');
+
   const save = async () => {
-    if (initial?.id) await API.put(`/commercial/business-partners/${initial.id}`, { ...form, roles });
-    else await API.post('/commercial/business-partners', { ...form, roles });
-    onSave(); onClose();
+    if (!form.company_name.trim()) { setError('Company name is required'); return; }
+    const dupErr = checkDuplicate(form);
+    if (dupErr) { setError(dupErr); return; }
+    setError('');
+    try {
+      if (initial?.id) await API.put(`/commercial/business-partners/${initial.id}`, { ...form, roles });
+      else await API.post('/commercial/business-partners', { ...form, roles });
+      onSave(); onClose();
+    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
   };
 
   return (
     <>
+      {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={tc.companyName + " *"}><input style={inputStyle} value={form.company_name} onChange={set('company_name')} /></Field>
+        <Field label={tc.companyName + " *"}>
+          <input style={inputStyle} value={form.company_name} onChange={set('company_name')} />
+          <DuplicateWarning value={form.company_name} field="company_name" />
+        </Field>
         <Field label={tc.tradeName}><input style={inputStyle} value={form.trade_name} onChange={set('trade_name')} /></Field>
         <Field label={tc.contactName}><input style={inputStyle} value={form.contact_name} onChange={set('contact_name')} /></Field>
-        <Field label={tc.taxId}><input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} /></Field>
+        <Field label={tc.taxId}>
+          <input style={inputStyle} value={form.tax_id} onChange={set('tax_id')} />
+          {form.tax_id && <DuplicateWarning value={form.tax_id} field="tax_id" />}
+        </Field>
         <Field label={tc.email}><input style={inputStyle} type="email" value={form.email} onChange={set('email')} /></Field>
         <Field label={tc.phone}><input style={inputStyle} value={form.phone} onChange={set('phone')} /></Field>
         <Field label={tc.city}><input style={inputStyle} value={form.city} onChange={set('city')} /></Field>
@@ -195,7 +217,7 @@ export default function BusinessPartners() {
 
       {(modal === 'new' || modal === 'edit') && (
         <Modal title={modal === 'edit' ? `Edit — ${selected?.company_name}` : tc.newPartner} onClose={() => setModal(null)}>
-          <BPForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} />
+          <BPForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} existingItems={partners} />
         </Modal>
       )}
 
