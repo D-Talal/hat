@@ -87,6 +87,7 @@ function CompanyCodeForm({ onSave, onClose, t, initial, existingItems = [] }) {
     currency:    initial?.currency    || 'USD',
     continent:   initial?.continent   || '',
     country:     initial?.country     || '',
+    state:       initial?.state       || '',
     description: initial?.description || '',
   });
   const [saving, setSaving] = useState(false);
@@ -106,7 +107,7 @@ function CompanyCodeForm({ onSave, onClose, t, initial, existingItems = [] }) {
     if (dupErr) { setError(dupErr); return; }
     setSaving(true); setError('');
     try {
-      const payload = { code: form.code, name: form.name, currency: form.currency, country: form.country, description: form.description };
+      const payload = { code: form.code, name: form.name, currency: form.currency, country: form.country, state: form.state, description: form.description };
       if (initial) await loc.companyCodes.update(initial.id, payload);
       else         await loc.companyCodes.create(payload);
       onSave(); onClose();
@@ -132,7 +133,7 @@ function CompanyCodeForm({ onSave, onClose, t, initial, existingItems = [] }) {
       </Field>
       <Field label="Location">
         <GeoSelect
-          value={{ continent: form.continent, country: form.country }}
+          value={{ continent: form.continent, country: form.country, state: form.state || '' }}
           onChange={setGeo}
           showCity={false}
         />
