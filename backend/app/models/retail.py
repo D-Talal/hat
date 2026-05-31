@@ -47,6 +47,7 @@ class CompanyCode(Base):
     name         = Column(String(255), nullable=False)
     currency     = Column(String(10), default="USD")
     country      = Column(String(100))
+    state        = Column(String(100))
     description  = Column(String(500))
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
 
@@ -63,6 +64,7 @@ class BusinessEntity(Base):
     legal_name = Column(String(255))
     tax_id = Column(String(100))
     country = Column(String(100))
+    state = Column(String(100))
     city = Column(String(100))
     continent = Column(String(100))
     address = Column(String(500))
@@ -82,6 +84,7 @@ class Building(Base):
     name = Column(String(255), nullable=False)
     address = Column(String(500))
     city = Column(String(100))
+    state = Column(String(100))
     country = Column(String(100))
     continent = Column(String(100))
     total_area_sqm = Column(Float)
