@@ -128,6 +128,10 @@ def startup():
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_validated BOOLEAN DEFAULT false",
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255)",
             "UPDATE organizations SET is_validated = true WHERE slug = 'default' OR slug = 'propmanager'",
+            # State / Province fields for geo tables
+            "ALTER TABLE re_company_codes ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
+            "ALTER TABLE re_business_entities ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
+            "ALTER TABLE re_buildings ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
         ]
         for migration in migrations:
             try:
