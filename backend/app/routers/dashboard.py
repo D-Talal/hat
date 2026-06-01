@@ -13,7 +13,7 @@ from app.database import get_db
 from app.core.deps import get_current_user, get_current_org
 from app.models.hotel import Hotel, Room, Booking, BookingStatus
 from app.models.retail import (
-    BusinessEntity, RentalObject, SpaceStatus,
+    BusinessEntity, Space, SpaceStatus,
     Contract, ContractStatus, Invoice, MaintenanceRequest
 )
 
@@ -40,16 +40,15 @@ def _commercial_contract_ids(db, org):
     ]
     if not be_ids:
         return []
-    from app.models.retail import Building, RentalObject, ContractObject
-    # contracts are linked via ContractObject → RentalObject → Space → Floor → Building → BusinessEntity
-    # Simpler: filter contracts that have at least one ContractObject whose rental_object is in our org
-    # But rental_objects don't have direct org_id — use the BE chain
+    from app.models.retail import Building, Space, Floor, ContractObject
+    # contracts are linked via ContractObject → Space → Floor → Building → BusinessEntity
     # Fastest: get all contract IDs via Invoice which links to contract_id
     contract_ids = [
         r[0] for r in db.query(Contract.id)
         .join(ContractObject, ContractObject.contract_id == Contract.id)
-        .join(RentalObject, RentalObject.id == ContractObject.rental_object_id)
-        .join(Building, Building.id == RentalObject.building_id)
+        .join(Space, Space.id == ContractObject.space_id)
+        .join(Floor, Floor.id == Space.floor_id)
+        .join(Building, Building.id == Floor.building_id)
         .filter(Building.business_entity_id.in_(be_ids))
         .all()
     ]
@@ -64,15 +63,16 @@ def _org_invoice_q(db, org, *filters):
     return db.query(Invoice).filter(Invoice.contract_id.in_(contract_ids), *filters)
 
 
-def _org_rental_object_q(db, org):
+def _org_space_q(db, org):
     """Query rental objects filtered by org via BE chain."""
     from app.models.retail import Building
     be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
     if not be_ids:
-        return db.query(RentalObject).filter(RentalObject.id == -1)
+        return db.query(Space).filter(Space.id == -1)
     return (
-        db.query(RentalObject)
-        .join(Building, Building.id == RentalObject.building_id)
+        db.query(Space)
+        .join(Floor, Floor.id == Space.floor_id)
+        .join(Building, Building.id == Floor.building_id)
         .filter(Building.business_entity_id.in_(be_ids))
     )
 
@@ -219,9 +219,9 @@ def get_occupancy(
     today = date.today()
 
     if module in ("commercial", "all"):
-        ro_q = _org_rental_object_q(db, org)
+        ro_q = _org_space_q(db, org)
         total_objects = ro_q.count() or 0
-        occupied = ro_q.filter(RentalObject.status == SpaceStatus.occupied).count() or 0
+        occupied = ro_q.filter(Space.status == SpaceStatus.occupied).count() or 0
         vacant = total_objects - occupied
         result["commercial"] = {
             "total_units": total_objects,
@@ -366,7 +366,7 @@ def get_assets(
 
     if module in ("commercial", "all"):
         result["total_properties"] = db.query(func.count(BusinessEntity.id)).filter(BusinessEntity.org_id == org.id).scalar() or 0
-        result["total_units"]      = _org_rental_object_q(db, org).count() or 0
+        result["total_units"]      = _org_space_q(db, org).count() or 0
 
         city_props = (
             db.query(BusinessEntity.city, func.count(BusinessEntity.id).label("count"))

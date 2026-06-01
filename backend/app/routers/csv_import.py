@@ -26,7 +26,7 @@ from app.core.deps import get_current_user, get_current_org
 from app.core.permissions import require_permission
 from app.models.retail import (
     BusinessPartner, BusinessPartnerRole, BPRole,
-    BusinessEntity, Building, RentalObject,
+    BusinessEntity, Building, Space, Floor,
     Contract, ContractObject, Condition,
     ContractStatus, ContractType, ConditionType, ConditionFrequency, PaymentTiming,
 )
@@ -115,7 +115,7 @@ TEMPLATES = {
             "contract_number*",
             "tenant_company_name*",   # must match an existing BP
             "entity_name*",           # must match an existing BusinessEntity
-            "unit_code*",             # must match an existing RentalObject code
+            "unit_code*",             # must match an existing Space code
             "start_date*",            # YYYY-MM-DD
             "end_date*",              # YYYY-MM-DD
             "signing_date",

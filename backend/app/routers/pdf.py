@@ -13,7 +13,7 @@ from sqlalchemy.orm import Session, joinedload
 from app.database import get_db
 from app.core.deps import get_current_user, get_current_org
 from app.models.retail import (
-    Invoice, Contract, ContractObject, RentalObject,
+    Invoice, Contract, ContractObject, Space, Floor,
     BusinessPartner, BusinessEntity, Condition, ConditionType,
 )
 
@@ -143,7 +143,7 @@ def _load_invoice(db, invoice_id, org):
             .joinedload(Contract.business_entity),
             joinedload(Invoice.contract)
             .joinedload(Contract.contract_objects)
-            .joinedload(ContractObject.rental_object),
+            .joinedload(ContractObject.space).joinedload(Space.floor),
         )
         .filter(Invoice.id == invoice_id)
         .first()
@@ -163,7 +163,7 @@ def _load_contract(db, contract_id, org):
         .options(
             joinedload(Contract.business_partner).joinedload(BusinessPartner.roles),
             joinedload(Contract.business_entity),
-            joinedload(Contract.contract_objects).joinedload(ContractObject.rental_object),
+            joinedload(Contract.contract_objects).joinedload(ContractObject.space).joinedload(Space.floor),
             joinedload(Contract.conditions),
             joinedload(Contract.invoices),
         )
@@ -194,7 +194,7 @@ def download_invoice_pdf(
 
     # Rental object names
     ro_names = ", ".join(
-        co.rental_object.code if co.rental_object else "—"
+        co.space.space_code if co.space else "—"
         for co in (contract.contract_objects or [])
     ) or "—"
 
@@ -345,7 +345,7 @@ def download_lease_statement(
     st = _styles()
 
     ro_names = ", ".join(
-        co.rental_object.code if co.rental_object else "—"
+        co.space.space_code if co.space else "—"
         for co in (contract.contract_objects or [])
     ) or "—"
 

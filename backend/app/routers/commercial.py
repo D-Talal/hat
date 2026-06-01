@@ -22,7 +22,6 @@ from app.models.audit import AuditLog
 from app.models.retail import (
     CompanyCode,
     BusinessEntity, Building, Floor, Space, SpaceMeasurement,
-    RentalObject, RentalObjectSpace,
     BusinessPartner, BusinessPartnerRole,
     Contract, ContractDateSlot, ContractObject,
     Condition, SalesRule, SalesDeclaration,
@@ -140,6 +139,9 @@ class SpaceCreate(BaseModel):
     space_code: str
     description: Optional[str] = None
     status: Optional[str] = "available"
+    usage_type:  Optional[str] = None
+    cost_center: Optional[str] = None
+    im_key:      Optional[str] = None
     initial_measurement: Optional[MeasurementCreate] = None
 
     @field_validator('space_code')
@@ -224,7 +226,7 @@ class ContractCreate(BaseModel):
     day_count_method: Optional[str] = "act_365"
     pro_rata_enabled: Optional[bool] = True
     notes: Optional[str] = None
-    rental_object_ids: Optional[List[int]] = []
+    space_ids: Optional[List[int]] = []
 
     @field_validator('contract_number')
     @classmethod
@@ -263,13 +265,6 @@ class BusinessEntityMini(BaseModel):
     currency: Optional[str] = None
     country: Optional[str] = None
     city: Optional[str] = None
-    class Config: from_attributes = True
-
-class RentalObjectMini(BaseModel):
-    id: int
-    code: str
-    usage_type: Optional[str] = None
-    status: Optional[str] = None
     class Config: from_attributes = True
 
 class ContractOut(BaseModel):
@@ -350,44 +345,6 @@ class ConditionCreate(BaseModel):
 
 class ConditionOut(ConditionCreate):
     id: int
-    created_at: datetime
-    class Config: from_attributes = True
-
-class RentalObjectCreate(BaseModel):
-    building_id: Optional[int] = None
-    code: str
-    description: Optional[str] = None
-    usage_type: Optional[str] = "retail"
-    status: Optional[str] = "available"
-    cost_center: Optional[str] = None
-    im_key: Optional[str] = None
-    space_ids: Optional[List[int]] = []
-
-    @field_validator('code')
-    @classmethod
-    def v_code(cls, v):
-        v = v.strip()
-        if not v: raise ValueError('Code is required')
-        if len(v) > 50: raise ValueError('Code must be under 50 characters')
-        return v
-
-    @field_validator('usage_type')
-    @classmethod
-    def v_usage(cls, v): return validate_enum(v, VALID_USAGE_TYPES, 'usage type')
-
-    @field_validator('status')
-    @classmethod
-    def v_status(cls, v): return validate_enum(v, VALID_SPACE_STATUSES, 'status')
-
-class RentalObjectOut(BaseModel):
-    id: int
-    building_id: int
-    code: str
-    description: Optional[str] = None
-    usage_type: Optional[str] = None
-    status: str
-    cost_center: Optional[str] = None
-    im_key: Optional[str] = None
     created_at: datetime
     class Config: from_attributes = True
 
@@ -696,7 +653,7 @@ def list_spaces(floor_id: int, db: Session = Depends(get_db), u=Depends(get_curr
 
 @router.get("/buildings/{building_id}/available-spaces")
 def list_available_spaces(building_id: int, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    assigned = [r.space_id for r in db.query(RentalObjectSpace).all()]
+    assigned = [co.space_id for co in db.query(ContractObject).filter(ContractObject.valid_to == None).all()]
     floor_ids = [f.id for f in db.query(Floor).filter(Floor.building_id == building_id).all()]
     spaces = (db.query(Space)
                .filter(Space.floor_id.in_(floor_ids), ~Space.id.in_(assigned))
@@ -744,7 +701,7 @@ def update_space(id: int, data: SpaceCreate, db: Session = Depends(get_db), u=De
 def delete_space(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
     obj = db.query(Space).filter(Space.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
-    ro_count = db.query(RentalObjectSpace).filter(RentalObjectSpace.space_id == id).count()
+    ro_count = db.query(ContractObject).filter(ContractObject.space_id == id, ContractObject.valid_to == None).count()
     if ro_count > 0:
         raise HTTPException(400, f"Cannot delete: this space is linked to {ro_count} rental object(s). Remove them first.")
     db.delete(obj); db.commit()
@@ -795,6 +752,7 @@ def list_contracts(status: Optional[str] = None, db: Session = Depends(get_db), 
     q = db.query(Contract).options(
         joinedload(Contract.business_partner).joinedload(BusinessPartner.roles),
         joinedload(Contract.business_entity),
+        joinedload(Contract.contract_objects).joinedload(ContractObject.space),
     )
     # Filter by org via business_entity
     if u.organization_id:
@@ -806,15 +764,18 @@ def list_contracts(status: Optional[str] = None, db: Session = Depends(get_db), 
 
 @router.post("/contracts", response_model=ContractOut)
 def create_contract(data: ContractCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
-    ro_ids = data.rental_object_ids or []
-    payload = data.dict(exclude={"rental_object_ids"})
+    space_ids = data.space_ids or []
+    payload = data.dict(exclude={"space_ids"})
     if not payload.get("contract_number"):
         count = db.query(Contract).count()
         payload["contract_number"] = f"LO-{count + 1:05d}"
     obj = Contract(**payload)
     db.add(obj); db.flush()
-    for ro_id in ro_ids:
-        db.add(ContractObject(contract_id=obj.id, rental_object_id=ro_id, valid_from=data.start_date))
+    for sid in space_ids:
+        db.add(ContractObject(contract_id=obj.id, space_id=sid, valid_from=data.start_date))
+        # Mark space as occupied
+        sp = db.query(Space).filter(Space.id == sid).first()
+        if sp: sp.status = SpaceStatus.occupied
     db.commit(); db.refresh(obj)
     audit(db, u, "CREATE", "re_contracts", obj.id); return obj
 
@@ -873,94 +834,50 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
-@router.get("/debug/db-state")
-def debug_db_state(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    """Temporary diagnostic endpoint — shows counts and data chain"""
-    from sqlalchemy import text
-    ro_count    = db.query(RentalObject).count()
-    be_count    = db.query(BusinessEntity).count()
-    bld_count   = db.query(Building).count()
-    # Raw data
-    ros = db.query(RentalObject).limit(10).all()
-    blds = db.query(Building).limit(10).all()
-    bes  = db.query(BusinessEntity).limit(10).all()
-    return {
-        "user_org_id": u.organization_id,
-        "counts": {
-            "rental_objects": ro_count,
-            "buildings": bld_count,
-            "business_entities": be_count,
-        },
-        "rental_objects": [{"id": r.id, "code": r.code, "building_id": r.building_id, "status": str(r.status)} for r in ros],
-        "buildings": [{"id": b.id, "name": b.name, "business_entity_id": b.business_entity_id} for b in blds],
-        "business_entities": [{"id": e.id, "name": e.name, "org_id": e.org_id} for e in bes],
-    }
-
-@router.get("/rental-objects")
-def list_rental_objects(building_id: Optional[int] = None, business_entity_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    # Bare minimum — no joinedload, no filters, just count and return all
-    all_ros = db.query(RentalObject).all()
+@router.get("/spaces-leasable")
+def list_leasable_spaces(business_entity_id: Optional[int] = None, building_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """List spaces that can be assigned to a contract (available or vacant), with full hierarchy info."""
+    q = db.query(Space).join(Floor).join(Building).join(BusinessEntity).options(
+        joinedload(Space.floor).joinedload(Floor.building).joinedload(Building.business_entity),
+        joinedload(Space.measurements)
+    )
+    if u.organization_id:
+        q = q.filter((BusinessEntity.org_id == u.organization_id) | (BusinessEntity.org_id == None))
+    if business_entity_id:
+        q = q.filter(Building.business_entity_id == business_entity_id)
+    if building_id:
+        q = q.filter(Floor.building_id == building_id)
     results = []
-    for ro in all_ros:
-        st = ro.status
+    for s in q.all():
+        current = next((m for m in sorted(s.measurements, key=lambda m: m.valid_from, reverse=True) if not m.valid_to), None)
+        st = s.status
         status_str = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
-        # Load building separately
-        building = db.query(Building).filter(Building.id == ro.building_id).first()
         results.append({
-            "id": ro.id,
-            "code": ro.code,
-            "description": ro.description,
-            "usage_type": ro.usage_type,
+            "id": s.id,
+            "space_code": s.space_code,
+            "description": s.description,
             "status": status_str,
-            "building_id": ro.building_id,
-            "cost_center": ro.cost_center,
-            "im_key": ro.im_key,
-            "created_at": str(ro.created_at),
-            "building_entity_id": building.business_entity_id if building else None,
-            "building": {"id": building.id, "name": building.name, "business_entity_id": building.business_entity_id} if building else None,
-            "spaces": [],
+            "usage_type": s.usage_type,
+            "cost_center": s.cost_center,
+            "im_key": s.im_key,
+            "current_area_sqm": float(current.area_sqm) if current else None,
+            "floor_id": s.floor_id,
+            "floor_number": s.floor.floor_number if s.floor else None,
+            "floor_name": s.floor.name if s.floor else None,
+            "building_id": s.floor.building_id if s.floor else None,
+            "building_name": s.floor.building.name if s.floor and s.floor.building else None,
+            "business_entity_id": s.floor.building.business_entity_id if s.floor and s.floor.building else None,
+            "business_entity_name": s.floor.building.business_entity.name if s.floor and s.floor.building and s.floor.building.business_entity else None,
         })
     return results
 
-@router.post("/rental-objects", response_model=RentalObjectOut)
-def create_rental_object(data: RentalObjectCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
-    space_ids = data.space_ids or []
-    payload = data.dict(exclude={"space_ids"})
-    obj = RentalObject(**payload)
-    db.add(obj); db.flush()
-    for sid in space_ids:
-        db.add(RentalObjectSpace(rental_object_id=obj.id, space_id=sid))
-    db.commit(); db.refresh(obj)
-    audit(db, u, "CREATE", "re_rental_objects", obj.id); return obj
-
-@router.put("/rental-objects/{id}", response_model=RentalObjectOut)
-def update_rental_object(id: int, data: RentalObjectCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
-    obj = db.query(RentalObject).filter(RentalObject.id == id).first()
-    if not obj: raise HTTPException(404, "Not found")
-    # Exclude space_ids, building_id (immutable after creation), and None values
-    update_fields = {
-        k: v for k, v in data.dict(exclude={"space_ids", "building_id"}).items()
-        if v is not None
-    }
-    for k, v in update_fields.items():
-        setattr(obj, k, v)
-    db.commit(); db.refresh(obj); return obj
-
-@router.delete("/rental-objects/{id}")
-def delete_rental_object(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
-    obj = db.query(RentalObject).filter(RentalObject.id == id).first()
-    if not obj: raise HTTPException(404, "Not found")
-    db.delete(obj); db.commit(); return {"ok": True}
-
 @router.get("/buildings/{building_id}/contract-objects")
 def list_contract_objects_for_building(building_id: int, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    ros = db.query(RentalObject).filter(RentalObject.building_id == building_id).all()
-    ro_ids = [r.id for r in ros]
     cos = db.query(ContractObject).options(
         joinedload(ContractObject.contract).joinedload(Contract.business_partner),
-        joinedload(ContractObject.rental_object)
-    ).filter(ContractObject.rental_object_id.in_(ro_ids)).all()
-    return [{"id": co.id, "contract": {"id": co.contract.id, "contract_number": co.contract.contract_number}, "rental_object": {"id": co.rental_object.id, "code": co.rental_object.code}} for co in cos]
+        joinedload(ContractObject.space)
+    ).join(Space).join(Floor).filter(Floor.building_id == building_id).all()
+    return [{"id": co.id, "contract": {"id": co.contract.id, "contract_number": co.contract.contract_number}, "space": {"id": co.space.id, "space_code": co.space.space_code}} for co in cos]
 
 
 # ── PARTICIPATION GROUPS ──────────────────────────────────────────────────────
@@ -1146,8 +1063,8 @@ def update_maintenance(id: int, status: str, db: Session = Depends(get_db), u=De
 
 @router.get("/stats")
 def commercial_stats(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    total_objects    = db.query(RentalObject).count()
-    occupied         = db.query(RentalObject).filter(RentalObject.status == "occupied").count()
+    total_objects    = db.query(Space).count()
+    occupied         = db.query(Space).filter(Space.status == SpaceStatus.occupied).count()
     active_contracts = db.query(Contract).filter(Contract.status == "released").count()
     draft_contracts  = db.query(Contract).filter(Contract.status == "draft").count()
     total_partners   = db.query(BusinessPartner).count()
@@ -1294,8 +1211,8 @@ class VacancyOut(VacancyCreate):
 @router.get("/vacancy-postings")
 def list_vacancies(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
     be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
-    ro_ids = db.query(RentalObject.id).join(Building).filter(Building.business_entity_id.in_(be_ids)) if be_ids else []
-    return db.query(VacancyPosting)        .filter(VacancyPosting.rental_object_id.in_(ro_ids))        .options(joinedload(VacancyPosting.rental_object))        .order_by(VacancyPosting.period_from.desc()).all()
+    space_ids_q = db.query(Space.id).join(Floor).join(Building).filter(Building.business_entity_id.in_(be_ids)) if be_ids else []
+    return db.query(VacancyPosting)        .filter(VacancyPosting.space_id.in_(space_ids))        .options(joinedload(VacancyPosting.space))        .order_by(VacancyPosting.period_from.desc()).all()
 
 @router.post("/vacancy-postings", response_model=VacancyOut)
 def create_vacancy(data: VacancyCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
