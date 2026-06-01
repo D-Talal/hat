@@ -51,7 +51,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   const tc = t.commercial;
   const [partners, setPartners] = useState([]);
   const [entities, setEntities] = useState([]);
-  const [rentalObjects, setRentalObjects] = useState([]);
+  const [spaces, setSpaces] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState([]);
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
@@ -108,7 +108,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   // Reload rental objects whenever business_entity_id changes
   useEffect(() => {
     if (!form.business_entity_id) {
-      setRentalObjects([]);
+      setSpaces([]);
       setSelectedObjects([]);
       return;
     }
@@ -123,10 +123,10 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           if (beId == null) return true;
           return String(beId) === String(form.business_entity_id);
         });
-        setRentalObjects(forEntity);
+        setSpaces(forEntity);
         setSelectedObjects([]);
       })
-      .catch(() => setRentalObjects([]))
+      .catch(() => setSpaces([]))
       .finally(() => setLoadingRO(false));
   }, [form.business_entity_id, refreshRO]);
 
@@ -236,14 +236,14 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
             </div>
           ) : loadingRO ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--slate)', fontSize: 13 }}>Chargement…</div>
-          ) : rentalObjects.length === 0 ? (
+          ) : spaces.length === 0 ? (
             <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
               ⚠️ Aucun Rental Object trouvé pour cette entité.
               <div style={{ fontSize: 12, marginTop: 4 }}>Créez des Rental Objects dans la page dédiée et associez-les à un bâtiment de cette entité.</div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
-              {rentalObjects.map(ro => {
+              {spaces.map(ro => {
                 const s = (ro.status || '').toLowerCase();
                 const isLeasable = s === 'available' || s === 'vacant';
                 const isSelected = selectedObjects.includes(ro.id);

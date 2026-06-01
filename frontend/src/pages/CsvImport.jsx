@@ -200,7 +200,7 @@ export default function CsvImport() {
               ['Partners', status.business_partners],
               ['Properties', status.business_entities],
               ['Buildings', status.buildings],
-              ['Units', status.rental_objects],
+              ['Spaces', status.spaces],
               ['Contracts', status.contracts],
             ].map(([label, count]) => (
               <span key={label} style={{ fontSize: 13 }}>
