@@ -132,6 +132,10 @@ def startup():
             "ALTER TABLE re_company_codes ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
             "ALTER TABLE re_business_entities ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
             "ALTER TABLE re_buildings ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
+            # Full geo fields for business partners
+            "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS continent VARCHAR(100)",
+            "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
+            "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS address VARCHAR(500)",
         ]
         for migration in migrations:
             try:
