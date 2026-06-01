@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 
 from app.models.retail import (
-    Contract, ContractObject, Condition, RentalObject, SpaceStatus,
+    Contract, ContractObject, Condition, Space, SpaceStatus,
     SalesRule, SalesDeclaration, ParticipationGroup, ParticipationGroupMember,
     SettlementUnit, CostCollector, DepositContract, VacancyPosting,
     ContractStatus, ConditionType,
@@ -217,7 +217,7 @@ def run_scs_settlement(db, run, d_from, d_to):
                     co = m.contract_object
                     if not co: continue
                     area = dec(0)
-                    for ros in (co.rental_object.spaces if co.rental_object else []):
+                    for ros in ([co.space] if co.space else []):
                         latest = sorted([ms for ms in ros.space.measurements if not ms.valid_to],
                                         key=lambda ms: ms.valid_from, reverse=True)
                         if latest: area += dec(latest[0].area_sqm)
@@ -264,7 +264,7 @@ def run_scs_settlement(db, run, d_from, d_to):
                         entries.append(make_entry(run, PostingEntryType.scs_settlement, charge,
                             "USD", d_from, d_to,
                             f"SCS {pg.code} {cc.charge_category} FY{cc.fiscal_year}",
-                            db, co.contract_id, rental_object_id=co.rental_object_id))
+                            db, co.contract_id, rental_object_id=co.space_id))
                     markup = (charge * dec(m.markup_rate or 0)).quantize(Decimal("0.01"))
                     if markup > 0:
                         entries.append(make_entry(run, PostingEntryType.markup_fee, markup,
@@ -278,15 +278,15 @@ def run_scs_settlement(db, run, d_from, d_to):
 
 def run_vacancy(db, run, d_from, d_to):
     entries = []
-    for ro in db.query(RentalObject).filter(RentalObject.status.in_([SpaceStatus.vacant, SpaceStatus.available])).all():
+    for ro in db.query(Space).filter(Space.status.in_([SpaceStatus.vacant, SpaceStatus.available])).all():
         active = db.query(ContractObject).filter(
-            ContractObject.rental_object_id == ro.id,
+            ContractObject.space_id == ro.id,
             ContractObject.valid_from <= d_to,
             or_(ContractObject.valid_to.is_(None), ContractObject.valid_to >= d_from)
         ).first()
         if active: continue
         vp = (db.query(VacancyPosting)
-                .filter(VacancyPosting.rental_object_id == ro.id, VacancyPosting.reversed == False)
+                .filter(VacancyPosting.space_id == ro.id, VacancyPosting.reversed == False)
                 .order_by(VacancyPosting.period_from.desc()).first())
         if not vp or not vp.market_rent: continue
         surface = dec(0)
@@ -299,7 +299,7 @@ def run_vacancy(db, run, d_from, d_to):
         entries.append(make_entry(run, PostingEntryType.vacancy_cost, monthly,
             "USD", d_from, d_to,
             f"Vacancy {ro.code} {float(surface):.1f}m² @ {vp.market_rent}/m²/yr",
-            db, rental_object_id=ro.id))
+            db, space_id=ro.id))
         if not run.dry_run: vp.posted = True
     return entries
 

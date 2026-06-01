@@ -206,8 +206,8 @@ def check_stale_maintenance():
                     continue
 
                 unit_name = None
-                if req.rental_object:
-                    unit_name = req.rental_object.code
+                if req.space:
+                    unit_name = req.space.code
 
                 for email in admins:
                     ok = send_maintenance_overdue(
