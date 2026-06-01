@@ -136,6 +136,33 @@ def startup():
             "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS continent VARCHAR(100)",
             "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
             "ALTER TABLE re_business_partners ADD COLUMN IF NOT EXISTS address VARCHAR(500)",
+            # Space absorbs RentalObject fields
+            "ALTER TABLE re_spaces ADD COLUMN IF NOT EXISTS usage_type VARCHAR(100)",
+            "ALTER TABLE re_spaces ADD COLUMN IF NOT EXISTS cost_center VARCHAR(100)",
+            "ALTER TABLE re_spaces ADD COLUMN IF NOT EXISTS im_key VARCHAR(100)",
+            # ContractObject: add space_id column (keep rental_object_id for migration)
+            "ALTER TABLE re_contract_objects ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES re_spaces(id)",
+            # Migrate existing ContractObject data: space_id from rental_object's first space
+            """
+            UPDATE re_contract_objects co
+            SET space_id = ros.space_id
+            FROM re_rental_object_spaces ros
+            WHERE ros.rental_object_id = co.rental_object_id
+            AND co.space_id IS NULL
+            AND EXISTS (SELECT 1 FROM re_rental_object_spaces ros2 WHERE ros2.rental_object_id = co.rental_object_id)
+            """,
+            # For contracts with no space assignment, try direct space from rental object's building
+            # VacancyPosting: add space_id
+            "ALTER TABLE re_vacancy_postings ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES re_spaces(id)",
+            "UPDATE re_vacancy_postings vp SET space_id = ros.space_id FROM re_rental_object_spaces ros WHERE ros.rental_object_id = vp.rental_object_id AND vp.space_id IS NULL",
+            # SalesDeclaration: add space_id
+            "ALTER TABLE re_sales_declarations ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES re_spaces(id)",
+            "UPDATE re_sales_declarations sd SET space_id = ros.space_id FROM re_rental_object_spaces ros WHERE ros.rental_object_id = sd.rental_object_id AND sd.space_id IS NULL",
+            # MaintenanceRequest: add space_id
+            "ALTER TABLE re_maintenance ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES re_spaces(id)",
+            "UPDATE re_maintenance m SET space_id = ros.space_id FROM re_rental_object_spaces ros WHERE ros.rental_object_id = m.rental_object_id AND m.space_id IS NULL",
+            # Copy usage_type/cost_center/im_key from rental objects to their spaces
+            "UPDATE re_spaces s SET usage_type = ro.usage_type, cost_center = ro.cost_center, im_key = ro.im_key FROM re_rental_object_spaces ros JOIN re_rental_objects ro ON ro.id = ros.rental_object_id WHERE ros.space_id = s.id AND s.usage_type IS NULL",
         ]
         for migration in migrations:
             try:
