@@ -17,7 +17,6 @@ import Patrimoine from './pages/Patrimoine';
 import BusinessPartners from './pages/BusinessPartners';
 import Contracts from './pages/Contracts';
 import Conditions from './pages/Conditions';
-import RentalObjects from './pages/RentalObjects';
 import ServiceCharges from './pages/ServiceCharges';
 import PostingEngine from './pages/PostingEngine';
 import CsvImport from './pages/CsvImport';
@@ -91,7 +90,6 @@ function AppRoutes() {
       <Route path="/commercial/partners" element={<ProtectedRoute><AppLayout><BusinessPartners /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/contracts" element={<ProtectedRoute><AppLayout><Contracts /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/conditions" element={<ProtectedRoute><AppLayout><Conditions /></AppLayout></ProtectedRoute>} />
-      <Route path="/commercial/rental-objects" element={<ProtectedRoute><AppLayout><RentalObjects /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/service-charges" element={<ProtectedRoute><AppLayout><ServiceCharges /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/invoices" element={<ProtectedRoute><AppLayout><Invoices /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/deposit-contracts" element={<ProtectedRoute><AppLayout><DepositContracts /></AppLayout></ProtectedRoute>} />
