@@ -905,7 +905,13 @@ def create_rental_object(data: RentalObjectCreate, db: Session = Depends(get_db)
 def update_rental_object(id: int, data: RentalObjectCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
     obj = db.query(RentalObject).filter(RentalObject.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
-    for k, v in data.dict(exclude={"space_ids"}).items(): setattr(obj, k, v)
+    # Exclude space_ids, building_id (immutable after creation), and None values
+    update_fields = {
+        k: v for k, v in data.dict(exclude={"space_ids", "building_id"}).items()
+        if v is not None
+    }
+    for k, v in update_fields.items():
+        setattr(obj, k, v)
     db.commit(); db.refresh(obj); return obj
 
 @router.delete("/rental-objects/{id}")
