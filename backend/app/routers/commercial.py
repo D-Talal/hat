@@ -836,13 +836,17 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 @router.get("/spaces-leasable")
 def list_leasable_spaces(business_entity_id: Optional[int] = None, building_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    """List spaces that can be assigned to a contract (available or vacant), with full hierarchy info."""
-    q = db.query(Space).join(Floor).join(Building).join(BusinessEntity).options(
-        joinedload(Space.floor).joinedload(Floor.building).joinedload(Building.business_entity),
-        joinedload(Space.measurements)
-    )
+    """List spaces with full hierarchy info."""
+    q = db.query(Space)        .join(Floor, Floor.id == Space.floor_id)        .join(Building, Building.id == Floor.building_id)        .outerjoin(BusinessEntity, BusinessEntity.id == Building.business_entity_id)        .options(
+            joinedload(Space.floor).joinedload(Floor.building).joinedload(Building.business_entity),
+            joinedload(Space.measurements)
+        )
     if u.organization_id:
-        q = q.filter((BusinessEntity.org_id == u.organization_id) | (BusinessEntity.org_id == None))
+        q = q.filter(
+            (BusinessEntity.org_id == u.organization_id) |
+            (BusinessEntity.org_id == None) |
+            (BusinessEntity.id == None)
+        )
     if business_entity_id:
         q = q.filter(Building.business_entity_id == business_entity_id)
     if building_id:
