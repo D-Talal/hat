@@ -257,6 +257,21 @@ class ContractPatch(BaseModel):
     absolute_end_date: Optional[date] = None
     notes: Optional[str] = None
 
+class BusinessEntityMini(BaseModel):
+    id: int
+    name: str
+    currency: Optional[str] = None
+    country: Optional[str] = None
+    city: Optional[str] = None
+    class Config: from_attributes = True
+
+class RentalObjectMini(BaseModel):
+    id: int
+    code: str
+    usage_type: Optional[str] = None
+    status: Optional[str] = None
+    class Config: from_attributes = True
+
 class ContractOut(BaseModel):
     id: int
     contract_number: Optional[str] = None
@@ -276,6 +291,7 @@ class ContractOut(BaseModel):
     notes: Optional[str] = None
     created_at: datetime
     business_partner: Optional[BusinessPartnerOut] = None
+    business_entity: Optional[BusinessEntityMini] = None
     class Config: from_attributes = True
 
 class ConditionCreate(BaseModel):
@@ -777,8 +793,14 @@ def delete_partner(id: int, db: Session = Depends(get_db), u=Depends(require_per
 @router.get("/contracts", response_model=List[ContractOut])
 def list_contracts(status: Optional[str] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
     q = db.query(Contract).options(
-        joinedload(Contract.business_partner).joinedload(BusinessPartner.roles)
+        joinedload(Contract.business_partner).joinedload(BusinessPartner.roles),
+        joinedload(Contract.business_entity),
     )
+    # Filter by org via business_entity
+    if u.organization_id:
+        q = q.join(BusinessEntity, Contract.business_entity_id == BusinessEntity.id).filter(
+            (BusinessEntity.org_id == u.organization_id) | (BusinessEntity.org_id == None)
+        )
     if status: q = q.filter(Contract.status == status)
     return q.all()
 
@@ -798,8 +820,18 @@ def create_contract(data: ContractCreate, db: Session = Depends(get_db), u=Depen
 
 @router.patch("/contracts/{id}", response_model=ContractOut)
 def patch_contract(id: int, data: ContractPatch, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
-    obj = db.query(Contract).filter(Contract.id == id).first()
+    obj = db.query(Contract).options(
+        joinedload(Contract.business_partner),
+        joinedload(Contract.business_entity),
+    ).filter(Contract.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
+    # Validate release
+    if data.status == "released":
+        if obj.status != "draft":
+            raise HTTPException(400, f"Cannot release a contract with status '{obj.status}'")
+        condition_count = db.query(Condition).filter(Condition.contract_id == id).count()
+        if condition_count == 0:
+            raise HTTPException(400, "Cannot release: contract has no conditions. Add at least one condition (base rent, etc.) before releasing.")
     for k, v in data.dict(exclude_none=True).items(): setattr(obj, k, v)
     db.commit(); db.refresh(obj)
     audit(db, u, "UPDATE", "re_contracts", id, f"status={obj.status}"); return obj
