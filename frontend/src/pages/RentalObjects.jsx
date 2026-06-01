@@ -72,20 +72,20 @@ function RentalObjectForm({ onSave, onClose, initial, existingItems = [] }) {
       .catch(() => setSpaces([]));
   }, [form.building_id, isEdit]);
 
-  // Pre-select entity if editing
+  // Pre-select entity if editing — load building info directly
   useEffect(() => {
-    if (initial?.building_id && entities.length > 0) {
-      // Find which entity owns this building
-      Promise.all(entities.map(e =>
-        API.get(`/commercial/business-entities/${e.id}/buildings`)
-          .then(r => ({ entity: e, buildings: r.data || [] }))
-          .catch(() => ({ entity: e, buildings: [] }))
-      )).then(results => {
-        const match = results.find(r => r.buildings.some(b => b.id === parseInt(initial.building_id)));
-        if (match) setSelectedEntityId(String(match.entity.id));
-      });
+    if (initial?.building_id) {
+      // Load building to get business_entity_id
+      API.get('/commercial/buildings').then(r => {
+        const allBuildings = r.data || [];
+        const b = allBuildings.find(b => b.id === parseInt(initial.building_id));
+        if (b) {
+          setSelectedEntityId(String(b.business_entity_id));
+          setBuildings(allBuildings.filter(bl => bl.business_entity_id === b.business_entity_id));
+        }
+      }).catch(() => {});
     }
-  }, [initial?.building_id, entities]);
+  }, [initial?.building_id]);
 
   const save = async () => {
     if (!form.code.trim()) { setError('Code is required'); return; }
@@ -110,30 +110,46 @@ function RentalObjectForm({ onSave, onClose, initial, existingItems = [] }) {
         ℹ Un Rental Object regroupe un ou plusieurs espaces physiques pour la location.
       </div>
 
-      {/* Cascade: Entity → Building */}
+      {/* Localisation — read-only in edit, cascade in create */}
       <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 14, marginBottom: 16 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 12 }}>Localisation</div>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Field label="Business Entity *">
-            <select style={inputStyle} value={selectedEntityId} onChange={e => { setSelectedEntityId(e.target.value); setForm(f => ({ ...f, building_id: '' })); }} disabled={isEdit}>
-              <option value="">— Sélectionner —</option>
-              {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
-            </select>
-          </Field>
-          <Field label={tc.buildings + ' *'}>
-            <select style={inputStyle} value={form.building_id} onChange={set('building_id')} disabled={isEdit || !selectedEntityId}>
-              <option value="">{selectedEntityId ? '— Sélectionner —' : '— Choisir une entité d\'abord —'}</option>
-              {buildings.map(b => <option key={b.id} value={b.id}>{b.name}{b.city ? ` (${b.city})` : ''}</option>)}
-            </select>
-          </Field>
+        <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 12 }}>
+          Localisation {isEdit && <span style={{ fontWeight: 400, color: '#9ea4be', textTransform: 'none', letterSpacing: 0 }}>(non modifiable après création)</span>}
         </div>
-        {/* Context chips */}
-        {(selectedEntity || selectedBuilding) && (
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
-            {selectedEntity  && <span style={{ background: '#e8eaf6', color: '#1a237e', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>🏛 {selectedEntity.name}</span>}
-            {selectedBuilding && <span style={{ background: '#e8f5e9', color: '#1b5e20', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>🏗 {selectedBuilding.name}</span>}
-            {selectedBuilding?.city && <span style={{ background: '#f5f5f5', color: '#555', borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>📍 {[selectedBuilding.city, selectedBuilding.country].filter(Boolean).join(', ')}</span>}
+        {isEdit ? (
+          /* Read-only context in edit mode */
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            {selectedEntity   && <span style={{ background: '#e8eaf6', color: '#1a237e', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700 }}>🏛 {selectedEntity.name}</span>}
+            {selectedBuilding && <span style={{ background: '#e8f5e9', color: '#1b5e20', borderRadius: 8, padding: '6px 14px', fontSize: 13, fontWeight: 700 }}>🏗 {selectedBuilding.name}</span>}
+            {selectedBuilding?.city && <span style={{ background: '#f5f5f5', color: '#555', borderRadius: 8, padding: '6px 14px', fontSize: 13 }}>📍 {[selectedBuilding.city, selectedBuilding.country].filter(Boolean).join(', ')}</span>}
+            {!selectedEntity && !selectedBuilding && (
+              <span style={{ color: 'var(--slate)', fontSize: 13 }}>Chargement…</span>
+            )}
           </div>
+        ) : (
+          /* Cascade selects in create mode */
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+              <Field label="Business Entity *">
+                <select style={inputStyle} value={selectedEntityId} onChange={e => { setSelectedEntityId(e.target.value); setForm(f => ({ ...f, building_id: '' })); }}>
+                  <option value="">— Sélectionner —</option>
+                  {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+                </select>
+              </Field>
+              <Field label={tc.buildings + ' *'}>
+                <select style={inputStyle} value={form.building_id} onChange={set('building_id')} disabled={!selectedEntityId}>
+                  <option value="">{selectedEntityId ? '— Sélectionner —' : '— Choisir une entité d'abord —'}</option>
+                  {buildings.map(b => <option key={b.id} value={b.id}>{b.name}{b.city ? ` (${b.city})` : ''}</option>)}
+                </select>
+              </Field>
+            </div>
+            {(selectedEntity || selectedBuilding) && (
+              <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 8 }}>
+                {selectedEntity  && <span style={{ background: '#e8eaf6', color: '#1a237e', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>🏛 {selectedEntity.name}</span>}
+                {selectedBuilding && <span style={{ background: '#e8f5e9', color: '#1b5e20', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 700 }}>🏗 {selectedBuilding.name}</span>}
+                {selectedBuilding?.city && <span style={{ background: '#f5f5f5', color: '#555', borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>📍 {[selectedBuilding.city, selectedBuilding.country].filter(Boolean).join(', ')}</span>}
+              </div>
+            )}
+          </>
         )}
       </div>
 
