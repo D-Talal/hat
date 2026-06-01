@@ -80,7 +80,7 @@ class PostingEntry(Base):
     posting_run_id  = Column(Integer, ForeignKey("re_posting_runs.id"), nullable=False)
     contract_id     = Column(Integer, ForeignKey("re_contracts.id"), nullable=True)
     condition_id    = Column(Integer, ForeignKey("re_conditions.id"), nullable=True)
-    rental_object_id= Column(Integer, ForeignKey("re_rental_objects.id"), nullable=True)
+    space_id        = Column(Integer, ForeignKey("re_spaces.id"), nullable=True)
 
     entry_type      = Column(Enum(PostingEntryType), nullable=False)
     period_from     = Column(Date, nullable=False)
