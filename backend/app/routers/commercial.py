@@ -836,35 +836,53 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
+@router.get("/debug/db-state")
+def debug_db_state(db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """Temporary diagnostic endpoint — shows counts and data chain"""
+    from sqlalchemy import text
+    ro_count    = db.query(RentalObject).count()
+    be_count    = db.query(BusinessEntity).count()
+    bld_count   = db.query(Building).count()
+    # Raw data
+    ros = db.query(RentalObject).limit(10).all()
+    blds = db.query(Building).limit(10).all()
+    bes  = db.query(BusinessEntity).limit(10).all()
+    return {
+        "user_org_id": u.organization_id,
+        "counts": {
+            "rental_objects": ro_count,
+            "buildings": bld_count,
+            "business_entities": be_count,
+        },
+        "rental_objects": [{"id": r.id, "code": r.code, "building_id": r.building_id, "status": str(r.status)} for r in ros],
+        "buildings": [{"id": b.id, "name": b.name, "business_entity_id": b.business_entity_id} for b in blds],
+        "business_entities": [{"id": e.id, "name": e.name, "org_id": e.org_id} for e in bes],
+    }
+
 @router.get("/rental-objects")
 def list_rental_objects(building_id: Optional[int] = None, business_entity_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    q = db.query(RentalObject).options(
-        joinedload(RentalObject.building),
-        joinedload(RentalObject.spaces).joinedload(RentalObjectSpace.space).joinedload(Space.measurements)
-    )
-    if building_id:
-        q = q.filter(RentalObject.building_id == building_id)
-
+    # Bare minimum — no joinedload, no filters, just count and return all
+    all_ros = db.query(RentalObject).all()
     results = []
-    for ro in q.all():
-        d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
-        # Serialize enum status to plain string
+    for ro in all_ros:
         st = ro.status
-        d["status"] = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
-        # Get business_entity_id directly from the building column (not via relationship)
-        be_id = ro.building.business_entity_id if ro.building else None
-        d["building"] = {
-            "id": ro.building.id,
-            "name": ro.building.name,
-            "business_entity_id": be_id,
-        } if ro.building else None
-        d["building_entity_id"] = be_id
-        d["spaces"] = []
-        for ros in ro.spaces:
-            s = ros.space
-            current = next((m for m in sorted(s.measurements, key=lambda m: m.valid_from, reverse=True) if not m.valid_to), None)
-            d["spaces"].append({"id": s.id, "space_code": s.space_code, "current_area_sqm": float(current.area_sqm) if current else None})
-        results.append(d)
+        status_str = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
+        # Load building separately
+        building = db.query(Building).filter(Building.id == ro.building_id).first()
+        results.append({
+            "id": ro.id,
+            "code": ro.code,
+            "description": ro.description,
+            "usage_type": ro.usage_type,
+            "status": status_str,
+            "building_id": ro.building_id,
+            "cost_center": ro.cost_center,
+            "im_key": ro.im_key,
+            "created_at": str(ro.created_at),
+            "building_entity_id": building.business_entity_id if building else None,
+            "building": {"id": building.id, "name": building.name, "business_entity_id": building.business_entity_id} if building else None,
+            "spaces": [],
+        })
     return results
 
 @router.post("/rental-objects", response_model=RentalObjectOut)
