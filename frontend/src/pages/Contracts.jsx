@@ -107,15 +107,15 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     API.get(`/commercial/rental-objects?business_entity_id=${form.business_entity_id}`)
       .then(r => {
         const all = r.data || [];
-        // Filter: only available or vacant
-        const leasable = all.filter(ro => {
-          const s = (ro.status || '').toString().toLowerCase().trim();
-          return s === 'available' || s === 'vacant';
-        });
-        setRentalObjects(leasable);
+        console.log('[RO] raw response count:', all.length, all.slice(0,3));
+        // Show all — let user see everything, occupied ones are just styled differently
+        setRentalObjects(all);
         setSelectedObjects([]);
       })
-      .catch(() => setRentalObjects([]))
+      .catch((err) => {
+        console.error('[RO] error:', err);
+        setRentalObjects([]);
+      })
       .finally(() => setLoadingRO(false));
   }, [form.business_entity_id]);
 
@@ -205,29 +205,44 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
               </label>
             ))}
           </div>
-          <SectionTitle>Rental Objects <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--slate)' }}>(disponibles / vacants)</span></SectionTitle>
+          <SectionTitle>Rental Objects</SectionTitle>
           {!form.business_entity_id ? (
             <div style={{ background: '#f0f7ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
-              ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les Rental Objects disponibles.
+              ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les Rental Objects.
             </div>
           ) : loadingRO ? (
-            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--slate)', fontSize: 13 }}>Chargement des espaces…</div>
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--slate)', fontSize: 13 }}>Chargement…</div>
           ) : rentalObjects.length === 0 ? (
             <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-              ⚠️ Aucun Rental Object <strong>available</strong> ou <strong>vacant</strong> trouvé pour cette entité.<br />
-              <span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Créez des Rental Objects dans la page dédiée, ou vérifiez leur statut.</span>
+              ⚠️ Aucun Rental Object trouvé pour cette entité.
+              <div style={{ fontSize: 12, marginTop: 4 }}>Créez des Rental Objects dans la page dédiée et associez-les à un bâtiment de cette entité.</div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
-              {rentalObjects.map(ro => (
-                <div key={ro.id} onClick={() => toggleObject(ro.id)}
-                  style={{ padding: '10px 14px', borderRadius: 8, border: `2px solid ${selectedObjects.includes(ro.id) ? 'var(--gold)' : 'var(--border)'}`, background: selectedObjects.includes(ro.id) ? '#fffbf0' : 'white', cursor: 'pointer', fontSize: 13, transition: 'all .12s' }}>
-                  <div style={{ fontWeight: 700 }}>{ro.code}</div>
-                  <div style={{ color: 'var(--slate)', fontSize: 11, marginTop: 2 }}>{ro.usage_type}</div>
-                  <div style={{ fontSize: 10, marginTop: 2, color: ro.status === 'vacant' ? '#dc2626' : '#15803d', fontWeight: 600, textTransform: 'uppercase' }}>{ro.status}</div>
-                  {ro.building && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>🏗 {ro.building.name}</div>}
-                </div>
-              ))}
+              {rentalObjects.map(ro => {
+                const s = (ro.status || '').toLowerCase();
+                const isLeasable = s === 'available' || s === 'vacant';
+                const isSelected = selectedObjects.includes(ro.id);
+                return (
+                  <div key={ro.id}
+                    onClick={() => isLeasable && toggleObject(ro.id)}
+                    style={{
+                      padding: '10px 14px', borderRadius: 8, fontSize: 13, transition: 'all .12s',
+                      border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`,
+                      background: isSelected ? '#fffbf0' : isLeasable ? 'white' : '#f9fafb',
+                      cursor: isLeasable ? 'pointer' : 'not-allowed',
+                      opacity: isLeasable ? 1 : 0.5,
+                    }}>
+                    <div style={{ fontWeight: 700 }}>{ro.code}</div>
+                    <div style={{ color: 'var(--slate)', fontSize: 11, marginTop: 2 }}>{ro.usage_type}</div>
+                    <div style={{ fontSize: 10, marginTop: 2, fontWeight: 600, textTransform: 'uppercase',
+                      color: s === 'available' ? '#15803d' : s === 'vacant' ? '#dc2626' : '#6b7280' }}>
+                      {ro.status}
+                    </div>
+                    {ro.building && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>🏗 {ro.building.name}</div>}
+                  </div>
+                );
+              })}
             </div>
           )}
         </>
