@@ -838,9 +838,8 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 @router.get("/rental-objects")
 def list_rental_objects(building_id: Optional[int] = None, business_entity_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    # Simple approach: get all rental objects, no complex join
     q = db.query(RentalObject).options(
-        joinedload(RentalObject.building).joinedload(Building.business_entity),
+        joinedload(RentalObject.building),
         joinedload(RentalObject.spaces).joinedload(RentalObjectSpace.space).joinedload(Space.measurements)
     )
     if building_id:
@@ -848,21 +847,18 @@ def list_rental_objects(building_id: Optional[int] = None, business_entity_id: O
 
     results = []
     for ro in q.all():
-        # Org filter — check via building chain
-        if u.organization_id and ro.building and ro.building.business_entity:
-            be_org = ro.building.business_entity.org_id
-            if be_org is not None and be_org != u.organization_id:
-                continue
-        # business_entity filter
-        if business_entity_id and ro.building:
-            if ro.building.business_entity_id != int(business_entity_id):
-                continue
-
         d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
         # Serialize enum status to plain string
         st = ro.status
         d["status"] = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
-        d["building"] = {"id": ro.building.id, "name": ro.building.name, "business_entity_id": ro.building.business_entity_id} if ro.building else None
+        # Get business_entity_id directly from the building column (not via relationship)
+        be_id = ro.building.business_entity_id if ro.building else None
+        d["building"] = {
+            "id": ro.building.id,
+            "name": ro.building.name,
+            "business_entity_id": be_id,
+        } if ro.building else None
+        d["building_entity_id"] = be_id
         d["spaces"] = []
         for ros in ro.spaces:
             s = ros.space
