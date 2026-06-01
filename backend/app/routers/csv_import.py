@@ -255,7 +255,7 @@ async def import_properties(
     org=Depends(get_current_org),
 ):
     """
-    Import property hierarchy: BusinessEntity → Building → RentalObject.
+    Import property hierarchy: BusinessEntity → Building → Floor → Space.
     One row = one rental unit. Entity and Building are created once and reused.
     Required: entity_name, building_name, unit_code
     """
@@ -316,23 +316,19 @@ async def import_properties(
                 db.flush()
             building_cache[bldg_key] = bldg
 
-            # ── RentalObject ──
-            existing_ro = db.query(RentalObject).filter(
-                RentalObject.building_id == bldg.id,
-                RentalObject.code == unit_code,
+            # ── Space lookup ──
+            # Spaces must be created via Patrimoine UI, not CSV import
+            # We look up an existing space by space_code within this entity's buildings
+            ro = None
+            from app.models.retail import Floor
+            ro = db.query(Space).join(Floor).filter(
+                Floor.building_id == bldg.id,
+                Space.space_code == unit_code,
             ).first()
-            if existing_ro:
+            if not ro:
                 skipped += 1
                 continue
 
-            ro = RentalObject(
-                building_id=bldg.id,
-                code=unit_code,
-                description=row.get("unit_description", "").strip() or None,
-                usage_type=row.get("unit_usage_type", "").strip() or None,
-                cost_center=row.get("unit_cost_center", "").strip() or None,
-            )
-            db.add(ro)
             imported += 1
 
         except Exception as e:
@@ -364,7 +360,7 @@ async def import_contracts(
     # Pre-build lookups
     bp_cache:  dict[str, BusinessPartner] = {}
     be_cache:  dict[str, BusinessEntity]  = {}
-    ro_cache:  dict[str, RentalObject]    = {}
+    ro_cache:  dict = {}
 
     for i, row in enumerate(rows, start=2):
         try:
@@ -417,12 +413,16 @@ async def import_contracts(
             ro_key = f"{be.id}::{unit_code}"
             ro = ro_cache.get(ro_key)
             if not ro:
-                ro = db.query(RentalObject).join(Building).filter(
-                    Building.business_entity_id == be.id,
-                    RentalObject.code == unit_code,
-                ).first()
+                ro = None
                 if not ro:
-                    raise ValueError(f"Unit '{unit_code}' not found in '{entity_name}' — import properties first")
+                    # Space lookup by space_code — search across floors of this entity's buildings
+                    from app.models.retail import Floor
+                    ro = db.query(Space).join(Floor).join(Building).filter(
+                        Building.business_entity_id == be.id,
+                        Space.space_code == unit_code,
+                    ).first()
+                if not ro:
+                    raise ValueError(f"Space '{unit_code}' not found in '{entity_name}' — create spaces in Patrimoine first")
                 ro_cache[ro_key] = ro
 
             # Parse dates
@@ -462,13 +462,14 @@ async def import_contracts(
             db.add(contract)
             db.flush()
 
-            # Link rental object
-            db.add(ContractObject(
-                contract_id=contract.id,
-                rental_object_id=ro.id,
-                valid_from=start_date,
-                valid_to=end_date,
-            ))
+            # Link space to contract
+            if ro:
+                db.add(ContractObject(
+                    contract_id=contract.id,
+                    space_id=ro.id,
+                    valid_from=start_date,
+                    valid_to=end_date,
+                ))
 
             # Create condition
             try:
@@ -520,6 +521,6 @@ def import_status(
         "business_partners": db.query(func.count(BusinessPartner.id)).filter(BusinessPartner.org_id == org.id).scalar(),
         "business_entities": len(be_ids),
         "buildings": db.query(func.count(Building.id)).filter(Building.business_entity_id.in_(be_ids)).scalar() if be_ids else 0,
-        "rental_objects": db.query(func.count(RentalObject.id)).join(Building).filter(Building.business_entity_id.in_(be_ids)).scalar() if be_ids else 0,
+        "spaces": db.query(func.count(Space.id)).join(Floor).join(Building).filter(Building.business_entity_id.in_(be_ids)).scalar() if be_ids else 0,
         "contracts": db.query(func.count(Contract.id)).filter(Contract.business_entity_id.in_(be_ids)).scalar() if be_ids else 0,
     }

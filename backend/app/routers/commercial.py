@@ -425,7 +425,7 @@ class InvoiceOut(InvoiceCreate):
 
 class MaintenanceCreate(BaseModel):
     contract_id: Optional[int] = None
-    rental_object_id: Optional[int] = None
+    space_id: Optional[int] = None
     title: str
     description: Optional[str] = None
     priority: Optional[str] = "medium"
@@ -1186,7 +1186,7 @@ def delete_deposit(id: int, db: Session = Depends(get_db), u=Depends(require_per
 # ── VACANCY POSTINGS ──────────────────────────────────────────────────────────
 
 class VacancyCreate(BaseModel):
-    rental_object_id: int
+    space_id: int
     period_from: date
     period_to: date
     market_rent: Optional[float] = None
@@ -1256,7 +1256,7 @@ def delete_vacancy(id: int, db: Session = Depends(get_db), u=Depends(require_per
 class SalesDeclarationCreate(BaseModel):
     contract_id: int
     sales_rule_id: int
-    rental_object_id: Optional[int] = None
+    space_id: Optional[int] = None
     period_from: date
     period_to: date
     declared_amount: float
