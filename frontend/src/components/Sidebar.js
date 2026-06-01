@@ -42,7 +42,6 @@ export default function Sidebar() {
       { path: '/commercial/partners',        label: language === 'fr' ? 'Partenaires'       : 'Business Partners', icon: '◉' },
       { path: '/commercial/contracts',       label: language === 'fr' ? 'Contrats'          : 'Contracts',         icon: '◇' },
       { path: '/commercial/conditions',      label: language === 'fr' ? 'Conditions'        : 'Conditions',        icon: '≡' },
-      { path: '/commercial/rental-objects',  label: language === 'fr' ? 'Objets locatifs'   : 'Rental Objects',    icon: '⊞' },
       { path: '/commercial/service-charges', label: language === 'fr' ? 'Charges locatives' : 'Service Charges',   icon: '⚖' },
       { path: '/commercial/invoices',         label: language === 'fr' ? 'Factures'           : 'Invoices',          icon: '🧾', roles: ['admin','manager','accountant'] },
       { path: '/commercial/deposit-contracts',  label: language === 'fr' ? 'Dépôts de garantie'      : 'Deposits',            icon: '🔒', roles: ['admin','manager','accountant'] },
