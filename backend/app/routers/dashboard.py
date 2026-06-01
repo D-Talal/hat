@@ -13,8 +13,8 @@ from app.database import get_db
 from app.core.deps import get_current_user, get_current_org
 from app.models.hotel import Hotel, Room, Booking, BookingStatus
 from app.models.retail import (
-    BusinessEntity, Space, SpaceStatus,
-    Contract, ContractStatus, Invoice, MaintenanceRequest
+    BusinessEntity, Building, Floor, Space, SpaceStatus,
+    Contract, ContractStatus, ContractObject, Invoice, MaintenanceRequest
 )
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -40,7 +40,6 @@ def _commercial_contract_ids(db, org):
     ]
     if not be_ids:
         return []
-    from app.models.retail import Building, Space, Floor, ContractObject
     # contracts are linked via ContractObject → Space → Floor → Building → BusinessEntity
     # Fastest: get all contract IDs via Invoice which links to contract_id
     contract_ids = [
@@ -65,7 +64,6 @@ def _org_invoice_q(db, org, *filters):
 
 def _org_space_q(db, org):
     """Query rental objects filtered by org via BE chain."""
-    from app.models.retail import Building
     be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
     if not be_ids:
         return db.query(Space).filter(Space.id == -1)
