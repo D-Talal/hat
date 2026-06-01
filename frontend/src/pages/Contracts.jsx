@@ -81,28 +81,43 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     editingId: initial?.id,
   });
 
+  const [loadingRO, setLoadingRO] = useState(false);
+
+  // Load partners and entities once on mount
   useEffect(() => {
     Promise.all([
       API.get('/commercial/business-partners'),
       API.get('/commercial/business-entities'),
-      API.get('/commercial/rental-objects'),
     ])
-      .then(([bp, be, ro]) => {
+      .then(([bp, be]) => {
         setPartners(bp.data || []);
         setEntities(be.data || []);
-        const all = ro.data || [];
-        // Debug — remove after fix confirmed
-        console.log('[ContractForm] All rental objects:', all.map(r => ({ id: r.id, code: r.code, status: r.status })));
-        // Normalize status to lowercase string before filtering
-        const leasable = all.filter(r => {
-          const s = (r.status || '').toString().toLowerCase().trim();
+      })
+      .catch(() => {});
+  }, []);
+
+  // Reload rental objects whenever business_entity_id changes
+  useEffect(() => {
+    if (!form.business_entity_id) {
+      setRentalObjects([]);
+      setSelectedObjects([]);
+      return;
+    }
+    setLoadingRO(true);
+    API.get(`/commercial/rental-objects?business_entity_id=${form.business_entity_id}`)
+      .then(r => {
+        const all = r.data || [];
+        // Filter: only available or vacant
+        const leasable = all.filter(ro => {
+          const s = (ro.status || '').toString().toLowerCase().trim();
           return s === 'available' || s === 'vacant';
         });
-        console.log('[ContractForm] Leasable rental objects:', leasable.length);
         setRentalObjects(leasable);
+        setSelectedObjects([]);
       })
-      .catch((e) => { console.error('[ContractForm] Load error:', e); });
-  }, []);
+      .catch(() => setRentalObjects([]))
+      .finally(() => setLoadingRO(false));
+  }, [form.business_entity_id]);
 
   const toggleObject = id => setSelectedObjects(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
@@ -191,12 +206,16 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
             ))}
           </div>
           <SectionTitle>Rental Objects <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--slate)' }}>(disponibles / vacants)</span></SectionTitle>
-          {rentalObjects.length === 0 ? (
-            <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '14px 18px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-              ⚠️ Aucun Rental Object disponible ou vacant trouvé dans votre portefeuille.<br />
-              <span style={{ fontSize: 12, marginTop: 4, display: 'block', color: '#b45309' }}>
-                Vérifiez que vous avez créé des Rental Objects avec le statut <strong>available</strong> ou <strong>vacant</strong> dans la page Rental Objects.
-              </span>
+          {!form.business_entity_id ? (
+            <div style={{ background: '#f0f7ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
+              ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les Rental Objects disponibles.
+            </div>
+          ) : loadingRO ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--slate)', fontSize: 13 }}>Chargement des espaces…</div>
+          ) : rentalObjects.length === 0 ? (
+            <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+              ⚠️ Aucun Rental Object <strong>available</strong> ou <strong>vacant</strong> trouvé pour cette entité.<br />
+              <span style={{ fontSize: 12, marginTop: 4, display: 'block' }}>Créez des Rental Objects dans la page dédiée, ou vérifiez leur statut.</span>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
