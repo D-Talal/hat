@@ -28,6 +28,7 @@ from app.models.retail import (
     Condition, SalesRule, SalesDeclaration,
     ParticipationGroup, ParticipationGroupMember, SettlementUnit, CostCollector,
     DepositContract, VacancyPosting, Invoice, MaintenanceRequest,
+    SpaceStatus,
 )
 
 router = APIRouter()
@@ -660,9 +661,11 @@ def _space_with_area(space, db=None):
         None
     )
     d = {c.name: getattr(space, c.name) for c in space.__table__.columns}
-    d["current_area_sqm"]      = float(current.area_sqm)   if current else None
-    d["current_valid_from"]    = str(current.valid_from)    if current else None
-    d["initial_measurement"]   = None
+    # Force enum → plain string (avoids "SpaceStatus.available" serialization bug)
+    d["status"] = space.status.value if hasattr(space.status, 'value') else str(space.status).split('.')[-1] if space.status else "available"
+    d["current_area_sqm"]   = float(current.area_sqm)  if current else None
+    d["current_valid_from"] = str(current.valid_from)   if current else None
+    d["initial_measurement"] = None
     return d
 
 @router.get("/floors/{floor_id}/spaces")
@@ -835,36 +838,42 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 @router.get("/rental-objects")
 def list_rental_objects(building_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    q = db.query(RentalObject).join(
-        Building, RentalObject.building_id == Building.id
-    ).outerjoin(
-        BusinessEntity, Building.business_entity_id == BusinessEntity.id
-    ).options(
+    # Get all building IDs accessible to this org
+    if u.organization_id:
+        org_building_ids = db.query(Building.id).join(
+            BusinessEntity, Building.business_entity_id == BusinessEntity.id
+        ).filter(
+            (BusinessEntity.org_id == u.organization_id) | (BusinessEntity.org_id == None)
+        ).subquery()
+        q = db.query(RentalObject).filter(RentalObject.building_id.in_(org_building_ids))
+    else:
+        q = db.query(RentalObject)
+
+    q = q.options(
         joinedload(RentalObject.building),
         joinedload(RentalObject.spaces).joinedload(RentalObjectSpace.space).joinedload(Space.measurements)
     )
-    # Filter by org — accept rows where org matches OR org_id is null (legacy data)
-    if u.organization_id:
-        q = q.filter(
-            (BusinessEntity.org_id == u.organization_id) |
-            (BusinessEntity.org_id == None) |
-            (BusinessEntity.id == None)
-        )
     if building_id:
         q = q.filter(RentalObject.building_id == building_id)
-    if status:
-        q = q.filter(RentalObject.status == status)
+
     results = []
     for ro in q.all():
         d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
-        # SpaceStatus is str enum — serialize cleanly
-        d["status"] = ro.status.value if hasattr(ro.status, 'value') else str(ro.status) if ro.status else "available"
+        # Force enum → plain string always
+        raw_status = ro.status
+        if hasattr(raw_status, 'value'):
+            d["status"] = raw_status.value
+        elif raw_status is None:
+            d["status"] = "available"
+        else:
+            s = str(raw_status)
+            d["status"] = s.split('.')[-1] if '.' in s else s
         d["building"] = {"id": ro.building.id, "name": ro.building.name} if ro.building else None
         d["spaces"] = []
         for ros in ro.spaces:
             s = ros.space
             current = next((m for m in sorted(s.measurements, key=lambda m: m.valid_from, reverse=True) if not m.valid_to), None)
-            d["spaces"].append({"id": s.id, "space_code": s.space_code, "current_area_sqm": current.area_sqm if current else None})
+            d["spaces"].append({"id": s.id, "space_code": s.space_code, "current_area_sqm": float(current.area_sqm) if current else None})
         results.append(d)
     return results
 
