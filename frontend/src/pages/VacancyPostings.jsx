@@ -44,10 +44,10 @@ function VacancyForm({ onSave, onClose, initial, spaces }) {
   return (
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
-      <Field label="Rental Object *">
+      <Field label="Espace *">
         <select style={inputStyle} value={form.space_id} onChange={set('space_id')}>
           <option value="">— Select —</option>
-          {(spaces || []).map(s => <option key={s.id} value={s.id}>{s.space_code} — {s.building_name || ''} Ét.{s.floor_number || ''}</option>)}
+          {(spaces || []).map(s => <option key={s.id} value={s.id}>{s.space_code} — {s.building_name || ''} {s.floor_number != null ? `Ét.${s.floor_number}` : ''} [{s.status || ''}]</option>)}
         </select>
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

@@ -223,7 +223,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
             ))}
           </div>
           <SectionTitle>
-            Rental Objects
+            Espaces locatifs
             <button
               onClick={() => setRefreshRO(n => n + 1)}
               style={{ marginLeft: 12, fontSize: 11, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer', fontFamily: 'DM Sans', color: 'var(--slate)', verticalAlign: 'middle' }}
@@ -232,14 +232,14 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           </SectionTitle>
           {!form.business_entity_id ? (
             <div style={{ background: '#f0f7ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
-              ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les Rental Objects.
+              ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les espaces disponibles.
             </div>
           ) : loadingRO ? (
             <div style={{ padding: '20px', textAlign: 'center', color: 'var(--slate)', fontSize: 13 }}>Chargement…</div>
           ) : spaces.length === 0 ? (
             <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
-              ⚠️ Aucun Rental Object trouvé pour cette entité.
-              <div style={{ fontSize: 12, marginTop: 4 }}>Créez des Rental Objects dans la page dédiée et associez-les à un bâtiment de cette entité.</div>
+              ⚠️ Aucun espace disponible trouvé pour cette entité.
+              <div style={{ fontSize: 12, marginTop: 4 }}>Créez des espaces dans Patrimoine et assignez-leur un usage type.</div>
             </div>
           ) : (
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>

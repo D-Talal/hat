@@ -58,7 +58,7 @@ function PGForm({ onSave, onClose, initial, existingItems = [] }) {
 
   const addMember = co => {
     if (!members.find(m => m.contract_object_id === co.id))
-      setMembers(m => [...m, { contract_object_id: co.id, excluded: false, max_cost: '', markup_rate: 0, label: `${co.contract?.contract_number} — ${co.rental_object?.code}` }]);
+      setMembers(m => [...m, { contract_object_id: co.id, excluded: false, max_cost: '', markup_rate: 0, label: `${co.contract?.contract_number} — ${co.space?.space_code}` }]);
   };
   const setMember = (id, k, v) => setMembers(m => m.map(x => x.contract_object_id === id ? { ...x, [k]: v } : x));
 

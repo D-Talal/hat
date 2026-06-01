@@ -7,7 +7,7 @@ const FEATURES = [
     title: 'Patrimoine structuré',
     titleEn: 'Structured Patrimony',
     desc: 'Hiérarchie complète : Entité → Bâtiment → Étage → Espace → Objet locatif. Inspiré de SAP RE-FX.',
-    descEn: 'Full hierarchy: Entity → Building → Floor → Space → Rental Object. SAP RE-FX inspired.',
+    descEn: 'Full hierarchy: Entity → Building → Floor → Space. SAP RE-FX inspired.',
   },
   {
     icon: '◇',
