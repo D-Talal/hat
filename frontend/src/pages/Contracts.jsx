@@ -82,6 +82,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   });
 
   const [loadingRO, setLoadingRO] = useState(false);
+  const [refreshRO, setRefreshRO] = useState(0);
 
   // Load partners and entities once on mount
   useEffect(() => {
@@ -115,27 +116,19 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     API.get('/commercial/rental-objects')
       .then(r => {
         const all = r.data || [];
-        console.log('[RO] Total from API:', all.length);
-        console.log('[RO] Sample:', all.slice(0, 3).map(ro => ({
-          id: ro.id, code: ro.code, status: ro.status,
-          building_entity_id: ro.building_entity_id,
-          building_org_id: ro.building_org_id,
-        })));
-        console.log('[RO] Looking for business_entity_id:', form.business_entity_id, typeof form.business_entity_id);
-        // Filter by business entity
+        // Filter by business entity — match on building_entity_id OR building.business_entity_id
         const forEntity = all.filter(ro => {
-          const roEntityId = ro.building_entity_id;
-          const match = String(roEntityId) === String(form.business_entity_id);
-          if (!match) console.log(`[RO] skip ${ro.code}: building_entity_id=${roEntityId} !== ${form.business_entity_id}`);
-          return match;
+          const beId = ro.building_entity_id ?? ro.building?.business_entity_id;
+          // If no entity info at all, include it (show all for safety)
+          if (beId == null) return true;
+          return String(beId) === String(form.business_entity_id);
         });
-        console.log('[RO] After entity filter:', forEntity.length);
         setRentalObjects(forEntity);
         setSelectedObjects([]);
       })
-      .catch((err) => { console.error('[RO] error:', err); setRentalObjects([]); })
+      .catch(() => setRentalObjects([]))
       .finally(() => setLoadingRO(false));
-  }, [form.business_entity_id]);
+  }, [form.business_entity_id, refreshRO]);
 
   const toggleObject = id => setSelectedObjects(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
@@ -229,7 +222,14 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
               </label>
             ))}
           </div>
-          <SectionTitle>Rental Objects</SectionTitle>
+          <SectionTitle>
+            Rental Objects
+            <button
+              onClick={() => setRefreshRO(n => n + 1)}
+              style={{ marginLeft: 12, fontSize: 11, background: 'none', border: '1px solid var(--border)', borderRadius: 6, padding: '2px 10px', cursor: 'pointer', fontFamily: 'DM Sans', color: 'var(--slate)', verticalAlign: 'middle' }}
+              title="Actualiser la liste"
+            >↻ Actualiser</button>
+          </SectionTitle>
           {!form.business_entity_id ? (
             <div style={{ background: '#f0f7ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
               ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les Rental Objects.
