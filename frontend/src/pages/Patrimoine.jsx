@@ -346,7 +346,7 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
 function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existingSpaces = [] }) {
   const tc = t.commercial;
   const [form, setForm]   = useState({ space_code: initial?.space_code || '', description: initial?.description || '', status: initial?.status || 'available' });
-  const [area, setArea]   = useState({ valid_from: '', area_sqm: '' });
+  const [area, setArea]   = useState({ valid_from: new Date().toISOString().slice(0, 10), area_sqm: initial?.current_area_sqm || '' });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
@@ -362,9 +362,9 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
   const otherSpacesSum = existingSpaces
     .filter(s => s.id !== initial?.id)
     .reduce((acc, s) => acc + (parseFloat(s.current_area_sqm) || 0), 0);
-  const newArea      = parseFloat(area.area_sqm) || (parseFloat(initial?.current_area_sqm) || 0);
-  const totalUsed    = otherSpacesSum + newArea;
-  const areaExceeds  = floorAreaSqm && newArea && totalUsed > parseFloat(floorAreaSqm);
+  const newArea     = parseFloat(area.area_sqm) || 0;
+  const totalUsed   = otherSpacesSum + newArea;
+  const areaExceeds = floorAreaSqm && newArea && totalUsed > parseFloat(floorAreaSqm);
 
   const save = async () => {
     if (!form.space_code.trim()) { setError('Space code is required'); return; }
@@ -373,7 +373,12 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
     if (areaExceeds) { setError(`La somme des superficies des espaces (${totalUsed.toLocaleString()} m²) dépasse la superficie de l'étage (${parseFloat(floorAreaSqm).toLocaleString()} m²).`); return; }
     setSaving(true); setError('');
     try {
-      const payload = { ...form, ...(area.valid_from && area.area_sqm ? { initial_measurement: { valid_from: area.valid_from, area_sqm: parseFloat(area.area_sqm) } } : {}) };
+      const hasMeasurement = area.area_sqm !== '' && area.area_sqm !== null && area.area_sqm !== undefined && parseFloat(area.area_sqm) > 0;
+      const measurementDate = area.valid_from || new Date().toISOString().slice(0, 10);
+      const payload = {
+        ...form,
+        ...(hasMeasurement ? { initial_measurement: { valid_from: measurementDate, area_sqm: parseFloat(area.area_sqm) } } : {}),
+      };
       if (initial) await loc.spaces.update(initial.id, payload);
       else         await loc.spaces.create(floorId, payload);
       onSave(); onClose();
@@ -398,13 +403,18 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
       <Field label={tc.description || 'Description'}><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
       <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 16, marginTop: 4 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 12 }}>
-          {initial ? 'Add New Measurement' : (tc.initialMeasurement || 'Initial Measurement')}
+          {initial ? 'Nouvelle mesure' : 'Superficie'}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-          <Field label={(tc.validFrom || 'Valid From') + (initial ? '' : ' *')}><input style={inputStyle} type="date" value={area.valid_from} onChange={e => setArea(a => ({ ...a, valid_from: e.target.value }))} /></Field>
-          <Field label={(tc.areaSqm || 'Area') + ' (m²)' + (initial ? '' : ' *')}><input style={inputStyle} type="number" min="0" step="0.01" value={area.area_sqm} onChange={e => setArea(a => ({ ...a, area_sqm: e.target.value }))} /></Field>
+          <Field label="Superficie (m²)">
+            <input style={inputStyle} type="number" min="0" step="0.01" value={area.area_sqm} onChange={e => setArea(a => ({ ...a, area_sqm: e.target.value }))} placeholder="ex: 45.50" />
+          </Field>
+          <Field label="Date de validité">
+            <input style={inputStyle} type="date" value={area.valid_from} onChange={e => setArea(a => ({ ...a, valid_from: e.target.value }))} />
+            <div style={{ fontSize: 10, color: 'var(--slate)', marginTop: 3 }}>Laissez vide = aujourd'hui</div>
+          </Field>
         </div>
-        {floorAreaSqm && (area.area_sqm || initial?.current_area_sqm) && (
+        {floorAreaSqm && newArea > 0 && (
           <AreaWarning
             usedSqm={totalUsed}
             totalSqm={parseFloat(floorAreaSqm)}
