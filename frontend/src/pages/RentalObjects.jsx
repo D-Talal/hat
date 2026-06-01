@@ -93,8 +93,13 @@ function RentalObjectForm({ onSave, onClose, initial, existingItems = [] }) {
     if (dupErr) { setError(dupErr); return; }
     setError('');
     try {
-      if (isEdit) await API.put(`/commercial/rental-objects/${initial.id}`, { ...form, space_ids: selectedSpaces });
-      else        await API.post('/commercial/rental-objects', { ...form, space_ids: selectedSpaces });
+      const payload = {
+        ...form,
+        building_id: form.building_id ? parseInt(form.building_id) : undefined,
+        space_ids: selectedSpaces,
+      };
+      if (isEdit) await API.put(`/commercial/rental-objects/${initial.id}`, payload);
+      else        await API.post('/commercial/rental-objects', payload);
       onSave(); onClose();
     } catch (e) { setError(e.response?.data?.detail || 'Error'); }
   };
