@@ -32,25 +32,28 @@ function BPForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [form, setForm] = useState({
-    company_name: initial?.company_name || '',
-    trade_name: initial?.trade_name || '',
-    contact_name: initial?.contact_name || '',
-    email: initial?.email || '',
-    phone: initial?.phone || '',
-    address: initial?.address || '',
-    city: initial?.city || '',
-    country: initial?.country || '',
-    tax_id: initial?.tax_id || '',
+    company_name:  initial?.company_name  || '',
+    trade_name:    initial?.trade_name    || '',
+    contact_name:  initial?.contact_name  || '',
+    email:         initial?.email         || '',
+    phone:         initial?.phone         || '',
+    address:       initial?.address       || '',
+    continent:     initial?.continent     || '',
+    country:       initial?.country       || '',
+    state:         initial?.state         || '',
+    city:          initial?.city          || '',
+    tax_id:        initial?.tax_id        || '',
   });
   const [roles, setRoles] = useState(
     initial?.roles?.length
       ? initial.roles.map(r => ({ role: r.role, customer_account: r.customer_account || '' }))
       : [{ role: 'master_tenant', customer_account: '' }]
   );
-  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
-  const addRole = () => setRoles(r => [...r, { role: 'master_tenant', customer_account: '' }]);
+  const set    = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const setGeo = (field, val) => setForm(f => ({ ...f, [field]: val }));
+  const addRole    = () => setRoles(r => [...r, { role: 'master_tenant', customer_account: '' }]);
   const removeRole = i => setRoles(r => r.filter((_, idx) => idx !== i));
-  const setRole = (i, k, v) => setRoles(r => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
+  const setRole    = (i, k, v) => setRoles(r => r.map((row, idx) => idx === i ? { ...row, [k]: v } : row));
 
   const { checkDuplicate, DuplicateWarning } = useDuplicateCheck(existingItems, {
     fields: ['company_name', 'tax_id'],
@@ -67,7 +70,7 @@ function BPForm({ onSave, onClose, initial, existingItems = [] }) {
     setError('');
     try {
       if (initial?.id) await API.put(`/commercial/business-partners/${initial.id}`, { ...form, roles });
-      else await API.post('/commercial/business-partners', { ...form, roles });
+      else             await API.post('/commercial/business-partners', { ...form, roles });
       onSave(); onClose();
     } catch (e) { setError(e.response?.data?.detail || 'Error'); }
   };
@@ -76,8 +79,8 @@ function BPForm({ onSave, onClose, initial, existingItems = [] }) {
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        <Field label={tc.companyName + " *"}>
-          <input style={inputStyle} value={form.company_name} onChange={set('company_name')} />
+        <Field label={tc.companyName + ' *'}>
+          <input style={inputStyle} value={form.company_name} onChange={set('company_name')} autoFocus />
           <DuplicateWarning value={form.company_name} field="company_name" />
         </Field>
         <Field label={tc.tradeName}><input style={inputStyle} value={form.trade_name} onChange={set('trade_name')} /></Field>
@@ -88,10 +91,14 @@ function BPForm({ onSave, onClose, initial, existingItems = [] }) {
         </Field>
         <Field label={tc.email}><input style={inputStyle} type="email" value={form.email} onChange={set('email')} /></Field>
         <Field label={tc.phone}><input style={inputStyle} value={form.phone} onChange={set('phone')} /></Field>
-        <Field label={tc.city}><input style={inputStyle} value={form.city} onChange={set('city')} /></Field>
-        <Field label={tc.country}><input style={inputStyle} value={form.country} onChange={set('country')} /></Field>
       </div>
       <Field label={tc.address}><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
+      <Field label="Localisation">
+        <GeoSelect
+          value={{ continent: form.continent, country: form.country, state: form.state, city: form.city }}
+          onChange={setGeo}
+        />
+      </Field>
       <div style={{ marginTop: 8 }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <span style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)' }}>Roles</span>
@@ -131,19 +138,18 @@ export default function BusinessPartners() {
   const { t } = useLanguage();
   const tc = t.commercial;
   const [partners, setPartners] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [search, setSearch] = useState('');
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState('');
   const [filterRole, setFilterRole] = useState('all');
-  const [modal, setModal] = useState(null);
+  const [modal, setModal]   = useState(null);
   const [selected, setSelected] = useState(null);
-  const [confirm, setConfirm] = useState(null);
+  const [confirm, setConfirm]   = useState(null);
 
   const load = useCallback(async () => {
     setLoading(true);
     try { const r = await API.get('/commercial/business-partners'); setPartners(r.data); }
     catch { setPartners([]); } finally { setLoading(false); }
   }, []);
-
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id) => {
@@ -153,25 +159,21 @@ export default function BusinessPartners() {
 
   const filtered = partners.filter(p => {
     const matchSearch = p.company_name?.toLowerCase().includes(search.toLowerCase()) || p.email?.toLowerCase().includes(search.toLowerCase());
-    const matchRole = filterRole === 'all' || (p.roles || []).some(r => r.role === filterRole);
+    const matchRole   = filterRole === 'all' || (p.roles || []).some(r => r.role === filterRole);
     return matchSearch && matchRole;
   });
 
   return (
     <div className="animate-fade">
       <PageHeader title={tc.partnersTitle} sub={tc.partnersSub} />
-
       <div style={{ display: 'flex', gap: 12, marginBottom: 24, alignItems: 'center', flexWrap: 'wrap' }}>
         <input placeholder={t.common.search} value={search} onChange={e => setSearch(e.target.value)} style={{ ...inputStyle, maxWidth: 280 }} />
         <select value={filterRole} onChange={e => setFilterRole(e.target.value)} style={{ ...inputStyle, maxWidth: 180 }}>
           <option value="all">All Roles</option>
           {ROLES.map(r => <option key={r} value={r}>{ROLE_LABELS[r].label}</option>)}
         </select>
-        <button onClick={() => { setSelected(null); setModal('new'); }} style={{ ...btnPrimary, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-          + {tc.newPartner}
-        </button>
+        <button onClick={() => { setSelected(null); setModal('new'); }} style={{ ...btnPrimary, marginLeft: 'auto', whiteSpace: 'nowrap' }}>+ {tc.newPartner}</button>
       </div>
-
       {loading ? (
         <div style={{ textAlign: 'center', padding: 64, color: 'var(--slate)', fontFamily: 'DM Serif Display', fontSize: 20 }}>{t.common.loading}</div>
       ) : (
@@ -185,8 +187,8 @@ export default function BusinessPartners() {
                 </div>
                 <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
                   <span style={{ fontSize: 11, color: 'var(--slate)', background: '#f5f5f5', borderRadius: 6, padding: '2px 8px' }}>BP-{p.id}</span>
-                  <button onClick={() => { setSelected(p); setModal('edit'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }} title="Edit">✏️</button>
-                  <button onClick={() => setConfirm(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }} title={t.common.delete}>🗑</button>
+                  <button onClick={() => { setSelected(p); setModal('edit'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>✏️</button>
+                  <button onClick={() => setConfirm(p)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }}>🗑</button>
                 </div>
               </div>
               <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 10 }}>
@@ -196,7 +198,7 @@ export default function BusinessPartners() {
                 })}
               </div>
               <div style={{ fontSize: 13, color: 'var(--slate)' }}>
-                {[p.contact_name, p.email, p.city && p.country ? `${p.city}, ${p.country}` : null].filter(Boolean).join(' · ')}
+                {[p.contact_name, p.email, [p.city, p.state, p.country].filter(Boolean).join(', ')].filter(Boolean).join(' · ')}
               </div>
               {(p.roles || []).some(r => r.role === 'master_tenant' && !r.customer_account) && (
                 <div style={{ marginTop: 8, background: '#fff8e1', border: '1px solid #f9a825', borderRadius: 6, padding: '5px 10px', fontSize: 11, color: '#e65100' }}>
@@ -207,20 +209,17 @@ export default function BusinessPartners() {
           ))}
         </div>
       )}
-
       {filtered.length === 0 && !loading && (
         <div style={{ textAlign: 'center', padding: 64, color: 'var(--slate)' }}>
           <div style={{ fontFamily: 'DM Serif Display', fontSize: 22, marginBottom: 8 }}>{tc.noPartners}</div>
           <div style={{ fontSize: 14 }}>{tc.noPartnersDesc}</div>
         </div>
       )}
-
       {(modal === 'new' || modal === 'edit') && (
         <Modal title={modal === 'edit' ? `Edit — ${selected?.company_name}` : tc.newPartner} onClose={() => setModal(null)}>
           <BPForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} existingItems={partners} />
         </Modal>
       )}
-
       {modal === 'view' && selected && (
         <Modal title={selected.company_name} onClose={() => setModal(null)}>
           <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginBottom: 16 }}>
@@ -229,7 +228,7 @@ export default function BusinessPartners() {
               return <span key={i} style={{ background: rl.bg, color: rl.color, borderRadius: 5, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>{rl.label || r.role}</span>;
             })}
           </div>
-          {[['Tax ID', selected.tax_id], ['Contact', selected.contact_name], ['Email', selected.email], ['Phone', selected.phone], ['Address', [selected.address, selected.city, selected.country].filter(Boolean).join(', ')]].map(([label, val]) => val ? (
+          {[['Tax ID', selected.tax_id], ['Contact', selected.contact_name], ['Email', selected.email], ['Phone', selected.phone], ['Address', [selected.address, selected.city, selected.state, selected.country].filter(Boolean).join(', ')]].map(([label, val]) => val ? (
             <div key={label} style={{ display: 'flex', gap: 12, marginBottom: 10, fontSize: 14 }}>
               <span style={{ color: 'var(--slate)', minWidth: 80, fontWeight: 600 }}>{label}</span>
               <span>{val}</span>
@@ -246,9 +245,8 @@ export default function BusinessPartners() {
           </div>
         </Modal>
       )}
-
       {confirm && (
-        <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
+        <Modal title={t.common.confirm + ' ' + t.common.delete} onClose={() => setConfirm(null)}>
           <p style={{ fontSize: 14, marginBottom: 20 }}>Delete <strong>{confirm.company_name}</strong>? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>

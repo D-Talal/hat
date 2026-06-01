@@ -63,6 +63,14 @@ function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
     if (!initial?.contract_id) API.get('/commercial/contracts?status=released').then(r => setContracts(r.data || [])).catch(() => {});
   }, [initial]);
 
+  // Inherit currency from selected contract's BusinessEntity
+  const selectedContract = contracts.find(c => String(c.id) === String(form.contract_id));
+  useEffect(() => {
+    if (selectedContract?.business_entity?.currency && !form.currency) {
+      setForm(f => ({ ...f, currency: selectedContract.business_entity.currency }));
+    }
+  }, [form.contract_id, selectedContract]);
+
   const save = async () => {
     setFormError('');
     if (form.condition_code.trim()) {
@@ -88,6 +96,13 @@ function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
             <option value="">— Select —</option>
             {contracts.map(c => <option key={c.id} value={c.id}>{c.contract_number || `#${c.id}`} — {c.business_partner?.company_name}</option>)}
           </select>
+          {selectedContract && (
+            <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {selectedContract.business_entity?.name && <span style={{ background: '#e8eaf6', color: '#1a237e', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>🏛 {selectedContract.business_entity.name}</span>}
+              {selectedContract.business_entity?.currency && <span style={{ background: '#e8f5e9', color: '#1b5e20', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>💱 {selectedContract.business_entity.currency} ← hérité</span>}
+              {selectedContract.business_partner?.company_name && <span style={{ background: '#f5f5f5', color: '#555', borderRadius: 6, padding: '2px 8px', fontSize: 11 }}>👤 {selectedContract.business_partner.company_name}</span>}
+            </div>
+          )}
         </Field>
       )}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>

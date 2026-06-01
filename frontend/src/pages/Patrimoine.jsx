@@ -150,16 +150,18 @@ function CompanyCodeForm({ onSave, onClose, t, initial, existingItems = [] }) {
 }
 
 // ── BUSINESS ENTITY FORM ──────────────────────────────────────────────────
-function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId, existingItems = [] }) {
+function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId, existingItems = [], parentCC = null }) {
   const tc = t.commercial;
   const [form, setForm] = useState({
     name: initial?.name || '', legal_name: initial?.legal_name || '',
     tax_id: initial?.tax_id || '', address: initial?.address || '',
-    currency: initial?.currency || 'USD',
+    currency: initial?.currency || parentCC?.currency || 'USD',
     company_code_id: initial?.company_code_id || companyCodeId || null,
     continent: initial?.continent || '', country: initial?.country || '',
     state: initial?.state || '', city: initial?.city || '',
   });
+  // Inherit geo from parent CompanyCode
+  const geoInherit = parentCC ? { country: parentCC.country, state: parentCC.state } : null;
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
@@ -200,7 +202,7 @@ function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId, existi
         <CurrencySelect value={form.currency} onChange={v => setForm(f => ({ ...f, currency: v }))} />
       </Field>
       <Field label="Location">
-        <GeoSelect value={{ continent: form.continent, country: form.country, state: form.state, city: form.city }} onChange={setGeo} />
+        <GeoSelect value={{ continent: form.continent, country: form.country, state: form.state, city: form.city }} onChange={setGeo} inheritFrom={geoInherit} />
       </Field>
       <Field label={tc.address}><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
@@ -212,14 +214,16 @@ function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId, existi
 }
 
 // ── BUILDING FORM ─────────────────────────────────────────────────────────
-function BuildingForm({ beId, onSave, onClose, t, initial, existingBuildings = [] }) {
+function BuildingForm({ beId, onSave, onClose, t, initial, existingBuildings = [], parentBE = null }) {
   const tc = t.commercial;
   const [form, setForm] = useState({
-    name: initial?.name || '', address: initial?.address || '',
+    name: initial?.name || '', address: initial?.address || parentBE?.address || '',
     city: initial?.city || '', country: initial?.country || '',
     state: initial?.state || '', continent: initial?.continent || '',
     total_area_sqm: initial?.total_area_sqm || '', construction_year: initial?.construction_year || '',
   });
+  // Inherit geo from parent BusinessEntity
+  const geoInherit = parentBE ? { continent: parentBE.continent, country: parentBE.country, state: parentBE.state, city: parentBE.city } : null;
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
@@ -259,7 +263,7 @@ function BuildingForm({ beId, onSave, onClose, t, initial, existingBuildings = [
       </div>
       <Field label={tc.address || 'Address'}><input style={inputStyle} value={form.address} onChange={set('address')} /></Field>
       <Field label="Location">
-        <GeoSelect value={{ continent: form.continent, country: form.country, state: form.state, city: form.city }} onChange={setGeo} />
+        <GeoSelect value={{ continent: form.continent, country: form.country, state: form.state, city: form.city }} onChange={setGeo} inheritFrom={geoInherit} />
       </Field>
       <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
         <button onClick={onClose} style={btnSecondary}>{t.common.cancel}</button>
@@ -915,12 +919,12 @@ export default function Patrimoine() {
       )}
       {modal === 'be' && !editTarget && (
         <Modal title={tc.newBusinessEntity || 'New Business Entity'} onClose={() => setModal(null)}>
-          <BusinessEntityForm onSave={() => { if (selectedCC) loadEntities(selectedCC.id); setModal(null); }} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} existingItems={entities} />
+          <BusinessEntityForm onSave={() => { if (selectedCC) loadEntities(selectedCC.id); setModal(null); }} onClose={() => setModal(null)} t={t} companyCodeId={selectedCC?.id} existingItems={entities} parentCC={selectedCC} />
         </Modal>
       )}
       {modal === 'building' && !editTarget && selectedBE && (
         <Modal title={tc.newBuilding || 'New Building'} onClose={() => setModal(null)}>
-          <BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} existingBuildings={buildings} />
+          <BuildingForm beId={selectedBE.id} onSave={() => loadBuildings(selectedBE.id)} onClose={() => setModal(null)} t={t} existingBuildings={buildings} parentBE={selectedBE} />
         </Modal>
       )}
       {modal === 'floor' && !editTarget && selectedBuilding && (

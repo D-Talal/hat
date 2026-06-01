@@ -96,6 +96,14 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
       .catch(() => {});
   }, []);
 
+  // Inherit currency from selected BusinessEntity
+  const selectedEntity = entities.find(e => String(e.id) === String(form.business_entity_id));
+  useEffect(() => {
+    if (selectedEntity?.currency && !initial?.id) {
+      // Show inheritance hint — don't auto-set, let user see it
+    }
+  }, [form.business_entity_id, selectedEntity]);
+
   // Reload rental objects whenever business_entity_id changes
   useEffect(() => {
     if (!form.business_entity_id) {
@@ -104,18 +112,28 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
       return;
     }
     setLoadingRO(true);
-    API.get(`/commercial/rental-objects?business_entity_id=${form.business_entity_id}`)
+    API.get('/commercial/rental-objects')
       .then(r => {
         const all = r.data || [];
-        console.log('[RO] raw response count:', all.length, all.slice(0,3));
-        // Show all — let user see everything, occupied ones are just styled differently
-        setRentalObjects(all);
+        console.log('[RO] Total from API:', all.length);
+        console.log('[RO] Sample:', all.slice(0, 3).map(ro => ({
+          id: ro.id, code: ro.code, status: ro.status,
+          building_entity_id: ro.building_entity_id,
+          building_org_id: ro.building_org_id,
+        })));
+        console.log('[RO] Looking for business_entity_id:', form.business_entity_id, typeof form.business_entity_id);
+        // Filter by business entity
+        const forEntity = all.filter(ro => {
+          const roEntityId = ro.building_entity_id;
+          const match = String(roEntityId) === String(form.business_entity_id);
+          if (!match) console.log(`[RO] skip ${ro.code}: building_entity_id=${roEntityId} !== ${form.business_entity_id}`);
+          return match;
+        });
+        console.log('[RO] After entity filter:', forEntity.length);
+        setRentalObjects(forEntity);
         setSelectedObjects([]);
       })
-      .catch((err) => {
-        console.error('[RO] error:', err);
-        setRentalObjects([]);
-      })
+      .catch((err) => { console.error('[RO] error:', err); setRentalObjects([]); })
       .finally(() => setLoadingRO(false));
   }, [form.business_entity_id]);
 
@@ -155,8 +173,14 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
         <Field label={tc.businessEntity + " *"}>
           <select style={inputStyle} value={form.business_entity_id} onChange={set('business_entity_id')} disabled={isEdit}>
             <option value="">— Select —</option>
-            {entities.map(e => <option key={e.id} value={e.id}>{e.name}</option>)}
+            {entities.map(e => <option key={e.id} value={e.id}>{e.name}{e.currency ? ` (${e.currency})` : ''}</option>)}
           </select>
+          {selectedEntity && (
+            <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {selectedEntity.currency && <span style={{ background: '#e8eaf6', color: '#1a237e', borderRadius: 6, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>💱 {selectedEntity.currency}</span>}
+              {selectedEntity.country && <span style={{ background: '#f5f5f5', color: '#555', borderRadius: 6, padding: '2px 8px', fontSize: 11 }}>📍 {[selectedEntity.city, selectedEntity.country].filter(Boolean).join(', ')}</span>}
+            </div>
+          )}
         </Field>
         <Field label={tc.businessPartner + " *"}>
           <select style={inputStyle} value={form.business_partner_id} onChange={set('business_partner_id')} disabled={isEdit}>
