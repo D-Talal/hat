@@ -163,8 +163,10 @@ class BusinessPartnerCreate(BaseModel):
     email: Optional[str] = None
     phone: Optional[str] = None
     address: Optional[str] = None
-    city: Optional[str] = None
+    continent: Optional[str] = None
     country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
     tax_id: Optional[str] = None
     roles: Optional[List[BPRoleCreate]] = []
 
@@ -194,8 +196,11 @@ class BusinessPartnerOut(BaseModel):
     contact_name: Optional[str] = None
     email: Optional[str] = None
     phone: Optional[str] = None
-    city: Optional[str] = None
+    address: Optional[str] = None
+    continent: Optional[str] = None
     country: Optional[str] = None
+    state: Optional[str] = None
+    city: Optional[str] = None
     tax_id: Optional[str] = None
     is_active: bool
     roles: List[BPRoleOut] = []
