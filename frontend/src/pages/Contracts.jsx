@@ -113,12 +113,12 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
       return;
     }
     setLoadingRO(true);
-    API.get('/commercial/rental-objects')
+    API.get('/commercial/spaces-leasable')
       .then(r => {
         const all = r.data || [];
         // Filter by business entity — match on building_entity_id OR building.business_entity_id
         const forEntity = all.filter(ro => {
-          const beId = ro.building_entity_id ?? ro.building?.business_entity_id;
+          const beId = ro.business_entity_id;
           // If no entity info at all, include it (show all for safety)
           if (beId == null) return true;
           return String(beId) === String(form.business_entity_id);
@@ -141,7 +141,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     }
     try {
       if (initial?.id) await API.patch(`/commercial/contracts/${initial.id}`, { probable_end_date: form.probable_end_date, absolute_end_date: form.absolute_end_date, notes: form.notes });
-      else await API.post('/commercial/contracts', { ...form, rental_object_ids: selectedObjects });
+      else await API.post('/commercial/contracts', { ...form, space_ids: selectedObjects });
       onSave(); onClose();
     } catch (e) { setFormError(e.response?.data?.detail || 'Error'); }
   };
@@ -257,13 +257,13 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
                       cursor: isLeasable ? 'pointer' : 'not-allowed',
                       opacity: isLeasable ? 1 : 0.5,
                     }}>
-                    <div style={{ fontWeight: 700 }}>{ro.code}</div>
-                    <div style={{ color: 'var(--slate)', fontSize: 11, marginTop: 2 }}>{ro.usage_type}</div>
+                    <div style={{ fontWeight: 700 }}>{ro.space_code}</div>
+                    <div style={{ color: 'var(--slate)', fontSize: 11, marginTop: 2 }}>{ro.usage_type || '—'}{ro.current_area_sqm ? ` · ${ro.current_area_sqm} m²` : ''}</div>
                     <div style={{ fontSize: 10, marginTop: 2, fontWeight: 600, textTransform: 'uppercase',
                       color: s === 'available' ? '#15803d' : s === 'vacant' ? '#dc2626' : '#6b7280' }}>
                       {ro.status}
                     </div>
-                    {ro.building && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>🏗 {ro.building.name}</div>}
+                    {ro.building_name && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>🏗 {ro.building_name} · Étage {ro.floor_number}</div>}
                   </div>
                 );
               })}

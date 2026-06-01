@@ -110,7 +110,7 @@ function PGForm({ onSave, onClose, initial, existingItems = [] }) {
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
             {contractObjects.filter(co => !members.find(m => m.contract_object_id === co.id)).map(co => (
               <button key={co.id} onClick={() => addMember(co)} style={{ background: '#f5f5f5', border: '1.5px solid var(--border)', borderRadius: 6, padding: '5px 12px', cursor: 'pointer', fontSize: 12, fontFamily: 'DM Sans' }}>
-                + {co.contract?.contract_number} / {co.rental_object?.code}
+                + {co.contract?.contract_number} / {co.space?.space_code}
               </button>
             ))}
           </div>

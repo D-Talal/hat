@@ -15,11 +15,11 @@ function Field({ label, children }) {
   );
 }
 
-function SalesDeclarationForm({ onSave, onClose, initial, contracts, salesRules, rentalObjects }) {
+function SalesDeclarationForm({ onSave, onClose, initial, contracts, salesRules, spaces }) {
   const [form, setForm] = useState({
     contract_id:       initial?.contract_id       || '',
     sales_rule_id:     initial?.sales_rule_id     || '',
-    rental_object_id:  initial?.rental_object_id  || '',
+    space_id: initial?.space_id || '',
     period_from:       initial?.period_from        || '',
     period_to:         initial?.period_to          || '',
     declared_amount:   initial?.declared_amount    || '',
@@ -40,7 +40,7 @@ function SalesDeclarationForm({ onSave, onClose, initial, contracts, salesRules,
     }
     setSaving(true); setError('');
     try {
-      const payload = { ...form, declared_amount: parseFloat(form.declared_amount), rental_object_id: form.rental_object_id || null };
+      const payload = { ...form, declared_amount: parseFloat(form.declared_amount), space_id: form.space_id || null };
       if (initial?.id) await API.put(`/commercial/sales-declarations/${initial.id}`, payload);
       else await API.post('/commercial/sales-declarations', payload);
       onSave(); onClose();
@@ -68,10 +68,10 @@ function SalesDeclarationForm({ onSave, onClose, initial, contracts, salesRules,
             {filteredRules.map(r => <option key={r.id} value={r.id}>{r.name || `Rule #${r.id}`} ({r.rate_pct}%)</option>)}
           </select>
         </Field>
-        <Field label="Rental Object">
-          <select style={inputStyle} value={form.rental_object_id} onChange={set('rental_object_id')}>
+        <Field label="Space">
+          <select style={inputStyle} value={form.space_id} onChange={set('space_id')}>
             <option value="">— All units —</option>
-            {rentalObjects.map(ro => <option key={ro.id} value={ro.id}>{ro.code}</option>)}
+            {(spaces || []).map(s => <option key={s.id} value={s.id}>{s.space_code} — {s.building_name || ''}</option>)}
           </select>
         </Field>
         <Field label="Sales Category">
@@ -107,7 +107,7 @@ export default function SalesDeclarations() {
   const [items, setItems]             = useState([]);
   const [contracts, setContracts]     = useState([]);
   const [salesRules, setSalesRules]   = useState([]);
-  const [rentalObjects, setRentalObjects] = useState([]);
+  const [spaces, setSpaces] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [modal, setModal]             = useState(null);
   const [selected, setSelected]       = useState(null);
@@ -120,12 +120,12 @@ export default function SalesDeclarations() {
         API.get('/commercial/sales-declarations'),
         API.get('/commercial/contracts'),
         API.get('/commercial/sales-rules'),
-        API.get('/commercial/rental-objects'),
+        API.get('/commercial/spaces-leasable'),
       ]);
       setItems(dRes.data || []);
       setContracts(cRes.data || []);
       setSalesRules(rRes.data || []);
-      setRentalObjects(roRes.data || []);
+      setSpaces(roRes.data || []);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, []);
@@ -216,7 +216,7 @@ export default function SalesDeclarations() {
             initial={selected}
             contracts={contracts}
             salesRules={salesRules}
-            rentalObjects={rentalObjects}
+            spaces={spaces}
           />
         </Modal>
       )}

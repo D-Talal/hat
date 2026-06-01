@@ -349,7 +349,7 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
 // ── SPACE FORM ────────────────────────────────────────────────────────────
 function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existingSpaces = [] }) {
   const tc = t.commercial;
-  const [form, setForm]   = useState({ space_code: initial?.space_code || '', description: initial?.description || '', status: initial?.status || 'available' });
+  const [form, setForm]   = useState({ space_code: initial?.space_code || '', description: initial?.description || '', status: initial?.status || 'available', usage_type: initial?.usage_type || '', cost_center: initial?.cost_center || '', im_key: initial?.im_key || '' });
   const [area, setArea]   = useState({ valid_from: initial?.current_valid_from || new Date().toISOString().slice(0, 10), area_sqm: initial?.current_area_sqm || '' });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
@@ -405,6 +405,24 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
         </Field>
       </div>
       <Field label={tc.description || 'Description'}><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
+        <Field label="Usage Type">
+          <select style={inputStyle} value={form.usage_type || ''} onChange={set('usage_type')}>
+            <option value="">— None —</option>
+            <option value="retail">Retail</option>
+            <option value="office">Office</option>
+            <option value="storage">Storage</option>
+            <option value="restaurant">Restaurant</option>
+            <option value="anchor">Anchor</option>
+            <option value="kiosk">Kiosk</option>
+            <option value="common_area">Common Area</option>
+            <option value="parking">Parking</option>
+            <option value="other">Other</option>
+          </select>
+        </Field>
+        <Field label="Cost Center"><input style={inputStyle} value={form.cost_center || ''} onChange={set('cost_center')} placeholder="ex: CC-1001" /></Field>
+        <Field label="IM Key"><input style={inputStyle} value={form.im_key || ''} onChange={set('im_key')} placeholder="ex: ASSET-4200" /></Field>
+      </div>
       <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 16, marginTop: 4 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 12 }}>
           {initial
@@ -899,6 +917,7 @@ export default function Patrimoine() {
                             <div style={{ marginTop: 6 }}><Badge status={s.status} /></div>
                             {s.description && <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 6 }}>{s.description}</div>}
                             {s.current_area_sqm && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, color: 'var(--ink)' }}>📐 {s.current_area_sqm.toLocaleString()} m²</div>}
+                  {s.usage_type && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 4, textTransform: 'uppercase', fontWeight: 600 }}>{s.usage_type}</div>}
                           </Card>
                         ))}
                       </div>

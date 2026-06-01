@@ -15,9 +15,9 @@ function Field({ label, children }) {
   );
 }
 
-function VacancyForm({ onSave, onClose, initial, rentalObjects }) {
+function VacancyForm({ onSave, onClose, initial, spaces }) {
   const [form, setForm] = useState({
-    rental_object_id: initial?.rental_object_id || '',
+    space_id: initial?.space_id || '',
     period_from:      initial?.period_from      || '',
     period_to:        initial?.period_to        || '',
     market_rent:      initial?.market_rent      || '',
@@ -28,7 +28,7 @@ function VacancyForm({ onSave, onClose, initial, rentalObjects }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const save = async () => {
-    if (!form.rental_object_id || !form.period_from || !form.period_to) { setError('Rental object and period are required'); return; }
+    if (!form.space_id || !form.period_from || !form.period_to) { setError('Space and period are required'); return; }
     setSaving(true); setError('');
     try {
       const payload = { ...form, market_rent: form.market_rent ? parseFloat(form.market_rent) : null };
@@ -45,9 +45,9 @@ function VacancyForm({ onSave, onClose, initial, rentalObjects }) {
     <>
       {error && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{error}</div>}
       <Field label="Rental Object *">
-        <select style={inputStyle} value={form.rental_object_id} onChange={set('rental_object_id')}>
+        <select style={inputStyle} value={form.space_id} onChange={set('space_id')}>
           <option value="">— Select —</option>
-          {rentalObjects.map(ro => <option key={ro.id} value={ro.id}>{ro.code} — {ro.description || ''}</option>)}
+          {(spaces || []).map(s => <option key={s.id} value={s.id}>{s.space_code} — {s.building_name || ''} Ét.{s.floor_number || ''}</option>)}
         </select>
       </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
@@ -66,7 +66,7 @@ function VacancyForm({ onSave, onClose, initial, rentalObjects }) {
 
 export default function VacancyPostings() {
   const [items, setItems]             = useState([]);
-  const [rentalObjects, setRentalObjects] = useState([]);
+  const [spaces, setSpaces] = useState([]);
   const [loading, setLoading]         = useState(true);
   const [modal, setModal]             = useState(null);
   const [selected, setSelected]       = useState(null);
@@ -78,10 +78,10 @@ export default function VacancyPostings() {
     try {
       const [vRes, roRes] = await Promise.all([
         API.get('/commercial/vacancy-postings'),
-        API.get('/commercial/rental-objects'),
+        API.get('/commercial/spaces-leasable'),
       ]);
       setItems(vRes.data || []);
-      setRentalObjects(roRes.data || []);
+      setSpaces(roRes.data || []);
     } catch { /* ignore */ }
     finally { setLoading(false); }
   }, []);
@@ -112,7 +112,7 @@ export default function VacancyPostings() {
   return (
     <div style={{ padding: '32px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-        <PageHeader title="Vacancy Postings" sub="Track unoccupied rental objects by period" />
+        <PageHeader title="Vacancy Postings" sub="Track unoccupied espaces by period" />
         <button style={btnPrimary} onClick={() => { setSelected(null); setModal('form'); }}>+ New Posting</button>
       </div>
 
@@ -157,7 +157,7 @@ export default function VacancyPostings() {
                 const st = getStatus(v);
                 return (
                   <tr key={v.id} style={{ borderBottom: '1px solid var(--border)', background: idx % 2 === 0 ? 'white' : '#fafafa' }}>
-                    <td style={{ padding: '10px 14px', fontWeight: 600 }}>{v.rental_object?.code || `#${v.rental_object_id}`}</td>
+                    <td style={{ padding: '10px 14px', fontWeight: 600 }}>{v.space?.space_code || `#${v.space_id}`}</td>
                     <td style={{ padding: '10px 14px', color: 'var(--slate)' }}>{v.period_from}</td>
                     <td style={{ padding: '10px 14px', color: 'var(--slate)' }}>{v.period_to}</td>
                     <td style={{ padding: '10px 14px', fontWeight: 600 }}>{v.market_rent ? parseFloat(v.market_rent).toLocaleString(undefined, { minimumFractionDigits: 2 }) : '—'}</td>
@@ -186,13 +186,13 @@ export default function VacancyPostings() {
 
       {modal === 'form' && (
         <Modal title={selected ? 'Edit Vacancy Posting' : 'New Vacancy Posting'} onClose={() => setModal(null)}>
-          <VacancyForm onSave={() => { load(); setModal(null); }} onClose={() => setModal(null)} initial={selected} rentalObjects={rentalObjects} />
+          <VacancyForm onSave={() => { load(); setModal(null); }} onClose={() => setModal(null)} initial={selected} spaces={spaces} />
         </Modal>
       )}
 
       {confirm && (
         <Modal title="Confirm Delete" onClose={() => setConfirm(null)}>
-          <p style={{ fontSize: 14, marginBottom: 20 }}>Delete this vacancy posting for <strong>{confirm.rental_object?.code}</strong>?</p>
+          <p style={{ fontSize: 14, marginBottom: 20 }}>Delete this vacancy posting for <strong>{confirm.space?.space_code}</strong>?</p>
           <div style={{ display: 'flex', gap: 10 }}>
             <button onClick={() => handleDelete(confirm.id)} style={{ padding: '9px 18px', borderRadius: 8, border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontWeight: 700 }}>Delete</button>
             <button onClick={() => setConfirm(null)} style={btnSecondary}>Cancel</button>
