@@ -163,6 +163,9 @@ def startup():
             "UPDATE re_maintenance m SET space_id = ros.space_id FROM re_rental_object_spaces ros WHERE ros.rental_object_id = m.rental_object_id AND m.space_id IS NULL",
             # Copy usage_type/cost_center/im_key from rental objects to their spaces
             "UPDATE re_spaces s SET usage_type = ro.usage_type, cost_center = ro.cost_center, im_key = ro.im_key FROM re_rental_object_spaces ros JOIN re_rental_objects ro ON ro.id = ros.rental_object_id WHERE ros.space_id = s.id AND s.usage_type IS NULL",
+            # Posting entries: add space_id column
+            "ALTER TABLE re_posting_entries ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES re_spaces(id)",
+            "UPDATE re_posting_entries pe SET space_id = co.space_id FROM re_contract_objects co WHERE co.id = pe.contract_id AND pe.space_id IS NULL",
         ]
         for migration in migrations:
             try:
