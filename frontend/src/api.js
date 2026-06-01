@@ -112,11 +112,8 @@ export const commercial = {
     update: (id, d) => API.put(`/commercial/conditions/${id}`, d),
     delete: (id) => API.delete(`/commercial/conditions/${id}`),
   },
-  rentalObjects: {
-    list: (buildingId) => API.get('/commercial/rental-objects' + (buildingId ? `?building_id=${buildingId}` : '')),
-    create: (d) => API.post('/commercial/rental-objects', d),
-    update: (id, d) => API.put(`/commercial/rental-objects/${id}`, d),
-    delete: (id) => API.delete(`/commercial/rental-objects/${id}`),
+  spaces: {
+    leasable: (businessEntityId) => API.get('/commercial/spaces-leasable' + (businessEntityId ? `?business_entity_id=${businessEntityId}` : '')),
   },
   participationGroups: {
     list: () => API.get('/commercial/participation-groups'),
