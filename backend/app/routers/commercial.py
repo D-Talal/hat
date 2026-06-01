@@ -837,7 +837,7 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
 @router.get("/rental-objects")
-def list_rental_objects(building_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
+def list_rental_objects(building_id: Optional[int] = None, business_entity_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
     # Get all building IDs accessible to this org
     if u.organization_id:
         org_building_ids = db.query(Building.id).join(
@@ -855,11 +855,14 @@ def list_rental_objects(building_id: Optional[int] = None, status: Optional[str]
     )
     if building_id:
         q = q.filter(RentalObject.building_id == building_id)
+    if business_entity_id:
+        # Filter via building → business_entity
+        be_building_ids = db.query(Building.id).filter(Building.business_entity_id == business_entity_id).subquery()
+        q = q.filter(RentalObject.building_id.in_(be_building_ids))
 
     results = []
     for ro in q.all():
         d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
-        # Force enum → plain string always
         raw_status = ro.status
         if hasattr(raw_status, 'value'):
             d["status"] = raw_status.value
