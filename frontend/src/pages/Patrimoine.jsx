@@ -346,7 +346,7 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
 function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existingSpaces = [] }) {
   const tc = t.commercial;
   const [form, setForm]   = useState({ space_code: initial?.space_code || '', description: initial?.description || '', status: initial?.status || 'available' });
-  const [area, setArea]   = useState({ valid_from: new Date().toISOString().slice(0, 10), area_sqm: initial?.current_area_sqm || '' });
+  const [area, setArea]   = useState({ valid_from: initial?.current_valid_from || new Date().toISOString().slice(0, 10), area_sqm: initial?.current_area_sqm || '' });
   const [saving, setSaving] = useState(false);
   const [error, setError]   = useState('');
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
@@ -403,7 +403,9 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
       <Field label={tc.description || 'Description'}><input style={inputStyle} value={form.description} onChange={set('description')} /></Field>
       <div style={{ background: '#f8f9fa', borderRadius: 10, padding: 16, marginTop: 4 }}>
         <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 12 }}>
-          {initial ? 'Nouvelle mesure' : 'Superficie'}
+          {initial
+            ? <span>Modifier la mesure courante{initial.current_area_sqm ? <span style={{ fontWeight: 400, color: 'var(--slate)', marginLeft: 6 }}>— actuellement <strong>{parseFloat(initial.current_area_sqm).toLocaleString()} m²</strong> depuis le {initial.current_valid_from || '—'}</span> : ''}</span>
+            : 'Superficie'}
         </div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
           <Field label="Superficie (m²)">
