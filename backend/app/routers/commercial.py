@@ -838,66 +838,31 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 @router.get("/rental-objects")
 def list_rental_objects(building_id: Optional[int] = None, business_entity_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    import logging
-    log = logging.getLogger("rental_objects")
-
-    # Step 1: count ALL rental objects in DB
-    total_ro = db.query(RentalObject).count()
-    log.warning(f"[RO DEBUG] total rental objects in DB: {total_ro}")
-
-    # Step 2: if business_entity_id given, check the building chain
-    if business_entity_id:
-        buildings_for_be = db.query(Building).filter(Building.business_entity_id == business_entity_id).all()
-        log.warning(f"[RO DEBUG] buildings for entity {business_entity_id}: {[b.id for b in buildings_for_be]}")
-        if buildings_for_be:
-            ros_for_buildings = db.query(RentalObject).filter(
-                RentalObject.building_id.in_([b.id for b in buildings_for_be])
-            ).all()
-            log.warning(f"[RO DEBUG] rental objects for those buildings: {[(r.id, r.code) for r in ros_for_buildings]}")
-
-    # Step 3: check org filter
-    if u.organization_id:
-        org_building_ids_q = db.query(Building.id).join(
-            BusinessEntity, Building.business_entity_id == BusinessEntity.id
-        ).filter(
-            (BusinessEntity.org_id == u.organization_id) | (BusinessEntity.org_id == None)
-        )
-        org_building_ids = [r[0] for r in org_building_ids_q.all()]
-        log.warning(f"[RO DEBUG] org_id={u.organization_id}, accessible building ids: {org_building_ids}")
-        # Also check buildings with NULL business_entity_id
-        null_be_buildings = db.query(Building.id).filter(Building.business_entity_id == None).all()
-        log.warning(f"[RO DEBUG] buildings with NULL business_entity_id: {null_be_buildings}")
-        q = db.query(RentalObject).filter(
-            (RentalObject.building_id.in_(org_building_ids)) | (RentalObject.building_id == None)
-        )
-    else:
-        q = db.query(RentalObject)
-
-    q = q.options(
-        joinedload(RentalObject.building),
+    # Simple approach: get all rental objects, no complex join
+    q = db.query(RentalObject).options(
+        joinedload(RentalObject.building).joinedload(Building.business_entity),
         joinedload(RentalObject.spaces).joinedload(RentalObjectSpace.space).joinedload(Space.measurements)
     )
     if building_id:
         q = q.filter(RentalObject.building_id == building_id)
-    if business_entity_id:
-        be_building_ids = db.query(Building.id).filter(Building.business_entity_id == business_entity_id).subquery()
-        q = q.filter(RentalObject.building_id.in_(be_building_ids))
-
-    all_ros = q.all()
-    log.warning(f"[RO DEBUG] final query result count: {len(all_ros)}")
 
     results = []
-    for ro in all_ros:
+    for ro in q.all():
+        # Org filter — check via building chain
+        if u.organization_id and ro.building and ro.building.business_entity:
+            be_org = ro.building.business_entity.org_id
+            if be_org is not None and be_org != u.organization_id:
+                continue
+        # business_entity filter
+        if business_entity_id and ro.building:
+            if ro.building.business_entity_id != int(business_entity_id):
+                continue
+
         d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
-        raw_status = ro.status
-        if hasattr(raw_status, 'value'):
-            d["status"] = raw_status.value
-        elif raw_status is None:
-            d["status"] = "available"
-        else:
-            s = str(raw_status)
-            d["status"] = s.split('.')[-1] if '.' in s else s
-        d["building"] = {"id": ro.building.id, "name": ro.building.name} if ro.building else None
+        # Serialize enum status to plain string
+        st = ro.status
+        d["status"] = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
+        d["building"] = {"id": ro.building.id, "name": ro.building.name, "business_entity_id": ro.building.business_entity_id} if ro.building else None
         d["spaces"] = []
         for ros in ro.spaces:
             s = ros.space
