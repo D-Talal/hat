@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from typing import List, Optional
@@ -802,6 +802,159 @@ def delete_contract(id: int, db: Session = Depends(get_db), u=Depends(require_pe
     obj = db.query(Contract).filter(Contract.id == id).first()
     if not obj: raise HTTPException(404, "Not found")
     db.delete(obj); db.commit(); return {"ok": True}
+
+
+# ── CONTRACT ACTIONS ──────────────────────────────────────────────────────────
+
+@router.post("/contracts/{id}/generate-invoices")
+def generate_invoices_for_contract(
+    id: int,
+    period_from: date = Query(..., description="Start of billing period"),
+    period_to:   date = Query(..., description="End of billing period"),
+    db: Session = Depends(get_db),
+    u=Depends(require_permission("create")),
+):
+    """
+    Quittancement automatique — génère les appels de loyer pour un contrat
+    sur la période donnée, en se basant sur ses conditions actives.
+    Évite les doublons en vérifiant les invoices déjà existantes.
+    """
+    from decimal import Decimal, ROUND_HALF_UP
+    from sqlalchemy import or_
+
+    contract = db.query(Contract).options(
+        joinedload(Contract.business_entity),
+        joinedload(Contract.business_partner),
+    ).filter(Contract.id == id).first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    if contract.status != ContractStatus.released:
+        raise HTTPException(400, f"Contract must be Released to generate invoices (current: {contract.status.value})")
+
+    # Get active conditions for this period
+    conditions = db.query(Condition).filter(
+        Condition.contract_id == id,
+        Condition.valid_from <= period_to,
+        or_(Condition.valid_to.is_(None), Condition.valid_to >= period_from),
+        Condition.amount.isnot(None),
+        Condition.amount > 0,
+    ).all()
+
+    if not conditions:
+        raise HTTPException(400, "No active conditions found for this period")
+
+    freq_mult = {"monthly": 12, "quarterly": 4, "semi_annual": 2, "annual": 1}
+    created = []
+    skipped = []
+
+    for cond in conditions:
+        # Check for existing invoice for this condition+period (avoid duplicates)
+        existing = db.query(Invoice).filter(
+            Invoice.contract_id == id,
+            Invoice.condition_type == cond.condition_type,
+            Invoice.period_from == period_from,
+            Invoice.period_to == period_to,
+        ).first()
+        if existing:
+            skipped.append({"condition_type": cond.condition_type.value, "reason": "already_exists", "invoice_id": existing.id})
+            continue
+
+        # Calculate amount pro-rata
+        freq = cond.frequency.value if hasattr(cond.frequency, 'value') else (cond.frequency or "monthly")
+        n = freq_mult.get(freq, 12)
+        annual = Decimal(str(cond.amount)) * Decimal(str(n))
+
+        # Pro-rata calculation
+        total_days_in_month = (period_to - period_from).days + 1
+        import calendar
+        days_in_month = calendar.monthrange(period_from.year, period_from.month)[1]
+        if total_days_in_month == days_in_month:
+            amount = (annual / Decimal(12)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+        else:
+            amount = (annual / Decimal(365) * Decimal(total_days_in_month)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
+
+        # Due date: in_advance = first day of period, in_arrears = last day
+        payment_timing = cond.payment_timing.value if hasattr(cond.payment_timing, 'value') else "in_advance"
+        due_date = period_from if payment_timing == "in_advance" else period_to
+
+        currency = cond.currency or (contract.business_entity.currency if contract.business_entity else "USD") or "USD"
+
+        invoice = Invoice(
+            contract_id=id,
+            condition_type=cond.condition_type,
+            amount=amount,
+            currency=currency,
+            due_date=due_date,
+            period_from=period_from,
+            period_to=period_to,
+            status="pending",
+            description=f"{cond.condition_type.value.replace('_', ' ').title()} — {period_from.strftime('%B %Y')}",
+            is_catch_up=False,
+        )
+        db.add(invoice)
+        created.append({
+            "condition_type": cond.condition_type.value,
+            "amount": float(amount),
+            "currency": currency,
+            "due_date": str(due_date),
+        })
+
+    db.commit()
+    audit(db, u, "CREATE", "re_invoices", id, f"bulk_generate period={period_from}:{period_to} count={len(created)}")
+    return {
+        "contract_id": id,
+        "contract_number": contract.contract_number,
+        "period_from": str(period_from),
+        "period_to": str(period_to),
+        "created": created,
+        "skipped": skipped,
+        "total_created": len(created),
+        "total_skipped": len(skipped),
+    }
+
+
+@router.post("/contracts/{id}/apply-ipc")
+def trigger_ipc_revision(
+    id: int,
+    new_index: float = Query(..., description="New IPC index value (e.g. 115.3)"),
+    applied_date: date = Query(..., description="Date from which the new index applies"),
+    db: Session = Depends(get_db),
+    u=Depends(require_permission("update")),
+):
+    """
+    Déclenche une révision IPC sur toutes les conditions ipc_enabled du contrat.
+    Crée de nouvelles conditions avec le montant révisé et ferme les anciennes.
+    """
+    contract = db.query(Contract).filter(Contract.id == id).first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    if contract.status != ContractStatus.released:
+        raise HTTPException(400, "Contract must be Released to apply IPC revision")
+
+    # Check there are IPC-enabled conditions
+    from sqlalchemy import or_
+    ipc_conditions = db.query(Condition).filter(
+        Condition.contract_id == id,
+        Condition.ipc_enabled == True,
+        or_(Condition.valid_to.is_(None), Condition.valid_to >= applied_date),
+    ).all()
+    if not ipc_conditions:
+        raise HTTPException(400, "No IPC-enabled conditions found on this contract. Enable IPC on at least one condition first.")
+
+    from app.services.posting_engine import apply_ipc
+    history = apply_ipc(db, id, new_index, applied_date)
+
+    audit(db, u, "UPDATE", "re_contracts", id, f"ipc_revision index={new_index} date={applied_date}")
+    return {
+        "contract_id": id,
+        "contract_number": contract.contract_number,
+        "applied_date": str(applied_date),
+        "old_index": float(history.old_index),
+        "new_index": float(history.new_index),
+        "revision_pct": round(float(history.revision_pct), 2),
+        "conditions_updated": len(history.conditions_updated),
+        "message": f"IPC revision applied: {round(float(history.revision_pct), 2):+.2f}% — {len(history.conditions_updated)} condition(s) updated",
+    }
 
 
 # ── CONDITIONS ────────────────────────────────────────────────────────────────
