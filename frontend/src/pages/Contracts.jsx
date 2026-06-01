@@ -85,15 +85,23 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     Promise.all([
       API.get('/commercial/business-partners'),
       API.get('/commercial/business-entities'),
-      API.get('/commercial/rental-objects'),        // all statuses — we'll filter client-side
+      API.get('/commercial/rental-objects'),
     ])
       .then(([bp, be, ro]) => {
         setPartners(bp.data || []);
         setEntities(be.data || []);
-        // Only show available or vacant — those are the leasable ones
-        setRentalObjects((ro.data || []).filter(r => ['available', 'vacant'].includes(r.status)));
+        const all = ro.data || [];
+        // Debug — remove after fix confirmed
+        console.log('[ContractForm] All rental objects:', all.map(r => ({ id: r.id, code: r.code, status: r.status })));
+        // Normalize status to lowercase string before filtering
+        const leasable = all.filter(r => {
+          const s = (r.status || '').toString().toLowerCase().trim();
+          return s === 'available' || s === 'vacant';
+        });
+        console.log('[ContractForm] Leasable rental objects:', leasable.length);
+        setRentalObjects(leasable);
       })
-      .catch(() => {});
+      .catch((e) => { console.error('[ContractForm] Load error:', e); });
   }, []);
 
   const toggleObject = id => setSelectedObjects(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
