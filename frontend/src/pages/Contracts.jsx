@@ -288,10 +288,36 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   );
 }
 
-function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
+function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onRefresh }) {
   const [conditions, setConditions] = useState([]);
   const [activeTab, setActiveTab] = useState('info');
   const [invoices, setInvoices] = useState([]);
+
+  // IPC modal state
+  const [ipcModal, setIpcModal]     = useState(false);
+  const [ipcIndex, setIpcIndex]     = useState('');
+  const [ipcDate, setIpcDate]       = useState('');
+  const [ipcLoading, setIpcLoading] = useState(false);
+  const [ipcResult, setIpcResult]   = useState(null);
+  const [ipcError, setIpcError]     = useState('');
+
+  // Quittancement modal state
+  const [qModal, setQModal]         = useState(false);
+  const [qFrom, setQFrom]           = useState('');
+  const [qTo, setQTo]               = useState('');
+  const [qLoading, setQLoading]     = useState(false);
+  const [qResult, setQResult]       = useState(null);
+  const [qError, setQError]         = useState('');
+
+  // Pre-fill quittancement with current month
+  useEffect(() => {
+    const now = new Date();
+    const y = now.getFullYear(), m = String(now.getMonth() + 1).padStart(2, '0');
+    const lastDay = new Date(y, now.getMonth() + 1, 0).getDate();
+    setQFrom(`${y}-${m}-01`);
+    setQTo(`${y}-${m}-${lastDay}`);
+    setIpcDate(`${y}-${m}-01`);
+  }, []);
 
   const downloadInvoicePdf = async (invoiceId) => {
     try {
@@ -416,13 +442,29 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
 
       {activeTab === 'invoices' && (
         <div>
+          {/* ── Quittancement automatique ── */}
+          {contract.status === 'released' && (
+            <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: '12px 16px', marginBottom: 16 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 13, color: '#15803d' }}>⚡ Quittancement automatique</div>
+                  <div style={{ fontSize: 12, color: '#166534', marginTop: 2 }}>Génère les appels de loyer selon les conditions actives du contrat</div>
+                </div>
+                <button onClick={() => { setQResult(null); setQError(''); setQModal(true); }}
+                  style={{ padding: '8px 16px', borderRadius: 8, border: 'none', background: '#15803d', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 13, whiteSpace: 'nowrap' }}>
+                  📄 Générer
+                </button>
+              </div>
+            </div>
+          )}
+
           {invoices.length === 0 ? (
-            <p style={{ color: 'var(--slate)', fontSize: 13 }}>No invoices found for this contract.</p>
+            <p style={{ color: 'var(--slate)', fontSize: 13 }}>Aucune facture trouvée pour ce contrat.</p>
           ) : (
             <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
               <thead>
                 <tr style={{ background: '#f5f7ff' }}>
-                  {['Period', 'Type', 'Amount', 'Due Date', 'Status', 'PDF'].map(h => (
+                  {['Période', 'Type', 'Montant', 'Échéance', 'Statut', 'PDF'].map(h => (
                     <th key={h} style={{ padding: '8px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', borderBottom: '1px solid var(--border)' }}>{h}</th>
                   ))}
                 </tr>
@@ -452,10 +494,128 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
           )}
         </div>
       )}
-      <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+
+      {/* ── Bottom action bar ── */}
+      <div style={{ display: 'flex', gap: 10, marginTop: 16, paddingTop: 16, borderTop: '1px solid var(--border)', flexWrap: 'wrap' }}>
         <button onClick={onEdit} style={btnPrimary}>✏️ Edit</button>
+        {contract.status === 'released' && (
+          <button onClick={() => { setIpcResult(null); setIpcError(''); setIpcModal(true); }}
+            style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#ca8a04', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 }}>
+            📈 Révision IPC
+          </button>
+        )}
         {contract.status === 'draft' && <button onClick={onDelete} style={btnDanger}>🗑 Delete</button>}
       </div>
+
+      {/* ── Quittancement modal ── */}
+      {qModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 14, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>📄 Quittancement automatique</div>
+            <div style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 20 }}>Contrat {contract.contract_number}</div>
+            {qError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{qError}</div>}
+            {qResult ? (
+              <div>
+                <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, color: '#15803d', marginBottom: 8 }}>✅ {qResult.total_created} facture(s) créée(s)</div>
+                  {qResult.created.map((c, i) => (
+                    <div key={i} style={{ fontSize: 13, marginBottom: 4 }}>
+                      • {c.condition_type.replace(/_/g, ' ')} — <strong>{c.currency} {parseFloat(c.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}</strong> — échéance {c.due_date}
+                    </div>
+                  ))}
+                  {qResult.total_skipped > 0 && <div style={{ fontSize: 12, color: 'var(--slate)', marginTop: 8 }}>{qResult.total_skipped} doublon(s) ignoré(s)</div>}
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => { setQModal(false); setQResult(null); if (onRefresh) onRefresh(); API.get(`/commercial/invoices?contract_id=${contract.id}`).then(r => setInvoices(r.data || [])); }}
+                    style={btnPrimary}>Fermer</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Période du</label>
+                    <input style={inputStyle} type="date" value={qFrom} onChange={e => setQFrom(e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Au</label>
+                    <input style={inputStyle} type="date" value={qTo} onChange={e => setQTo(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={async () => {
+                    if (!qFrom || !qTo) { setQError('Sélectionnez les dates de période'); return; }
+                    setQLoading(true); setQError('');
+                    try {
+                      const r = await API.post(`/commercial/contracts/${contract.id}/generate-invoices?period_from=${qFrom}&period_to=${qTo}`);
+                      setQResult(r.data);
+                    } catch(e) { setQError(e.response?.data?.detail || 'Erreur lors de la génération'); }
+                    finally { setQLoading(false); }
+                  }} style={btnPrimary} disabled={qLoading}>
+                    {qLoading ? 'Génération…' : '⚡ Générer'}
+                  </button>
+                  <button onClick={() => setQModal(false)} style={btnSecondary}>Annuler</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── IPC modal ── */}
+      {ipcModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 14, padding: 28, width: 440, boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>📈 Révision IPC</div>
+            <div style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 20 }}>Contrat {contract.contract_number} — révise toutes les conditions IPC actives</div>
+            {ipcError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{ipcError}</div>}
+            {ipcResult ? (
+              <div>
+                <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, color: '#854d0e', marginBottom: 8 }}>✅ Révision appliquée</div>
+                  <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span>📊 Ancien indice : <strong>{ipcResult.old_index}</strong></span>
+                    <span>📊 Nouvel indice : <strong>{ipcResult.new_index}</strong></span>
+                    <span>📈 Variation : <strong style={{ color: ipcResult.revision_pct >= 0 ? '#15803d' : '#dc2626' }}>{ipcResult.revision_pct >= 0 ? '+' : ''}{ipcResult.revision_pct}%</strong></span>
+                    <span>📋 {ipcResult.conditions_updated} condition(s) mise(s) à jour</span>
+                  </div>
+                </div>
+                <button onClick={() => { setIpcModal(false); setIpcResult(null); }} style={btnPrimary}>Fermer</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 20 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Nouvel indice *</label>
+                    <input style={inputStyle} type="number" step="0.01" value={ipcIndex} onChange={e => setIpcIndex(e.target.value)} placeholder="ex: 115.30" />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Date d'application *</label>
+                    <input style={inputStyle} type="date" value={ipcDate} onChange={e => setIpcDate(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ background: '#fefce8', border: '1px solid #fde047', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#854d0e', marginBottom: 16 }}>
+                  ⚠️ Cette action crée de nouvelles conditions avec le loyer révisé et ferme les anciennes. Elle est irréversible.
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={async () => {
+                    if (!ipcIndex || !ipcDate) { setIpcError('Indice et date requis'); return; }
+                    setIpcLoading(true); setIpcError('');
+                    try {
+                      const r = await API.post(`/commercial/contracts/${contract.id}/apply-ipc?new_index=${ipcIndex}&applied_date=${ipcDate}`);
+                      setIpcResult(r.data);
+                    } catch(e) { setIpcError(e.response?.data?.detail || 'Erreur lors de la révision IPC'); }
+                    finally { setIpcLoading(false); }
+                  }} style={{ ...btnPrimary, background: '#ca8a04' }} disabled={ipcLoading}>
+                    {ipcLoading ? 'Application…' : '📈 Appliquer'}
+                  </button>
+                  <button onClick={() => setIpcModal(false)} style={btnSecondary}>Annuler</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }
