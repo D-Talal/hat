@@ -815,15 +815,26 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
 @router.get("/rental-objects")
-def list_rental_objects(building_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
-    q = db.query(RentalObject).options(
+def list_rental_objects(building_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
+    q = db.query(RentalObject).join(
+        Building, RentalObject.building_id == Building.id
+    ).join(
+        BusinessEntity, Building.business_entity_id == BusinessEntity.id
+    ).options(
         joinedload(RentalObject.building),
         joinedload(RentalObject.spaces).joinedload(RentalObjectSpace.space).joinedload(Space.measurements)
     )
-    if building_id: q = q.filter(RentalObject.building_id == building_id)
+    # Filter by org
+    if u.organization_id:
+        q = q.filter(BusinessEntity.org_id == u.organization_id)
+    if building_id:
+        q = q.filter(RentalObject.building_id == building_id)
+    if status:
+        q = q.filter(RentalObject.status == status)
     results = []
     for ro in q.all():
         d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
+        d["status"] = ro.status.value if ro.status else None
         d["building"] = {"id": ro.building.id, "name": ro.building.name} if ro.building else None
         d["spaces"] = []
         for ros in ro.spaces:
