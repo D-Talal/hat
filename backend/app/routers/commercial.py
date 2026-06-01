@@ -834,6 +834,31 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
+@router.get("/debug/spaces")
+def debug_spaces(db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """Temporary diagnostic — check spaces chain in DB"""
+    spaces_count = db.query(Space).count()
+    floors_count = db.query(Floor).count()
+    buildings_count = db.query(Building).count()
+    # Sample spaces with their chain
+    samples = db.query(Space).limit(5).all()
+    result = []
+    for s in samples:
+        floor = db.query(Floor).filter(Floor.id == s.floor_id).first()
+        building = db.query(Building).filter(Building.id == floor.building_id).first() if floor else None
+        be = db.query(BusinessEntity).filter(BusinessEntity.id == building.business_entity_id).first() if building else None
+        result.append({
+            "space_id": s.id, "space_code": s.space_code,
+            "floor_id": s.floor_id, "floor_exists": floor is not None,
+            "building_id": floor.building_id if floor else None, "building_exists": building is not None,
+            "be_id": building.business_entity_id if building else None, "be_org_id": be.org_id if be else None,
+            "user_org_id": u.organization_id,
+        })
+    return {
+        "counts": {"spaces": spaces_count, "floors": floors_count, "buildings": buildings_count},
+        "sample": result,
+    }
+
 @router.get("/spaces-leasable")
 def list_leasable_spaces(business_entity_id: Optional[int] = None, building_id: Optional[int] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
     """List spaces with full hierarchy info."""
@@ -1215,8 +1240,15 @@ class VacancyOut(VacancyCreate):
 @router.get("/vacancy-postings")
 def list_vacancies(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
     be_ids = [r[0] for r in db.query(BusinessEntity.id).filter(BusinessEntity.org_id == org.id).all()]
-    space_ids_q = db.query(Space.id).join(Floor).join(Building).filter(Building.business_entity_id.in_(be_ids)) if be_ids else []
-    return db.query(VacancyPosting)        .filter(VacancyPosting.space_id.in_(space_ids))        .options(joinedload(VacancyPosting.space))        .order_by(VacancyPosting.period_from.desc()).all()
+    if not be_ids:
+        return []
+    space_ids = [r[0] for r in db.query(Space.id).join(Floor).join(Building).filter(Building.business_entity_id.in_(be_ids)).all()]
+    if not space_ids:
+        return []
+    return db.query(VacancyPosting)\
+        .filter(VacancyPosting.space_id.in_(space_ids))\
+        .options(joinedload(VacancyPosting.space))\
+        .order_by(VacancyPosting.period_from.desc()).all()
 
 @router.post("/vacancy-postings", response_model=VacancyOut)
 def create_vacancy(data: VacancyCreate, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
