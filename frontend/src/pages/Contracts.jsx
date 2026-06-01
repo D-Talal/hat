@@ -82,8 +82,17 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   });
 
   useEffect(() => {
-    Promise.all([API.get('/commercial/business-partners'), API.get('/commercial/business-entities'), API.get('/commercial/rental-objects')])
-      .then(([bp, be, ro]) => { setPartners(bp.data || []); setEntities(be.data || []); setRentalObjects(ro.data || []); })
+    Promise.all([
+      API.get('/commercial/business-partners'),
+      API.get('/commercial/business-entities'),
+      API.get('/commercial/rental-objects'),        // all statuses — we'll filter client-side
+    ])
+      .then(([bp, be, ro]) => {
+        setPartners(bp.data || []);
+        setEntities(be.data || []);
+        // Only show available or vacant — those are the leasable ones
+        setRentalObjects((ro.data || []).filter(r => ['available', 'vacant'].includes(r.status)));
+      })
       .catch(() => {});
   }, []);
 
@@ -173,16 +182,27 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
               </label>
             ))}
           </div>
-          <SectionTitle>Rental Objects</SectionTitle>
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
-            {rentalObjects.map(ro => (
-              <div key={ro.id} onClick={() => toggleObject(ro.id)}
-                style={{ padding: '10px 14px', borderRadius: 8, border: `2px solid ${selectedObjects.includes(ro.id) ? 'var(--gold)' : 'var(--border)'}`, background: selectedObjects.includes(ro.id) ? '#fffbf0' : 'white', cursor: 'pointer', fontSize: 13 }}>
-                <div style={{ fontWeight: 700 }}>{ro.code}</div>
-                <div style={{ color: 'var(--slate)', fontSize: 11 }}>{ro.usage_type}</div>
-              </div>
-            ))}
-          </div>
+          <SectionTitle>Rental Objects <span style={{ fontSize: 12, fontWeight: 400, color: 'var(--slate)' }}>(disponibles / vacants)</span></SectionTitle>
+          {rentalObjects.length === 0 ? (
+            <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '14px 18px', marginBottom: 16, fontSize: 13, color: '#92400e' }}>
+              ⚠️ Aucun Rental Object disponible ou vacant trouvé dans votre portefeuille.<br />
+              <span style={{ fontSize: 12, marginTop: 4, display: 'block', color: '#b45309' }}>
+                Vérifiez que vous avez créé des Rental Objects avec le statut <strong>available</strong> ou <strong>vacant</strong> dans la page Rental Objects.
+              </span>
+            </div>
+          ) : (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
+              {rentalObjects.map(ro => (
+                <div key={ro.id} onClick={() => toggleObject(ro.id)}
+                  style={{ padding: '10px 14px', borderRadius: 8, border: `2px solid ${selectedObjects.includes(ro.id) ? 'var(--gold)' : 'var(--border)'}`, background: selectedObjects.includes(ro.id) ? '#fffbf0' : 'white', cursor: 'pointer', fontSize: 13, transition: 'all .12s' }}>
+                  <div style={{ fontWeight: 700 }}>{ro.code}</div>
+                  <div style={{ color: 'var(--slate)', fontSize: 11, marginTop: 2 }}>{ro.usage_type}</div>
+                  <div style={{ fontSize: 10, marginTop: 2, color: ro.status === 'vacant' ? '#dc2626' : '#15803d', fontWeight: 600, textTransform: 'uppercase' }}>{ro.status}</div>
+                  {ro.building && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>🏗 {ro.building.name}</div>}
+                </div>
+              ))}
+            </div>
+          )}
         </>
       )}
 
