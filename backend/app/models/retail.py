@@ -50,7 +50,6 @@ class CompanyCode(Base):
     state        = Column(String(100))
     description  = Column(String(500))
     created_at   = Column(DateTime(timezone=True), server_default=func.now())
-
     business_entities = relationship("BusinessEntity", back_populates="company_code")
 
 
@@ -92,7 +91,6 @@ class Building(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     business_entity = relationship("BusinessEntity", back_populates="buildings")
     floors = relationship("Floor", back_populates="building")
-    rental_objects = relationship("RentalObject", back_populates="building")
 
 
 class Floor(Base):
@@ -110,17 +108,25 @@ class Floor(Base):
 
 class Space(Base):
     __tablename__ = "re_spaces"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        UniqueConstraint("floor_id", "space_code", name="uq_space_code_per_floor"),
+        {'extend_existing': True},
+    )
     id = Column(Integer, primary_key=True, index=True)
     floor_id = Column(Integer, ForeignKey("re_floors.id"), nullable=False)
     space_code = Column(String(50), nullable=False)
     description = Column(String(255))
     status = Column(Enum(SpaceStatus), default=SpaceStatus.available)
+    # Fields migrated from RentalObject
+    usage_type  = Column(String(100))
+    cost_center = Column(String(100))
+    im_key      = Column(String(100))
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     floor = relationship("Floor", back_populates="spaces")
     measurements = relationship("SpaceMeasurement", back_populates="space")
-    rental_object_assignments = relationship("RentalObjectSpace", back_populates="space")
-    __table_args__ = (UniqueConstraint("floor_id", "space_code", name="uq_space_code_per_floor"),)
+    contract_objects = relationship("ContractObject", back_populates="space")
+    vacancy_postings = relationship("VacancyPosting", back_populates="space")
+    maintenance_requests = relationship("MaintenanceRequest", back_populates="space")
 
 
 class SpaceMeasurement(Base):
@@ -133,61 +139,6 @@ class SpaceMeasurement(Base):
     area_sqm = Column(Float, nullable=False)
     note = Column(String(255))
     space = relationship("Space", back_populates="measurements")
-
-
-class RentalObject(Base):
-    __tablename__ = "re_rental_objects"
-    __table_args__ = {'extend_existing': True}
-    id = Column(Integer, primary_key=True, index=True)
-    building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
-    code = Column(String(50), nullable=False)
-    description = Column(String(255))
-    usage_type = Column(String(100))
-    status = Column(Enum(SpaceStatus), default=SpaceStatus.available)
-    cost_center = Column(String(100))
-    im_key = Column(String(100))
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    building = relationship("Building", back_populates="rental_objects")
-    spaces = relationship("RentalObjectSpace", back_populates="rental_object")
-    contract_objects = relationship("ContractObject", back_populates="rental_object")
-    vacancy_postings = relationship("VacancyPosting", back_populates="rental_object")
-    pooled_assignments = relationship("PooledSpaceMember", back_populates="rental_object")
-    __table_args__ = (UniqueConstraint("building_id", "code", name="uq_rental_object_code"),)
-
-
-class RentalObjectSpace(Base):
-    __tablename__ = "re_rental_object_spaces"
-    __table_args__ = {'extend_existing': True}
-    id = Column(Integer, primary_key=True, index=True)
-    rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
-    space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=False)
-    assigned_at = Column(DateTime(timezone=True), server_default=func.now())
-    rental_object = relationship("RentalObject", back_populates="spaces")
-    space = relationship("Space", back_populates="rental_object_assignments")
-    __table_args__ = (UniqueConstraint("rental_object_id", "space_id", name="uq_ro_space"),)
-
-
-class PooledSpace(Base):
-    __tablename__ = "re_pooled_spaces"
-    __table_args__ = {'extend_existing': True}
-    id = Column(Integer, primary_key=True, index=True)
-    building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
-    code = Column(String(50), nullable=False)
-    description = Column(String(255))
-    total_capacity_sqm = Column(Float)
-    created_at = Column(DateTime(timezone=True), server_default=func.now())
-    building = relationship("Building")
-    members = relationship("PooledSpaceMember", back_populates="pooled_space")
-
-
-class PooledSpaceMember(Base):
-    __tablename__ = "re_pooled_space_members"
-    __table_args__ = {'extend_existing': True}
-    id = Column(Integer, primary_key=True, index=True)
-    pooled_space_id = Column(Integer, ForeignKey("re_pooled_spaces.id"), nullable=False)
-    rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
-    pooled_space = relationship("PooledSpace", back_populates="members")
-    rental_object = relationship("RentalObject", back_populates="pooled_assignments")
 
 
 class BusinessPartner(Base):
@@ -277,16 +228,18 @@ class ContractDateSlot(Base):
 
 class ContractObject(Base):
     __tablename__ = "re_contract_objects"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        UniqueConstraint("contract_id", "space_id", "valid_from", name="uq_contract_space_period"),
+        {'extend_existing': True},
+    )
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
-    rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
+    space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=False)
     valid_from = Column(Date, nullable=False)
     valid_to = Column(Date)
     object_group = Column(String(100))
     contract = relationship("Contract", back_populates="contract_objects")
-    rental_object = relationship("RentalObject", back_populates="contract_objects")
-    __table_args__ = (UniqueConstraint("contract_id", "rental_object_id", "valid_from", name="uq_contract_object_period"),)
+    space = relationship("Space", back_populates="contract_objects")
 
 
 class Condition(Base):
@@ -348,7 +301,7 @@ class SalesDeclaration(Base):
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
     sales_rule_id = Column(Integer, ForeignKey("re_sales_rules.id"), nullable=False)
-    rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=True)
+    space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=True)
     period_from = Column(Date, nullable=False)
     period_to = Column(Date, nullable=False)
     declared_amount = Column(Numeric(18, 2), nullable=False)
@@ -359,11 +312,15 @@ class SalesDeclaration(Base):
     submitted_at = Column(DateTime(timezone=True), server_default=func.now())
     contract = relationship("Contract", back_populates="sales_declarations")
     sales_rule = relationship("SalesRule", back_populates="declarations")
+    space = relationship("Space")
 
 
 class ParticipationGroup(Base):
     __tablename__ = "re_participation_groups"
-    __table_args__ = {'extend_existing': True}
+    __table_args__ = (
+        UniqueConstraint("building_id", "code", name="uq_pg_code_per_building"),
+        {'extend_existing': True},
+    )
     id = Column(Integer, primary_key=True, index=True)
     building_id = Column(Integer, ForeignKey("re_buildings.id"), nullable=False)
     code = Column(String(50), nullable=False)
@@ -373,7 +330,6 @@ class ParticipationGroup(Base):
     building = relationship("Building")
     members = relationship("ParticipationGroupMember", back_populates="participation_group")
     settlement_units = relationship("SettlementUnit", back_populates="participation_group")
-    __table_args__ = (UniqueConstraint("building_id", "code", name="uq_pg_code_per_building"),)
 
 
 class ParticipationGroupMember(Base):
@@ -446,7 +402,7 @@ class VacancyPosting(Base):
     __tablename__ = "re_vacancy_postings"
     __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
-    rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=False)
+    space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=False)
     period_from = Column(Date, nullable=False)
     period_to = Column(Date, nullable=False)
     market_rent = Column(Numeric(18, 2))
@@ -454,7 +410,7 @@ class VacancyPosting(Base):
     posted = Column(Boolean, default=False)
     reversed = Column(Boolean, default=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    rental_object = relationship("RentalObject", back_populates="vacancy_postings")
+    space = relationship("Space", back_populates="vacancy_postings")
 
 
 class Invoice(Base):
@@ -481,7 +437,7 @@ class MaintenanceRequest(Base):
     __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=True)
-    rental_object_id = Column(Integer, ForeignKey("re_rental_objects.id"), nullable=True)
+    space_id = Column(Integer, ForeignKey("re_spaces.id"), nullable=True)
     title = Column(String(255), nullable=False)
     description = Column(Text)
     priority = Column(String(50), default="medium")
@@ -490,4 +446,4 @@ class MaintenanceRequest(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     resolved_at = Column(DateTime(timezone=True))
     contract = relationship("Contract", back_populates="maintenance_requests")
-    rental_object = relationship("RentalObject")
+    space = relationship("Space", back_populates="maintenance_requests")
