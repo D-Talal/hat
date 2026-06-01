@@ -338,13 +338,14 @@ class ConditionOut(ConditionCreate):
     class Config: from_attributes = True
 
 class RentalObjectCreate(BaseModel):
-    building_id: int
+    building_id: Optional[int] = None
     code: str
     description: Optional[str] = None
     usage_type: Optional[str] = "retail"
     status: Optional[str] = "available"
     cost_center: Optional[str] = None
     im_key: Optional[str] = None
+    space_ids: Optional[List[int]] = []
 
     @field_validator('code')
     @classmethod
@@ -361,7 +362,6 @@ class RentalObjectCreate(BaseModel):
     @field_validator('status')
     @classmethod
     def v_status(cls, v): return validate_enum(v, VALID_SPACE_STATUSES, 'status')
-    space_ids: Optional[List[int]] = []
 
 class RentalObjectOut(BaseModel):
     id: int
