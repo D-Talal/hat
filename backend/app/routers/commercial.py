@@ -818,15 +818,19 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 def list_rental_objects(building_id: Optional[int] = None, status: Optional[str] = None, db: Session = Depends(get_db), u=Depends(get_current_user)):
     q = db.query(RentalObject).join(
         Building, RentalObject.building_id == Building.id
-    ).join(
+    ).outerjoin(
         BusinessEntity, Building.business_entity_id == BusinessEntity.id
     ).options(
         joinedload(RentalObject.building),
         joinedload(RentalObject.spaces).joinedload(RentalObjectSpace.space).joinedload(Space.measurements)
     )
-    # Filter by org
+    # Filter by org — accept rows where org matches OR org_id is null (legacy data)
     if u.organization_id:
-        q = q.filter(BusinessEntity.org_id == u.organization_id)
+        q = q.filter(
+            (BusinessEntity.org_id == u.organization_id) |
+            (BusinessEntity.org_id == None) |
+            (BusinessEntity.id == None)
+        )
     if building_id:
         q = q.filter(RentalObject.building_id == building_id)
     if status:
@@ -834,7 +838,8 @@ def list_rental_objects(building_id: Optional[int] = None, status: Optional[str]
     results = []
     for ro in q.all():
         d = {c.name: getattr(ro, c.name) for c in ro.__table__.columns}
-        d["status"] = ro.status.value if ro.status else None
+        # SpaceStatus is str enum — serialize cleanly
+        d["status"] = ro.status.value if hasattr(ro.status, 'value') else str(ro.status) if ro.status else "available"
         d["building"] = {"id": ro.building.id, "name": ro.building.name} if ro.building else None
         d["spaces"] = []
         for ros in ro.spaces:
