@@ -67,11 +67,11 @@ def period_amount(annual: Decimal, d_from: date, d_to: date, method: str, freq: 
     return (annual * factor / dec(n)).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 def make_entry(run, etype, amount, currency, d_from, d_to, desc, db,
-               contract_id=None, condition_id=None, rental_object_id=None, catchup=False):
+               contract_id=None, condition_id=None, space_id=None, catchup=False):
     fx = get_fx_rate(db, currency, "USD", d_to)
     e = PostingEntry(
         posting_run_id=run.id, contract_id=contract_id, condition_id=condition_id,
-        rental_object_id=rental_object_id, entry_type=etype,
+        space_id=space_id, entry_type=etype,
         period_from=d_from, period_to=d_to, amount=amount, currency=currency,
         amount_base=amount * dec(fx), fx_rate=fx,
         description=desc, is_catchup=catchup, posted=not run.dry_run,
@@ -264,7 +264,7 @@ def run_scs_settlement(db, run, d_from, d_to):
                         entries.append(make_entry(run, PostingEntryType.scs_settlement, charge,
                             "USD", d_from, d_to,
                             f"SCS {pg.code} {cc.charge_category} FY{cc.fiscal_year}",
-                            db, co.contract_id, rental_object_id=co.space_id))
+                            db, co.contract_id, space_id=co.space_id))
                     markup = (charge * dec(m.markup_rate or 0)).quantize(Decimal("0.01"))
                     if markup > 0:
                         entries.append(make_entry(run, PostingEntryType.markup_fee, markup,
