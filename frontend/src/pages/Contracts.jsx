@@ -295,7 +295,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
 
   const downloadInvoicePdf = async (invoiceId) => {
     try {
-      const res = await api.invoices.downloadPdf(invoiceId);
+      const res = await API.get(`/commercial/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
@@ -313,7 +313,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
 
   useEffect(() => {
     if (activeTab === 'invoices') {
-      api.invoices.list(contract.id).then(r => setInvoices(r.data)).catch(() => {});
+      API.get(`/commercial/invoices?contract_id=${contract.id}`).then(r => setInvoices(r.data || [])).catch(() => {});
     }
     if (activeTab === 'conditions') {
       API.get(`/commercial/conditions?contract_id=${contract.id}`)
@@ -402,9 +402,15 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t }) {
 
       {/* Actions */}
       {contract.status === 'draft' && (
-        <div style={{ background: '#e8f5e9', borderRadius: 8, padding: '12px 16px', marginTop: 16 }}>
-          <div style={{ fontSize: 13, color: '#2e7d32', marginBottom: 10 }}>✓ Ready to release? Once Released, FI postings will begin.</div>
-          <button onClick={() => onRelease(contract.id)} style={{ padding: '8px 20px', borderRadius: 8, border: 'none', background: '#2e7d32', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 }}>Release Contract</button>
+        <div style={{ background: '#e8f5e9', border: '1.5px solid #86efac', borderRadius: 10, padding: '14px 16px', marginTop: 16 }}>
+          <div style={{ fontSize: 13, color: '#15803d', marginBottom: 4, fontWeight: 700 }}>✓ Prêt à activer ce contrat ?</div>
+          <div style={{ fontSize: 12, color: '#166534', marginBottom: 12 }}>
+            Une fois Released, les postings FI peuvent commencer. Assurez-vous d'avoir au moins une condition (loyer de base, etc.) avant de continuer.
+          </div>
+          <button onClick={() => onRelease(contract.id)}
+            style={{ padding: '8px 24px', borderRadius: 8, border: 'none', background: '#15803d', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 14 }}>
+            🚀 Release Contract
+          </button>
         </div>
       )}
 
@@ -460,7 +466,7 @@ export default function Contracts() {
 
   const downloadStatement = async (contractId, contractNumber) => {
     try {
-      const res = await api.invoices.downloadStatement(contractId);
+      const res = await API.get(`/commercial/contracts/${contractId}/pdf`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
@@ -486,9 +492,22 @@ export default function Contracts() {
 
   useEffect(() => { load(); }, [load]);
 
+  const [releaseError, setReleaseError] = useState('');
+
   const release = async (id) => {
-    await API.patch(`/commercial/contracts/${id}`, { status: 'released' });
-    load(); setSelected(null); setModal(null);
+    setReleaseError('');
+    try {
+      await API.patch(`/commercial/contracts/${id}`, { status: 'released' });
+      await load();
+      // Refresh selected contract
+      const r = await API.get('/commercial/contracts');
+      const updated = (r.data || []).find(c => c.id === id);
+      if (updated) setSelected(updated);
+      setModal('view');
+    } catch (e) {
+      const msg = e.response?.data?.detail || 'Erreur lors de la mise en Released.';
+      setReleaseError(msg);
+    }
   };
 
   const handleDelete = async (id) => {
@@ -580,8 +599,13 @@ export default function Contracts() {
       )}
 
       {modal === 'view' && selected && (
-        <Modal title={`Contract ${selected.contract_number || `#${selected.id}`}`} onClose={() => setModal(null)}>
-          <ContractDetail contract={selected} onClose={() => setModal(null)} onRelease={release}
+        <Modal title={`Contract ${selected.contract_number || `#${selected.id}`}`} onClose={() => { setModal(null); setReleaseError(''); }}>
+          {releaseError && (
+            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>
+              ⚠️ {releaseError}
+            </div>
+          )}
+          <ContractDetail contract={selected} onClose={() => { setModal(null); setReleaseError(''); }} onRelease={release}
             onEdit={() => setModal('edit')} onDelete={() => { setModal(null); setConfirm(selected); }} t={t} />
         </Modal>
       )}
