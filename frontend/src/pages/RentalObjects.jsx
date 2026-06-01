@@ -137,7 +137,7 @@ function RentalObjectForm({ onSave, onClose, initial, existingItems = [] }) {
               </Field>
               <Field label={tc.buildings + ' *'}>
                 <select style={inputStyle} value={form.building_id} onChange={set('building_id')} disabled={!selectedEntityId}>
-                  <option value="">{selectedEntityId ? '— Sélectionner —' : '— Choisir une entité d'abord —'}</option>
+                  <option value="">{selectedEntityId ? '— Sélectionner —' : "— Choisir une entité d'abord —"}</option>
                   {buildings.map(b => <option key={b.id} value={b.id}>{b.name}{b.city ? ` (${b.city})` : ''}</option>)}
                 </select>
               </Field>
