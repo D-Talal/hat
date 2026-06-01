@@ -650,14 +650,19 @@ def delete_floor(id: int, db: Session = Depends(get_db), u=Depends(require_permi
 
 # ── SPACES ────────────────────────────────────────────────────────────────────
 
-def _space_with_area(space):
+def _space_with_area(space, db=None):
+    # If db passed, reload measurements fresh from DB to avoid stale cache
+    if db:
+        from sqlalchemy.orm import joinedload as jl
+        space = db.query(Space).filter(Space.id == space.id).options(jl(Space.measurements)).first()
     current = next(
         (m for m in sorted(space.measurements, key=lambda m: m.valid_from, reverse=True) if not m.valid_to),
         None
     )
     d = {c.name: getattr(space, c.name) for c in space.__table__.columns}
-    d["current_area_sqm"] = current.area_sqm if current else None
-    d["initial_measurement"] = None
+    d["current_area_sqm"]      = float(current.area_sqm)   if current else None
+    d["current_valid_from"]    = str(current.valid_from)    if current else None
+    d["initial_measurement"]   = None
     return d
 
 @router.get("/floors/{floor_id}/spaces")
@@ -692,10 +697,24 @@ def update_space(id: int, data: SpaceCreate, db: Session = Depends(get_db), u=De
         setattr(obj, k, v)
     if data.initial_measurement:
         from app.models.retail import SpaceMeasurement
-        db.add(SpaceMeasurement(space_id=obj.id, **data.initial_measurement.dict()))
+        # Find the current active measurement (no valid_to)
+        current = next(
+            (m for m in sorted(obj.measurements, key=lambda m: m.valid_from, reverse=True) if not m.valid_to),
+            None
+        )
+        if current:
+            # Update in place — change area and/or date on the existing record
+            current.area_sqm  = data.initial_measurement.area_sqm
+            current.valid_from = data.initial_measurement.valid_from
+            if data.initial_measurement.note:
+                current.note = data.initial_measurement.note
+        else:
+            # No active measurement yet — create one
+            db.add(SpaceMeasurement(space_id=obj.id, **data.initial_measurement.dict()))
     db.commit()
+    db.refresh(obj)
     audit(db, u, "UPDATE", "re_spaces", id)
-    return _space_with_area(obj)
+    return _space_with_area(obj, db=db)
 
 @router.delete("/spaces/{id}")
 def delete_space(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
