@@ -806,6 +806,100 @@ def delete_contract(id: int, db: Session = Depends(get_db), u=Depends(require_pe
 
 # ── CONTRACT ACTIONS ──────────────────────────────────────────────────────────
 
+@router.post("/contracts/{id}/terminate")
+def terminate_contract(
+    id: int,
+    notice_date:    date = Query(..., description="Date the termination notice was given"),
+    effective_date: date = Query(..., description="Date the contract effectively ends"),
+    create_vacancy: bool = Query(True, description="Create a vacancy posting for freed spaces"),
+    market_rent:    Optional[float] = Query(None, description="Market rent per sqm/year for vacancy posting"),
+    reason:         Optional[str] = Query(None, description="Termination reason"),
+    db: Session = Depends(get_db),
+    u=Depends(require_permission("update")),
+):
+    """
+    Formal contract termination workflow:
+    - Sets contract status to 'terminated'
+    - Records notice + effective dates
+    - Closes contract-object links (valid_to = effective_date)
+    - Closes active conditions (valid_to = effective_date)
+    - Frees the spaces (status → vacant)
+    - Optionally creates vacancy postings for the freed spaces
+    """
+    from sqlalchemy import or_
+
+    contract = db.query(Contract).options(
+        joinedload(Contract.business_partner),
+        joinedload(Contract.business_entity),
+        joinedload(Contract.contract_objects).joinedload(ContractObject.space),
+    ).filter(Contract.id == id).first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    if contract.status != ContractStatus.released:
+        raise HTTPException(400, f"Only Released contracts can be terminated (current: {contract.status.value})")
+    if effective_date < notice_date:
+        raise HTTPException(400, "Effective date cannot be before notice date")
+
+    # 1. Update contract
+    contract.status = ContractStatus.terminated
+    contract.notice_date = notice_date
+    contract.absolute_end_date = effective_date
+    if reason:
+        contract.notes = ((contract.notes or "") + f"\n[Résiliation {effective_date}] {reason}").strip()
+
+    freed_spaces = []
+    # 2. Close contract-object links + free spaces
+    for co in contract.contract_objects:
+        if co.valid_to is None or co.valid_to > effective_date:
+            co.valid_to = effective_date
+        sp = co.space
+        if sp:
+            sp.status = SpaceStatus.vacant
+            freed_spaces.append(sp)
+
+    # 3. Close active conditions
+    conditions = db.query(Condition).filter(
+        Condition.contract_id == id,
+        or_(Condition.valid_to.is_(None), Condition.valid_to > effective_date),
+    ).all()
+    for cond in conditions:
+        cond.valid_to = effective_date
+
+    # 4. Optionally create vacancy postings
+    vacancies_created = []
+    if create_vacancy and freed_spaces:
+        from datetime import timedelta
+        vac_start = effective_date + timedelta(days=1)
+        # default vacancy window: until end of the year (or 90 days)
+        vac_end = vac_start + timedelta(days=90)
+        for sp in freed_spaces:
+            vp = VacancyPosting(
+                space_id=sp.id,
+                period_from=vac_start,
+                period_to=vac_end,
+                market_rent=market_rent,
+                posted=False,
+                reversed=False,
+            )
+            db.add(vp)
+            vacancies_created.append(sp.space_code)
+
+    db.commit()
+    db.refresh(contract)
+    audit(db, u, "UPDATE", "re_contracts", id, f"terminated effective={effective_date}")
+    return {
+        "contract_id": id,
+        "contract_number": contract.contract_number,
+        "status": "terminated",
+        "notice_date": str(notice_date),
+        "effective_date": str(effective_date),
+        "spaces_freed": [s.space_code for s in freed_spaces],
+        "conditions_closed": len(conditions),
+        "vacancy_postings_created": vacancies_created,
+        "message": f"Contrat résilié au {effective_date} — {len(freed_spaces)} espace(s) libéré(s)",
+    }
+
+
 @router.post("/contracts/{id}/generate-invoices")
 def generate_invoices_for_contract(
     id: int,
