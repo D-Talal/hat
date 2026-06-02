@@ -309,6 +309,17 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
   const [qResult, setQResult]       = useState(null);
   const [qError, setQError]         = useState('');
 
+  // Termination modal state
+  const [termModal, setTermModal]     = useState(false);
+  const [termNotice, setTermNotice]   = useState('');
+  const [termEffective, setTermEffective] = useState('');
+  const [termReason, setTermReason]   = useState('');
+  const [termVacancy, setTermVacancy] = useState(true);
+  const [termRent, setTermRent]       = useState('');
+  const [termLoading, setTermLoading] = useState(false);
+  const [termResult, setTermResult]   = useState(null);
+  const [termError, setTermError]     = useState('');
+
   // Pre-fill quittancement with current month
   useEffect(() => {
     const now = new Date();
@@ -317,6 +328,9 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
     setQFrom(`${y}-${m}-01`);
     setQTo(`${y}-${m}-${lastDay}`);
     setIpcDate(`${y}-${m}-01`);
+    const todayStr = `${y}-${m}-${String(now.getDate()).padStart(2, '0')}`;
+    setTermNotice(todayStr);
+    setTermEffective(todayStr);
   }, []);
 
   const downloadInvoicePdf = async (invoiceId) => {
@@ -504,6 +518,12 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
             📈 Révision IPC
           </button>
         )}
+        {contract.status === 'released' && (
+          <button onClick={() => { setTermResult(null); setTermError(''); setTermModal(true); }}
+            style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 }}>
+            🛑 Résilier
+          </button>
+        )}
         {contract.status === 'draft' && <button onClick={onDelete} style={btnDanger}>🗑 Delete</button>}
       </div>
 
@@ -610,6 +630,82 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                     {ipcLoading ? 'Application…' : '📈 Appliquer'}
                   </button>
                   <button onClick={() => setIpcModal(false)} style={btnSecondary}>Annuler</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Termination modal ── */}
+      {termModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 14, padding: 28, width: 480, boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>🛑 Résiliation du contrat</div>
+            <div style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 20 }}>Contrat {contract.contract_number}</div>
+            {termError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{termError}</div>}
+            {termResult ? (
+              <div>
+                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 10, padding: 16, marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, color: '#991b1b', marginBottom: 8 }}>✅ Contrat résilié</div>
+                  <div style={{ fontSize: 13, display: 'flex', flexDirection: 'column', gap: 4 }}>
+                    <span>📅 Date effective : <strong>{termResult.effective_date}</strong></span>
+                    <span>🏠 Espaces libérés : <strong>{termResult.spaces_freed.join(', ') || 'aucun'}</strong></span>
+                    <span>📋 Conditions fermées : <strong>{termResult.conditions_closed}</strong></span>
+                    {termResult.vacancy_postings_created.length > 0 && (
+                      <span>🏚️ Vacancy postings créés : <strong>{termResult.vacancy_postings_created.join(', ')}</strong></span>
+                    )}
+                  </div>
+                </div>
+                <button onClick={() => { setTermModal(false); setTermResult(null); if (onRefresh) onRefresh(); onClose(); }} style={btnPrimary}>Fermer</button>
+              </div>
+            ) : (
+              <>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 16 }}>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Date de préavis *</label>
+                    <input style={inputStyle} type="date" value={termNotice} onChange={e => setTermNotice(e.target.value)} />
+                  </div>
+                  <div>
+                    <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Date effective *</label>
+                    <input style={inputStyle} type="date" value={termEffective} onChange={e => setTermEffective(e.target.value)} />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Motif (optionnel)</label>
+                  <input style={inputStyle} value={termReason} onChange={e => setTermReason(e.target.value)} placeholder="ex: Départ anticipé du locataire" />
+                </div>
+                <div style={{ background: '#f8f9fa', borderRadius: 10, padding: '12px 14px', marginBottom: 16 }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer', fontSize: 13 }}>
+                    <input type="checkbox" checked={termVacancy} onChange={e => setTermVacancy(e.target.checked)} />
+                    <span style={{ fontWeight: 600 }}>Créer des vacancy postings pour les espaces libérés</span>
+                  </label>
+                  {termVacancy && (
+                    <div style={{ marginTop: 10 }}>
+                      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)', marginBottom: 6 }}>Loyer de marché (/m²/an)</label>
+                      <input style={inputStyle} type="number" step="0.01" value={termRent} onChange={e => setTermRent(e.target.value)} placeholder="ex: 250" />
+                    </div>
+                  )}
+                </div>
+                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 12, color: '#991b1b', marginBottom: 16 }}>
+                  ⚠️ Cette action ferme le contrat, libère les espaces (statut → vacant) et clôt les conditions actives. Elle est irréversible.
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={async () => {
+                    if (!termNotice || !termEffective) { setTermError('Dates de préavis et effective requises'); return; }
+                    setTermLoading(true); setTermError('');
+                    try {
+                      let url = `/commercial/contracts/${contract.id}/terminate?notice_date=${termNotice}&effective_date=${termEffective}&create_vacancy=${termVacancy}`;
+                      if (termRent) url += `&market_rent=${termRent}`;
+                      if (termReason) url += `&reason=${encodeURIComponent(termReason)}`;
+                      const r = await API.post(url);
+                      setTermResult(r.data);
+                    } catch(e) { setTermError(e.response?.data?.detail || 'Erreur lors de la résiliation'); }
+                    finally { setTermLoading(false); }
+                  }} style={{ ...btnPrimary, background: '#dc2626' }} disabled={termLoading}>
+                    {termLoading ? 'Résiliation…' : '🛑 Confirmer la résiliation'}
+                  </button>
+                  <button onClick={() => setTermModal(false)} style={btnSecondary}>Annuler</button>
                 </div>
               </>
             )}
@@ -766,7 +862,7 @@ export default function Contracts() {
             </div>
           )}
           <ContractDetail contract={selected} onClose={() => { setModal(null); setReleaseError(''); }} onRelease={release}
-            onEdit={() => setModal('edit')} onDelete={() => { setModal(null); setConfirm(selected); }} t={t} />
+            onEdit={() => setModal('edit')} onDelete={() => { setModal(null); setConfirm(selected); }} onRefresh={load} t={t} />
         </Modal>
       )}
 
