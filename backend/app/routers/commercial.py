@@ -987,29 +987,37 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
-@router.get("/debug/spaces")
-def debug_spaces(db: Session = Depends(get_db), u=Depends(get_current_user)):
-    """Temporary diagnostic — check spaces chain in DB"""
-    spaces_count = db.query(Space).count()
-    floors_count = db.query(Floor).count()
-    buildings_count = db.query(Building).count()
-    # Sample spaces with their chain
-    samples = db.query(Space).limit(5).all()
-    result = []
-    for s in samples:
-        floor = db.query(Floor).filter(Floor.id == s.floor_id).first()
-        building = db.query(Building).filter(Building.id == floor.building_id).first() if floor else None
-        be = db.query(BusinessEntity).filter(BusinessEntity.id == building.business_entity_id).first() if building else None
-        result.append({
-            "space_id": s.id, "space_code": s.space_code,
-            "floor_id": s.floor_id, "floor_exists": floor is not None,
-            "building_id": floor.building_id if floor else None, "building_exists": building is not None,
-            "be_id": building.business_entity_id if building else None, "be_org_id": be.org_id if be else None,
-            "user_org_id": u.organization_id,
-        })
+@router.get("/health/org-integrity")
+def org_integrity_check(db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """
+    Health check — counts orphaned (NULL org_id) rows across the data model.
+    After the backfill migration these should all be 0.
+    """
+    orphan_cc = db.query(CompanyCode).filter(CompanyCode.org_id == None).count()
+    orphan_be = db.query(BusinessEntity).filter(BusinessEntity.org_id == None).count()
+    orphan_bp = db.query(BusinessPartner).filter(BusinessPartner.org_id == None).count()
+    # Buildings whose business_entity is missing or has null org
+    orphan_buildings = db.query(Building).outerjoin(
+        BusinessEntity, BusinessEntity.id == Building.business_entity_id
+    ).filter((BusinessEntity.id == None) | (BusinessEntity.org_id == None)).count()
+    # Spaces whose chain is broken
+    orphan_spaces = db.query(Space).outerjoin(Floor, Floor.id == Space.floor_id)\
+        .outerjoin(Building, Building.id == Floor.building_id)\
+        .outerjoin(BusinessEntity, BusinessEntity.id == Building.business_entity_id)\
+        .filter((BusinessEntity.id == None) | (BusinessEntity.org_id == None)).count()
+    total = orphan_cc + orphan_be + orphan_bp + orphan_buildings + orphan_spaces
     return {
-        "counts": {"spaces": spaces_count, "floors": floors_count, "buildings": buildings_count},
-        "sample": result,
+        "healthy": total == 0,
+        "orphaned": {
+            "company_codes": orphan_cc,
+            "business_entities": orphan_be,
+            "business_partners": orphan_bp,
+            "buildings": orphan_buildings,
+            "spaces": orphan_spaces,
+        },
+        "total_orphaned": total,
+        "message": "All data correctly scoped to an organization." if total == 0
+                   else f"{total} orphaned row(s) found — they will be backfilled on next backend restart.",
     }
 
 @router.get("/spaces-leasable")
