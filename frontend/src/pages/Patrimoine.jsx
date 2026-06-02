@@ -466,6 +466,185 @@ function StatPill({ icon, label, value, color }) {
 }
 
 // ── MAIN COMPONENT ────────────────────────────────────────────────────────
+// ── Consolidated Space Detail ─────────────────────────────────────────────────
+function SpaceDetail({ spaceId, onClose }) {
+  const [data, setData]       = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError]     = useState('');
+
+  useEffect(() => {
+    setLoading(true);
+    API.get(`/commercial/spaces/${spaceId}/detail`)
+      .then(r => setData(r.data))
+      .catch(e => setError(e.response?.data?.detail || 'Erreur de chargement'))
+      .finally(() => setLoading(false));
+  }, [spaceId]);
+
+  if (loading) return <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>Chargement…</div>;
+  if (error)   return <div style={{ padding: 20, color: '#dc2626' }}>{error}</div>;
+  if (!data)   return null;
+
+  const { space, hierarchy, current_area_sqm, current_valid_from, measurements, active_contract, contracts, vacancies, maintenance, summary } = data;
+
+  const statusColor = {
+    available: { bg: '#dcfce7', text: '#15803d' },
+    occupied:  { bg: '#dbeafe', text: '#1e40af' },
+    vacant:    { bg: '#fee2e2', text: '#b91c1c' },
+    maintenance: { bg: '#fef3c7', text: '#92400e' },
+  }[space.status] || { bg: '#f3f4f6', text: '#374151' };
+
+  const kpiBox = (label, value, color) => (
+    <div style={{ flex: 1, background: '#f8f9fa', borderRadius: 10, padding: '12px 14px', textAlign: 'center' }}>
+      <div style={{ fontSize: 22, fontWeight: 800, color: color || 'var(--ink)' }}>{value}</div>
+      <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 2, textTransform: 'uppercase', letterSpacing: '.05em' }}>{label}</div>
+    </div>
+  );
+
+  const sectionTitle = (txt) => (
+    <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 10, marginTop: 22, paddingBottom: 6, borderBottom: '1px solid var(--border)' }}>{txt}</div>
+  );
+
+  return (
+    <div style={{ maxHeight: '70vh', overflowY: 'auto' }}>
+      {/* Header */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14 }}>
+        <div>
+          <div style={{ fontSize: 24, fontWeight: 800, color: 'var(--ink)' }}>{space.space_code}</div>
+          <div style={{ fontSize: 13, color: 'var(--slate)', marginTop: 4 }}>
+            🏛 {hierarchy.business_entity_name} · 🏗 {hierarchy.building_name} · 📍 Étage {hierarchy.floor_number}
+            {hierarchy.city ? ` · ${hierarchy.city}` : ''}
+          </div>
+        </div>
+        <span style={{ padding: '4px 12px', borderRadius: 6, fontSize: 12, fontWeight: 700, textTransform: 'uppercase', background: statusColor.bg, color: statusColor.text }}>
+          {space.status}
+        </span>
+      </div>
+
+      {/* Attributes chips */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 16 }}>
+        {space.usage_type   && <span style={{ background: '#eef0fd', color: '#4361ee', borderRadius: 6, padding: '3px 10px', fontSize: 11, fontWeight: 600 }}>🏷 {space.usage_type}</span>}
+        {space.cost_center  && <span style={{ background: '#f3f4f6', color: '#374151', borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>💰 {space.cost_center}</span>}
+        {space.im_key       && <span style={{ background: '#f3f4f6', color: '#374151', borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>🔑 {space.im_key}</span>}
+        {space.description  && <span style={{ background: '#f3f4f6', color: '#374151', borderRadius: 6, padding: '3px 10px', fontSize: 11 }}>{space.description}</span>}
+      </div>
+
+      {/* KPI row */}
+      <div style={{ display: 'flex', gap: 10 }}>
+        {kpiBox('Superficie', current_area_sqm ? `${current_area_sqm.toLocaleString()} m²` : '—')}
+        {kpiBox('Contrats', summary.total_contracts, summary.has_active_contract ? '#15803d' : 'var(--ink)')}
+        {kpiBox('Vacances', summary.total_vacancy_periods, summary.total_vacancy_periods > 0 ? '#b91c1c' : 'var(--ink)')}
+        {kpiBox('Maintenance', summary.open_maintenance, summary.open_maintenance > 0 ? '#92400e' : 'var(--ink)')}
+      </div>
+
+      {/* Active contract highlight */}
+      {active_contract ? (
+        <>
+          {sectionTitle('Contrat actif')}
+          <div style={{ background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 10, padding: 14 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 15 }}>{active_contract.contract_number}</div>
+                <div style={{ fontSize: 13, color: 'var(--slate)', marginTop: 2 }}>👤 {active_contract.tenant || '—'}</div>
+              </div>
+              <span style={{ padding: '3px 10px', borderRadius: 6, fontSize: 11, fontWeight: 700, textTransform: 'uppercase', background: '#dcfce7', color: '#15803d' }}>{active_contract.status}</span>
+            </div>
+            <div style={{ fontSize: 12, color: 'var(--slate)', marginTop: 8 }}>
+              📅 {active_contract.start_date || '—'} → {active_contract.end_date || '∞'}
+            </div>
+            {active_contract.conditions.length > 0 && (
+              <div style={{ marginTop: 10, paddingTop: 10, borderTop: '1px dashed #86efac' }}>
+                {active_contract.conditions.map(c => (
+                  <div key={c.id} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, marginBottom: 4 }}>
+                    <span>{c.type.replace(/_/g, ' ')}{c.ipc_enabled ? ' 📈' : ''}</span>
+                    <strong>{c.currency} {c.amount.toLocaleString(undefined, { minimumFractionDigits: 2 })} / {c.frequency}</strong>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </>
+      ) : (
+        <>
+          {sectionTitle('Contrat actif')}
+          <div style={{ background: '#fff8e1', border: '1px solid #fde047', borderRadius: 10, padding: '12px 16px', fontSize: 13, color: '#92400e' }}>
+            Aucun contrat actif sur cet espace actuellement.
+          </div>
+        </>
+      )}
+
+      {/* Measurements history */}
+      {measurements.length > 0 && (
+        <>
+          {sectionTitle('Historique des superficies')}
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead><tr style={{ background: '#f5f7ff' }}>
+              {['Superficie', 'Depuis', "Jusqu'à", 'Note'].map(h => (
+                <th key={h} style={{ padding: '6px 10px', textAlign: 'left', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', color: 'var(--slate)' }}>{h}</th>
+              ))}
+            </tr></thead>
+            <tbody>
+              {measurements.map(m => (
+                <tr key={m.id} style={{ borderBottom: '1px solid var(--border)', background: m.is_current ? '#f0fdf4' : 'transparent' }}>
+                  <td style={{ padding: '6px 10px', fontWeight: 600 }}>{m.area_sqm.toLocaleString()} m²{m.is_current ? ' ✓' : ''}</td>
+                  <td style={{ padding: '6px 10px' }}>{m.valid_from}</td>
+                  <td style={{ padding: '6px 10px' }}>{m.valid_to || '—'}</td>
+                  <td style={{ padding: '6px 10px', color: 'var(--slate)' }}>{m.note || '—'}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </>
+      )}
+
+      {/* Contract history (past) */}
+      {contracts.filter(c => !c.is_active).length > 0 && (
+        <>
+          {sectionTitle('Historique des contrats')}
+          {contracts.filter(c => !c.is_active).map(c => (
+            <div key={c.contract_id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 12px', borderRadius: 8, background: '#f8f9fa', marginBottom: 6, fontSize: 13 }}>
+              <div>
+                <strong>{c.contract_number}</strong> · {c.tenant || '—'}
+                <span style={{ color: 'var(--slate)', marginLeft: 8, fontSize: 12 }}>{c.co_valid_from} → {c.co_valid_to || '∞'}</span>
+              </div>
+              <span style={{ fontSize: 11, color: 'var(--slate)', textTransform: 'uppercase' }}>{c.status}</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* Vacancy periods */}
+      {vacancies.length > 0 && (
+        <>
+          {sectionTitle('Périodes de vacance')}
+          {vacancies.map(v => (
+            <div key={v.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: v.reversed ? '#f3f4f6' : '#fef2f2', marginBottom: 6, fontSize: 13 }}>
+              <span>{v.period_from} → {v.period_to}{v.reversed ? ' (inversé)' : ''}</span>
+              <strong>{v.market_rent ? `${v.market_rent.toLocaleString()} /m²/an` : '—'}</strong>
+            </div>
+          ))}
+        </>
+      )}
+
+      {/* Maintenance */}
+      {maintenance.length > 0 && (
+        <>
+          {sectionTitle('Demandes de maintenance')}
+          {maintenance.map(m => (
+            <div key={m.id} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 8, background: '#f8f9fa', marginBottom: 6, fontSize: 13 }}>
+              <span>{m.title}</span>
+              <span style={{ fontSize: 11, textTransform: 'uppercase', color: m.status === 'closed' ? '#15803d' : '#92400e' }}>{m.status}</span>
+            </div>
+          ))}
+        </>
+      )}
+
+      <div style={{ marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)', textAlign: 'right' }}>
+        <button onClick={onClose} style={{ padding: '10px 20px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans' }}>Fermer</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Patrimoine() {
   const { t } = useLanguage();
   const tc = t.commercial;
@@ -476,6 +655,7 @@ export default function Patrimoine() {
   const [modal,        setModal]        = useState(null);
   const [editTarget,   setEditTarget]   = useState(null);
   const [confirm,      setConfirm]      = useState(null);
+  const [detailSpaceId, setDetailSpaceId] = useState(null);
   const [apiError,     setApiError]     = useState('');
 
   // ── Detail panel state — lives under selected CC, fully reset on CC change ──
@@ -911,13 +1091,18 @@ export default function Patrimoine() {
                         {spaces.map(s => (
                           <Card key={s.id} style={{ padding: '14px 16px', borderRadius: 10 }}>
                             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)' }}>{s.space_code}</div>
+                              <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--ink)', cursor: 'pointer' }}
+                                onClick={() => { setDetailSpaceId(s.id); setModal('space-detail'); }}>{s.space_code}</div>
                               <ActionBtns onEdit={() => openEdit('space', s)} onDelete={() => setConfirm({ type: 'space', id: s.id, label: s.space_code })} />
                             </div>
                             <div style={{ marginTop: 6 }}><Badge status={s.status} /></div>
                             {s.description && <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 6 }}>{s.description}</div>}
                             {s.current_area_sqm && <div style={{ fontSize: 13, fontWeight: 600, marginTop: 6, color: 'var(--ink)' }}>📐 {s.current_area_sqm.toLocaleString()} m²</div>}
-                  {s.usage_type && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 4, textTransform: 'uppercase', fontWeight: 600 }}>{s.usage_type}</div>}
+                            {s.usage_type && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 4, textTransform: 'uppercase', fontWeight: 600 }}>{s.usage_type}</div>}
+                            <button onClick={() => { setDetailSpaceId(s.id); setModal('space-detail'); }}
+                              style={{ marginTop: 10, width: '100%', padding: '6px 0', borderRadius: 6, border: '1px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontSize: 12, color: 'var(--slate)' }}>
+                              🔍 Détails
+                            </button>
                           </Card>
                         ))}
                       </div>
@@ -981,6 +1166,11 @@ export default function Patrimoine() {
       {modal === 'edit' && editTarget?.type === 'space' && (
         <Modal title={`Edit — ${editTarget.item.space_code}`} onClose={() => { setModal(null); setEditTarget(null); }}>
           <SpaceForm initial={editTarget.item} floorId={selectedFloor?.id} onSave={() => { if (selectedFloor) loadSpaces(selectedFloor.id); setModal(null); setEditTarget(null); }} onClose={() => { setModal(null); setEditTarget(null); }} t={t} floorAreaSqm={selectedFloor?.area_sqm} existingSpaces={spaces} />
+        </Modal>
+      )}
+      {modal === 'space-detail' && detailSpaceId && (
+        <Modal title="Détail de l'espace" onClose={() => { setModal(null); setDetailSpaceId(null); }}>
+          <SpaceDetail spaceId={detailSpaceId} onClose={() => { setModal(null); setDetailSpaceId(null); }} />
         </Modal>
       )}
     </div>
