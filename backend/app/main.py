@@ -166,6 +166,20 @@ def startup():
             # Posting entries: add space_id column
             "ALTER TABLE re_posting_entries ADD COLUMN IF NOT EXISTS space_id INTEGER REFERENCES re_spaces(id)",
             "UPDATE re_posting_entries pe SET space_id = co.space_id FROM re_contract_objects co WHERE co.id = pe.contract_id AND pe.space_id IS NULL",
+            # ─────────────────────────────────────────────────────────────
+            # ORG_ID BACKFILL — assign all orphaned (NULL org_id) rows to the
+            # earliest organization. Eliminates the legacy-NULL bug class.
+            # Only runs when exactly one org exists (safe single-tenant case)
+            # or assigns to the lowest org id otherwise.
+            # ─────────────────────────────────────────────────────────────
+            "UPDATE re_company_codes SET org_id = (SELECT MIN(id) FROM organizations) WHERE org_id IS NULL AND EXISTS (SELECT 1 FROM organizations)",
+            "UPDATE re_business_entities SET org_id = (SELECT MIN(id) FROM organizations) WHERE org_id IS NULL AND EXISTS (SELECT 1 FROM organizations)",
+            "UPDATE re_business_partners SET org_id = (SELECT MIN(id) FROM organizations) WHERE org_id IS NULL AND EXISTS (SELECT 1 FROM organizations)",
+            # Backfill company_code_id linkage on business entities missing it
+            # (so the CC → BE chain is intact for org-scoped queries)
+            "UPDATE re_business_entities be SET company_code_id = (SELECT MIN(cc.id) FROM re_company_codes cc WHERE cc.org_id = be.org_id) WHERE be.company_code_id IS NULL AND be.org_id IS NOT NULL AND EXISTS (SELECT 1 FROM re_company_codes cc2 WHERE cc2.org_id = be.org_id)",
+            # Users without org → earliest org
+            "UPDATE users SET organization_id = (SELECT MIN(id) FROM organizations) WHERE organization_id IS NULL AND EXISTS (SELECT 1 FROM organizations)",
         ]
         for migration in migrations:
             try:
