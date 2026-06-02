@@ -987,6 +987,148 @@ def delete_condition(id: int, db: Session = Depends(get_db), u=Depends(require_p
 
 # ── RENTAL OBJECTS ────────────────────────────────────────────────────────────
 
+@router.get("/spaces/{space_id}/detail")
+def get_space_detail(space_id: int, db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """
+    Consolidated view of a single space — everything in one call:
+    hierarchy, current/historical measurements, active & past contracts,
+    conditions, vacancy postings, maintenance requests.
+    """
+    from sqlalchemy import or_
+    space = db.query(Space).options(
+        joinedload(Space.floor).joinedload(Floor.building).joinedload(Building.business_entity),
+        joinedload(Space.measurements),
+    ).filter(Space.id == space_id).first()
+    if not space:
+        raise HTTPException(404, "Space not found")
+
+    floor    = space.floor
+    building = floor.building if floor else None
+    be       = building.business_entity if building else None
+
+    st = space.status
+    status_str = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
+
+    # Measurements history (sorted newest first)
+    measurements = sorted(space.measurements, key=lambda m: m.valid_from, reverse=True)
+    current_m = next((m for m in measurements if not m.valid_to), None)
+
+    # Contract objects linking this space (active + historical)
+    contract_objects = db.query(ContractObject).options(
+        joinedload(ContractObject.contract).joinedload(Contract.business_partner),
+        joinedload(ContractObject.contract).joinedload(Contract.conditions),
+    ).filter(ContractObject.space_id == space_id).all()
+
+    today = date.today()
+    contracts_out = []
+    for co in contract_objects:
+        c = co.contract
+        if not c:
+            continue
+        # Is this assignment currently active?
+        is_active = (co.valid_from <= today) and (co.valid_to is None or co.valid_to >= today)
+        bp = c.business_partner
+        # Active conditions for this contract
+        conds = [
+            {
+                "id": cond.id,
+                "type": cond.condition_type.value if hasattr(cond.condition_type, 'value') else str(cond.condition_type),
+                "amount": float(cond.amount) if cond.amount else 0,
+                "currency": cond.currency or "USD",
+                "frequency": cond.frequency.value if hasattr(cond.frequency, 'value') else str(cond.frequency),
+                "valid_from": str(cond.valid_from),
+                "valid_to": str(cond.valid_to) if cond.valid_to else None,
+                "ipc_enabled": cond.ipc_enabled,
+            }
+            for cond in (c.conditions or [])
+            if cond.valid_from <= today and (cond.valid_to is None or cond.valid_to >= today)
+        ]
+        contracts_out.append({
+            "contract_id": c.id,
+            "contract_number": c.contract_number,
+            "status": c.status.value if hasattr(c.status, 'value') else str(c.status),
+            "tenant": bp.company_name if bp else None,
+            "tenant_id": bp.id if bp else None,
+            "co_valid_from": str(co.valid_from),
+            "co_valid_to": str(co.valid_to) if co.valid_to else None,
+            "is_active": is_active,
+            "start_date": str(c.start_date) if c.start_date else None,
+            "end_date": str(c.absolute_end_date) if c.absolute_end_date else None,
+            "conditions": conds,
+        })
+    # Active first, then by start desc
+    contracts_out.sort(key=lambda x: (not x["is_active"], x["co_valid_from"]), reverse=False)
+
+    # Vacancy postings
+    vacancies = db.query(VacancyPosting).filter(
+        VacancyPosting.space_id == space_id
+    ).order_by(VacancyPosting.period_from.desc()).all()
+    vacancies_out = [{
+        "id": v.id,
+        "period_from": str(v.period_from),
+        "period_to": str(v.period_to),
+        "market_rent": float(v.market_rent) if v.market_rent else None,
+        "posted": v.posted,
+        "reversed": v.reversed,
+    } for v in vacancies]
+
+    # Maintenance requests
+    maint = db.query(MaintenanceRequest).filter(
+        MaintenanceRequest.space_id == space_id
+    ).order_by(MaintenanceRequest.created_at.desc()).all()
+    maint_out = [{
+        "id": m.id,
+        "title": m.title,
+        "priority": m.priority,
+        "status": m.status.value if hasattr(m.status, 'value') else str(m.status),
+        "created_at": str(m.created_at) if m.created_at else None,
+    } for m in maint]
+
+    active_contract = next((c for c in contracts_out if c["is_active"]), None)
+
+    return {
+        "space": {
+            "id": space.id,
+            "space_code": space.space_code,
+            "description": space.description,
+            "status": status_str,
+            "usage_type": space.usage_type,
+            "cost_center": space.cost_center,
+            "im_key": space.im_key,
+        },
+        "hierarchy": {
+            "floor_id": floor.id if floor else None,
+            "floor_number": floor.floor_number if floor else None,
+            "floor_name": floor.name if floor else None,
+            "building_id": building.id if building else None,
+            "building_name": building.name if building else None,
+            "business_entity_id": be.id if be else None,
+            "business_entity_name": be.name if be else None,
+            "city": building.city if building else None,
+            "country": building.country if building else None,
+        },
+        "current_area_sqm": float(current_m.area_sqm) if current_m else None,
+        "current_valid_from": str(current_m.valid_from) if current_m else None,
+        "measurements": [{
+            "id": m.id,
+            "area_sqm": float(m.area_sqm),
+            "valid_from": str(m.valid_from),
+            "valid_to": str(m.valid_to) if m.valid_to else None,
+            "note": m.note,
+            "is_current": (m.valid_to is None),
+        } for m in measurements],
+        "active_contract": active_contract,
+        "contracts": contracts_out,
+        "vacancies": vacancies_out,
+        "maintenance": maint_out,
+        "summary": {
+            "total_contracts": len(contracts_out),
+            "has_active_contract": active_contract is not None,
+            "total_vacancy_periods": len(vacancies_out),
+            "open_maintenance": len([m for m in maint_out if m["status"] != "closed"]),
+        },
+    }
+
 @router.get("/health/org-integrity")
 def org_integrity_check(db: Session = Depends(get_db), u=Depends(get_current_user)):
     """
