@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { CONDITION_TYPES, FREQUENCIES, PAYMENT_TIMINGS, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
@@ -278,7 +278,15 @@ export default function Conditions() {
               })}
             </tbody>
           </table>
-          {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: 'var(--slate)' }}>{tc.noConditions}</div>}
+          {filtered.length === 0 && (
+            <EmptyState
+              icon="≡"
+              title={tc.noConditions || 'Aucune condition'}
+              description="Les conditions définissent les loyers et charges d'un contrat. Ajoutez-en une pour pouvoir activer un contrat."
+              actionLabel={`+ ${tc.newCondition}`}
+              onAction={() => { setSelected(null); setModal('new'); }}
+            />
+          )}
         </div>
       )}
 

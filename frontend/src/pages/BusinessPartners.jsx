@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import GeoSelect from '../components/shared/GeoSelect';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
@@ -212,10 +212,22 @@ export default function BusinessPartners() {
         </div>
       )}
       {filtered.length === 0 && !loading && (
-        <div style={{ textAlign: 'center', padding: 64, color: 'var(--slate)' }}>
-          <div style={{ fontFamily: 'DM Serif Display', fontSize: 22, marginBottom: 8 }}>{tc.noPartners}</div>
-          <div style={{ fontSize: 14 }}>{tc.noPartnersDesc}</div>
-        </div>
+        partners.length === 0 ? (
+          <EmptyState
+            icon="🤝"
+            title={tc.noPartners}
+            description={tc.noPartnersDesc}
+            actionLabel={`+ ${tc.newPartner}`}
+            onAction={() => { setSelected(null); setModal('new'); }}
+          />
+        ) : (
+          <EmptyState
+            icon="🔍"
+            title="Aucun résultat"
+            description="Aucun partenaire ne correspond à votre recherche ou filtre."
+            subtle
+          />
+        )
       )}
       {(modal === 'new' || modal === 'edit') && (
         <Modal title={modal === 'edit' ? `Edit — ${selected?.company_name}` : tc.newPartner} onClose={() => setModal(null)}>

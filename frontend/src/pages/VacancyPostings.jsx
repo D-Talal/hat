@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -144,7 +144,13 @@ export default function VacancyPostings() {
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>Loading…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>No vacancy postings found.</div>
+          <EmptyState
+            icon="🏚"
+            title="Aucun posting de vacance"
+            description="Enregistrez les périodes de vacance de vos espaces pour suivre les pertes de revenu locatif."
+            actionLabel="+ Nouveau posting"
+            onAction={() => { setSelected(null); setModal('form'); }}
+          />
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

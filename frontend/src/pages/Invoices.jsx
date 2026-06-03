@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { CONDITION_TYPES as COND_TYPES_SHARED, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -244,9 +244,17 @@ export default function Invoices() {
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>Loading…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>
-            {tc.noInvoices || 'No invoices found.'}
-          </div>
+          invoices.length === 0 ? (
+            <EmptyState
+              icon="🧾"
+              title={tc.noInvoices || 'Aucune facture'}
+              description="Les factures apparaissent ici. Créez-en une manuellement ou générez-les depuis un contrat."
+              actionLabel={`+ ${tc.newInvoice || 'Nouvelle facture'}`}
+              onAction={() => { setSelected(null); setModal('create'); }}
+            />
+          ) : (
+            <EmptyState icon="🔍" title="Aucun résultat" description="Aucune facture avec ce filtre." subtle />
+          )
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

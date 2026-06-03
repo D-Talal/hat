@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
 const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -169,9 +169,13 @@ export default function SalesDeclarations() {
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>Loading…</div>
         ) : items.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>
-            No sales declarations yet. Use "New Declaration" to submit tenant turnover.
-          </div>
+          <EmptyState
+            icon="📊"
+            title="Aucune déclaration de CA"
+            description="Les locataires à loyer variable déclarent ici leur chiffre d'affaires. Créez-en une pour calculer le loyer."
+            actionLabel="+ Nouvelle déclaration"
+            onAction={() => { setSelected(null); setModal('form'); }}
+          />
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>

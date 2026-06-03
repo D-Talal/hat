@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { DAY_COUNT_METHODS, CONTRACT_TYPES, PAYMENT_TIMINGS } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
@@ -847,7 +847,19 @@ export default function Contracts() {
               })}
             </tbody>
           </table>
-          {filtered.length === 0 && <div style={{ textAlign: 'center', padding: 48, color: 'var(--slate)' }}>{tc.noContracts}</div>}
+          {filtered.length === 0 && (
+            contracts.length === 0 ? (
+              <EmptyState
+                icon="📄"
+                title={tc.noContracts || 'Aucun contrat'}
+                description="Créez votre premier contrat de location pour commencer à gérer vos baux."
+                actionLabel={`+ ${tc.newContract}`}
+                onAction={() => { setSelected(null); setModal('new'); }}
+              />
+            ) : (
+              <EmptyState icon="🔍" title="Aucun résultat" description="Aucun contrat avec ce statut." subtle />
+            )
+          )}
         </div>
       )}
 

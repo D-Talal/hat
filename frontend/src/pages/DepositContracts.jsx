@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal } from '../components/UI';
+import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { CURRENCIES } from '../data/currencies';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
@@ -204,7 +204,13 @@ export default function DepositContracts() {
         {loading ? (
           <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>Loading…</div>
         ) : filtered.length === 0 ? (
-          <div style={{ padding: 40, textAlign: 'center', color: 'var(--slate)' }}>No deposit contracts found.</div>
+          <EmptyState
+            icon="🔒"
+            title="Aucun dépôt de garantie"
+            description="Créez les dépôts de garantie associés à vos contrats de location."
+            actionLabel="+ Nouveau dépôt"
+            onAction={() => { setSelected(null); setModal('form'); }}
+          />
         ) : (
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
             <thead>
