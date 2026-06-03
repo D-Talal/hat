@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { CONDITION_TYPES, FREQUENCIES, PAYMENT_TIMINGS, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
@@ -187,6 +188,7 @@ function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
 }
 
 export default function Conditions() {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const [conditions, setConditions] = useState([]);
@@ -210,7 +212,7 @@ export default function Conditions() {
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/conditions/${id}`); load(); setConfirm(null); setModal(null); }
-    catch { alert(t.common.deleteFailed); }
+    catch { toast.error(t.common.deleteFailed); }
   };
 
   const filtered = conditions

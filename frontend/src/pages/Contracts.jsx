@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { DAY_COUNT_METHODS, CONTRACT_TYPES, PAYMENT_TIMINGS } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
@@ -289,6 +290,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
 }
 
 function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onRefresh }) {
+  const toast = useToast();
   const [conditions, setConditions] = useState([]);
   const [activeTab, setActiveTab] = useState('info');
   const [invoices, setInvoices] = useState([]);
@@ -343,7 +345,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      alert('Failed to download PDF');
+      toast.error('Échec du téléchargement du PDF');
     }
   };
   const s = STATUS_COLORS[contract.status] || STATUS_COLORS.draft;
@@ -717,6 +719,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
 }
 
 export default function Contracts() {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
 
@@ -730,7 +733,7 @@ export default function Contracts() {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch (e) {
-      alert('Failed to download PDF');
+      toast.error('Échec du téléchargement du PDF');
     }
   };
   const [contracts, setContracts] = useState([]);
@@ -767,8 +770,8 @@ export default function Contracts() {
   };
 
   const handleDelete = async (id) => {
-    try { await API.delete(`/commercial/contracts/${id}`); load(); setConfirm(null); setModal(null); }
-    catch { alert(t.common.deleteFailed); }
+    try { await API.delete(`/commercial/contracts/${id}`); toast.success('Contrat supprimé'); load(); setConfirm(null); setModal(null); }
+    catch { toast.error(t.common.deleteFailed); }
   };
 
   const filtered = filter === 'all' ? contracts : contracts.filter(c => c.status === filter);

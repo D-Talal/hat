@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { CONDITION_TYPES as COND_TYPES_SHARED, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
@@ -46,6 +47,7 @@ function CondTypeBadge({ type }) {
 }
 
 function InvoiceForm({ onSave, onClose, initial, contracts }) {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const [form, setForm] = useState({
@@ -72,7 +74,7 @@ function InvoiceForm({ onSave, onClose, initial, contracts }) {
       }
       onSave();
     } catch (e) {
-      alert(e.response?.data?.detail || 'Error saving invoice');
+      toast.error(e.response?.data?.detail || 'Erreur lors de la sauvegarde');
     } finally {
       setSaving(false);
     }
@@ -128,6 +130,7 @@ function InvoiceForm({ onSave, onClose, initial, contracts }) {
 }
 
 export default function Invoices() {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const [invoices, setInvoices] = useState([]);
@@ -161,15 +164,15 @@ export default function Invoices() {
       const a = document.createElement('a'); a.href = url;
       a.download = `invoice_INV-${String(inv.id).padStart(5,'0')}.pdf`;
       a.click(); window.URL.revokeObjectURL(url);
-    } catch { alert('PDF error'); }
+    } catch { toast.error('Erreur PDF'); }
   };
 
   const handlePay = async (id) => {
-    try { await API.invoices.pay(id); load(); } catch { alert('Error'); }
+    try { await API.invoices.pay(id); toast.success('Facture marquée payée'); load(); } catch { toast.error('Erreur'); }
   };
 
   const handleDelete = async (id) => {
-    try { await API.invoices.delete(id); setConfirm(null); load(); } catch { alert('Error'); }
+    try { await API.invoices.delete(id); toast.success('Facture supprimée'); setConfirm(null); load(); } catch { toast.error('Erreur'); }
   };
 
   // Stats

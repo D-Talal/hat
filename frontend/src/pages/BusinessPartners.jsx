@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import GeoSelect from '../components/shared/GeoSelect';
 import { useLanguage } from '../context/LanguageContext';
@@ -135,6 +136,7 @@ function BPForm({ onSave, onClose, initial, existingItems = [] }) {
 }
 
 export default function BusinessPartners() {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const [partners, setPartners] = useState([]);
@@ -153,8 +155,8 @@ export default function BusinessPartners() {
   useEffect(() => { load(); }, [load]);
 
   const handleDelete = async (id) => {
-    try { await API.delete(`/commercial/business-partners/${id}`); load(); setConfirm(null); setModal(null); }
-    catch { alert(t.common.deleteFailed); }
+    try { await API.delete(`/commercial/business-partners/${id}`); toast.success('Partenaire supprimé'); load(); setConfirm(null); setModal(null); }
+    catch { toast.error(t.common.deleteFailed); }
   };
 
   const filtered = partners.filter(p => {

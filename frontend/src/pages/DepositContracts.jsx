@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { CURRENCIES } from '../data/currencies';
@@ -125,6 +126,7 @@ function DepositForm({ onSave, onClose, initial, contracts, partners, existingDe
 }
 
 export default function DepositContracts() {
+  const toast = useToast();
   const { t } = useLanguage();
   const [items, setItems]       = useState([]);
   const [contracts, setContracts] = useState([]);
@@ -154,12 +156,12 @@ export default function DepositContracts() {
 
   const handleRefund = async (id) => {
     try { await API.patch(`/commercial/deposit-contracts/${id}/refund`); load(); }
-    catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); }
   };
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/deposit-contracts/${id}`); setConfirm(null); load(); }
-    catch (e) { alert(e.response?.data?.detail || 'Error'); setConfirm(null); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); setConfirm(null); }
   };
 
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter);

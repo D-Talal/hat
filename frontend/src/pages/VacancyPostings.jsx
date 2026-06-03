@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 
 const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
@@ -65,6 +66,7 @@ function VacancyForm({ onSave, onClose, initial, spaces }) {
 }
 
 export default function VacancyPostings() {
+  const toast = useToast();
   const [items, setItems]             = useState([]);
   const [spaces, setSpaces] = useState([]);
   const [loading, setLoading]         = useState(true);
@@ -90,12 +92,12 @@ export default function VacancyPostings() {
 
   const handleReverse = async (id) => {
     try { await API.patch(`/commercial/vacancy-postings/${id}/reverse`); load(); }
-    catch (e) { alert(e.response?.data?.detail || 'Error'); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); }
   };
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/vacancy-postings/${id}`); setConfirm(null); load(); }
-    catch (e) { alert(e.response?.data?.detail || 'Error'); setConfirm(null); }
+    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); setConfirm(null); }
   };
 
   const filtered = filter === 'all' ? items

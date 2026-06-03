@@ -1,5 +1,6 @@
 import { useState } from "react";
 import API from "../api";
+import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
 import { PageHeader, Card } from "../components/UI";
 
@@ -97,7 +98,7 @@ function ImportStep({ step, language }) {
       a.click();
       window.URL.revokeObjectURL(url);
     } catch {
-      alert('Failed to download template');
+      toast.error('Échec du téléchargement du modèle');
     }
   };
 
@@ -172,6 +173,7 @@ function ImportStep({ step, language }) {
 }
 
 export default function CsvImport() {
+  const toast = useToast();
   const { t, language } = useLanguage();
   const [status, setStatus] = useState(null);
 

@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 
@@ -298,6 +299,7 @@ function IpcModal({ onSave, onClose }) {
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 export default function PostingEngine() {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const MODULES = getModules(tc);
@@ -342,7 +344,7 @@ export default function PostingEngine() {
       setSelectedRun(r.data);
       load();
     } catch (e) {
-      alert('Run failed: ' + (e.response?.data?.detail || e.message));
+      toast.error('Échec du run : ' + (e.response?.data?.detail || e.message));
     } finally { setRunning(false); }
   };
 

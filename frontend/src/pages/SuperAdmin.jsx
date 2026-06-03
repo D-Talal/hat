@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/UI';
 
@@ -10,6 +11,7 @@ function StatusBadge({ validated, active }) {
 }
 
 export default function SuperAdmin() {
+  const toast = useToast();
   const { user } = useAuth();
   const [orgs, setOrgs] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,7 +38,7 @@ export default function SuperAdmin() {
       await API.post(`/super-admin/orgs/${id}/validate`);
       await load();
     } catch (e) {
-      alert(e.response?.data?.detail || 'Failed');
+      toast.error(e.response?.data?.detail || 'Échec');
     } finally {
       setActionLoading(null);
     }
@@ -49,7 +51,7 @@ export default function SuperAdmin() {
       await API.post(`/super-admin/orgs/${id}/reject`);
       await load();
     } catch (e) {
-      alert(e.response?.data?.detail || 'Failed');
+      toast.error(e.response?.data?.detail || 'Échec');
     } finally {
       setActionLoading(null);
     }

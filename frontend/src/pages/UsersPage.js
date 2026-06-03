@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { usersAPI } from '../api';
 import { Card, Btn, Badge, Table, Modal, PageHeader, Input, Select } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
+import { useToast } from '../context/ToastContext';
 
 export default function UsersPage() {
+  const toast = useToast();
   const [users, setUsers] = useState([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -20,11 +22,11 @@ export default function UsersPage() {
       if (editing) await usersAPI.update(editing.id, { full_name: form.full_name, role: form.role, is_active: form.is_active });
       else await usersAPI.create(form);
       load(); setModal(false);
-    } catch (e) { alert(e.response?.data?.detail || 'Error saving'); }
+    } catch (e) { toast.error(e.response?.data?.detail || 'Erreur lors de la sauvegarde'); }
   };
 
   const remove = async (id) => {
-    if (id === me.id) return alert("You can't delete yourself");
+    if (id === me.id) return toast.warning("Vous ne pouvez pas vous supprimer vous-même");
     if (!window.confirm('Delete this user?')) return;
     await usersAPI.delete(id); load();
   };

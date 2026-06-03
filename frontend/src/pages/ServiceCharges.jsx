@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
+import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
@@ -204,6 +205,7 @@ function CostCollectorForm({ pgId, onSave, onClose, initial }) {
 }
 
 export default function ServiceCharges() {
+  const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const [groups, setGroups] = useState([]);
@@ -223,12 +225,12 @@ export default function ServiceCharges() {
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/participation-groups/${id}`); load(); setConfirm(null); setModal(null); }
-    catch { alert(t.common.deleteFailed); }
+    catch { toast.error(t.common.deleteFailed); }
   };
 
   const handleSettle = async (ccId) => {
     try { await API.patch(`/commercial/cost-collectors/${ccId}/settle`); load(); }
-    catch { alert('Settle failed.'); }
+    catch { toast.error('Échec de la régularisation.'); }
   };
 
   return (
