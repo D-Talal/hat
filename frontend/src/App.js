@@ -2,6 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
+import { ToastProvider } from './context/ToastContext';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -114,6 +115,6 @@ function AppRoutes() {
 
 export default function App() {
   return (
-    <AuthProvider><LanguageProvider><BrowserRouter><AppRoutes /></BrowserRouter></LanguageProvider></AuthProvider>
+    <AuthProvider><LanguageProvider><ToastProvider><BrowserRouter><AppRoutes /></BrowserRouter></ToastProvider></LanguageProvider></AuthProvider>
   );
 }
