@@ -156,3 +156,37 @@ export const PageHeader = ({ title, sub, action }) => (
 );
 
 export const RoleBadge = ({ role }) => <Badge status={role} />;
+
+export const EmptyState = ({ icon = '📋', title, description, actionLabel, onAction, subtle }) => (
+  <div style={{
+    textAlign: 'center',
+    padding: subtle ? '40px 24px' : '72px 24px',
+    display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4,
+  }}>
+    <div style={{
+      width: 72, height: 72, borderRadius: '50%',
+      background: 'linear-gradient(135deg, #fdf6e3 0%, #f5f0e0 100%)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: 32, marginBottom: 18,
+      boxShadow: '0 4px 16px rgba(201,168,76,0.15)',
+    }}>{icon}</div>
+    <div style={{ fontFamily: 'DM Serif Display', fontSize: 22, color: 'var(--ink)' }}>{title}</div>
+    {description && (
+      <div style={{ fontSize: 14, color: 'var(--slate)', maxWidth: 380, lineHeight: 1.5, marginTop: 4 }}>
+        {description}
+      </div>
+    )}
+    {actionLabel && onAction && (
+      <button onClick={onAction} style={{
+        marginTop: 20, padding: '11px 24px', borderRadius: 10, border: 'none',
+        background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer',
+        fontFamily: 'DM Sans', fontWeight: 700, fontSize: 14,
+        boxShadow: '0 4px 14px rgba(15,17,40,0.12)', transition: 'transform .12s',
+      }}
+      onMouseEnter={e => e.currentTarget.style.transform = 'translateY(-2px)'}
+      onMouseLeave={e => e.currentTarget.style.transform = 'translateY(0)'}>
+        {actionLabel}
+      </button>
+    )}
+  </div>
+);
