@@ -11,6 +11,7 @@ from app.routers import map as map_router
 from app.routers.dashboard import router as dashboard_router
 from app.routers.commercial import router as commercial_router
 from app.routers.posting import router as posting_router
+from app.routers.org_settings import router as org_settings_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -69,6 +70,7 @@ app.include_router(pdf_router_module.router, prefix="/api/pdf", tags=["pdf"])
 app.include_router(alerts_router_module.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(csv_import_router.router, prefix="/api/import", tags=["import"])
 app.include_router(super_admin_router.router, prefix="/api/super-admin", tags=["super-admin"])
+app.include_router(org_settings_router)
 
 @app.get("/")
 def root():
