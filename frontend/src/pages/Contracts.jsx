@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { daysUntil } from '../data/dates';
 
 
 const STATUS_COLORS = {
@@ -27,10 +28,6 @@ const CONDITION_TYPES = {
   abatement: { label: 'Abatement', color: '#6a1b9a', bg: '#f3e5f5' },
 };
 
-function daysUntil(dateStr) {
-  if (!dateStr) return null;
-  return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
-}
 
 
 function SectionTitle({ children }) {

@@ -7,6 +7,7 @@ import {
 import API from '../api';
 import { useLanguage } from '../context/LanguageContext';
 import '../components/Dashboard.css';
+import { daysUntil } from '../data/dates';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -23,10 +24,6 @@ const pctChange = (current, prev) => {
   return ((current - prev) / prev) * 100;
 };
 
-const daysUntil = (dateStr) => {
-  if (!dateStr) return null;
-  return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
-};
 
 // ── Sub-components ────────────────────────────────────────────────────────────
 
