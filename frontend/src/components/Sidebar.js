@@ -153,7 +153,6 @@ export default function Sidebar() {
           <div style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', color: 'rgba(255,255,255,0.3)', textTransform: 'uppercase', padding: '0 12px', marginBottom: 6 }}>
             {t.nav.commercial}
           </div>
-          <NavItem to="/commercial/dashboard"  icon="◈" label={fr ? 'Vue d\'ensemble' : 'Overview'} />
           <NavItem to="/commercial/patrimoine" icon="▦" label={fr ? 'Patrimoine'     : 'Properties'} />
           <NavItem to="/commercial/partners"   icon="◉" label={fr ? 'Partenaires'    : 'Partners'} />
           <NavItem to="/commercial/contracts"  icon="◇" label={fr ? 'Contrats'       : 'Contracts'} />
@@ -186,7 +185,6 @@ export default function Sidebar() {
           </div>
           <NavItem to="/hotel/calendar"   icon="📅" label={fr ? 'Calendrier'      : 'Calendar'} />
           <NavItem to="/hotel/reception"  icon="🛎" label={fr ? 'Réception'       : 'Reception'} />
-          <NavItem to="/hotel/dashboard"  icon="◈"  label={fr ? 'Tableau de bord' : 'Dashboard'} />
 
           <SubGroup label={fr ? 'Configuration' : 'Setup'}>
             <NavItem to="/hotel/hotels"   icon="▲" label={fr ? 'Hôtels'      : 'Hotels'} />
