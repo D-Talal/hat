@@ -129,6 +129,17 @@ def startup():
             "ALTER TABLE re_business_entities ADD COLUMN IF NOT EXISTS company_code_id INTEGER REFERENCES re_company_codes(id)",
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_validated BOOLEAN DEFAULT false",
             "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS contact_email VARCHAR(255)",
+            # Internationalization settings (per-org defaults)
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS default_currency VARCHAR(3) DEFAULT 'USD'",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS country VARCHAR(2) DEFAULT 'US'",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS locale VARCHAR(10) DEFAULT 'en-US'",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS timezone VARCHAR(50) DEFAULT 'UTC'",
+            "ALTER TABLE organizations ADD COLUMN IF NOT EXISTS area_unit VARCHAR(4) DEFAULT 'sqm'",
+            "UPDATE organizations SET default_currency = 'USD' WHERE default_currency IS NULL",
+            "UPDATE organizations SET country = 'US' WHERE country IS NULL",
+            "UPDATE organizations SET locale = 'en-US' WHERE locale IS NULL",
+            "UPDATE organizations SET timezone = 'UTC' WHERE timezone IS NULL",
+            "UPDATE organizations SET area_unit = 'sqm' WHERE area_unit IS NULL",
             "UPDATE organizations SET is_validated = true WHERE slug = 'default' OR slug = 'propmanager'",
             # State / Province fields for geo tables
             "ALTER TABLE re_company_codes ADD COLUMN IF NOT EXISTS state VARCHAR(100)",
