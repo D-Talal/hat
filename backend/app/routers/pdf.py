@@ -62,7 +62,13 @@ def _fmt_amount(amount, currency="USD"):
         val = float(amount or 0)
     except Exception:
         val = 0.0
-    sym = {"USD": "$", "EUR": "€", "GBP": "£", "CAD": "CA$", "MAD": "MAD"}.get(currency, currency + " ")
+    sym = {
+        "USD": "$", "EUR": "€", "GBP": "£", "CAD": "CA$", "AUD": "A$",
+        "CHF": "CHF ", "JPY": "¥", "CNY": "¥", "INR": "₹", "BRL": "R$",
+        "MXN": "MX$", "ZAR": "R", "AED": "AED ", "SAR": "SAR ", "SGD": "S$",
+        "HKD": "HK$", "SEK": "kr ", "NOK": "kr ", "DKK": "kr ", "PLN": "zł ",
+        "MAD": "MAD ",
+    }.get(currency, currency + " ")
     return f"{sym}{val:,.2f}"
 
 
@@ -594,7 +600,7 @@ def download_stay_invoice(
     total        = float(booking.total_amount or room_charges)
     paid         = float(booking.paid_amount or 0)
     balance      = total - paid
-    currency     = "USD"
+    currency     = getattr(org, "default_currency", None) or "USD"
 
     # Status
     status_label = (booking.status.value if booking.status else "confirmed").replace("_", " ").upper()
