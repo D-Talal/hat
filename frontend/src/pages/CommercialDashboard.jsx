@@ -9,16 +9,9 @@ import { useLanguage } from '../context/LanguageContext';
 import '../components/Dashboard.css';
 import { daysUntil } from '../data/dates';
 import { getContractStatus } from '../data/contractStatus';
+import { useFormat } from '../data/format';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
-
-const fmt = (n) => {
-  if (n === null || n === undefined) return '—';
-  const abs = Math.abs(n);
-  if (abs >= 1_000_000) return `${(n / 1_000_000).toFixed(1)}M`;
-  if (abs >= 1_000)     return `${(n / 1_000).toFixed(0)}k`;
-  return Number(n).toLocaleString(undefined, { maximumFractionDigits: 0 });
-};
 
 const pctChange = (current, prev) => {
   if (!prev || prev === 0) return null;
@@ -95,7 +88,7 @@ function AlertBanner({ alerts }) {
   );
 }
 
-function ChartTooltip({ active, payload, label }) {
+function ChartTooltip({ active, payload, label, fmt }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
@@ -105,7 +98,7 @@ function ChartTooltip({ active, payload, label }) {
     }}>
       <p style={{ color: '#9ea4be', marginBottom: 4, fontSize: 12 }}>{label}</p>
       <p style={{ color: '#0f1117', fontFamily: 'DM Mono, monospace', fontWeight: 500 }}>
-        {Number(payload[0].value).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+        {fmt ? fmt(payload[0].value) : Number(payload[0].value).toLocaleString(undefined, { maximumFractionDigits: 0 })}
       </p>
     </div>
   );
@@ -164,7 +157,8 @@ const DONUT_COLORS = ['#4361ee', '#f59e0b', '#ef4444', '#9ea4be'];
 
 export default function CommercialDashboard({ embedded = false }) {
   const navigate = useNavigate();
-  const { language, t } = useLanguage();
+  const { t } = useLanguage();
+  const { moneyShort: fmt, date: fmtDate } = useFormat();
 
   const [finance,   setFinance]   = useState(null);
   const [occupancy, setOccupancy] = useState(null);
@@ -218,7 +212,7 @@ export default function CommercialDashboard({ embedded = false }) {
     const [year, month] = item.month.split('-');
     const d = new Date(parseInt(year), parseInt(month) - 1);
     return {
-      label: d.toLocaleDateString(language === 'fr' ? 'fr-CA' : 'en-CA', { month: 'short', year: '2-digit' }),
+      label: fmtDate(d, { month: 'short', year: '2-digit' }),
       amount: item.amount,
     };
   });
@@ -275,7 +269,7 @@ export default function CommercialDashboard({ embedded = false }) {
             <h1 className="dashboard-title">Tableau de bord Commercial</h1>
             {lastUpdated && (
               <span className="dashboard-updated">
-                Mis à jour à {lastUpdated.toLocaleTimeString(language === 'fr' ? 'fr-CA' : 'en-CA', { hour: '2-digit', minute: '2-digit' })}
+                Mis à jour à {fmtDate(lastUpdated, { hour: '2-digit', minute: '2-digit' })}
               </span>
             )}
           </div>
@@ -348,7 +342,7 @@ export default function CommercialDashboard({ embedded = false }) {
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ea4be' }} axisLine={false} tickLine={false} />
                   <YAxis tick={{ fontSize: 11, fill: '#9ea4be' }} axisLine={false} tickLine={false}
                     tickFormatter={v => fmt(v)} width={52} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip fmt={fmt} />} />
                   <Bar dataKey="amount" radius={[4, 4, 0, 0]}>
                     {revenueData.map((_, i) => (
                       <Cell key={i} fill={i === revenueData.length - 1 ? '#4361ee' : '#c7d0f8'} />
@@ -443,7 +437,7 @@ export default function CommercialDashboard({ embedded = false }) {
                   <CartesianGrid vertical={false} stroke="#f0f1f6" />
                   <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#9ea4be' }} axisLine={false} tickLine={false} />
                   <YAxis allowDecimals={false} tick={{ fontSize: 11, fill: '#9ea4be' }} axisLine={false} tickLine={false} width={28} />
-                  <Tooltip content={<ChartTooltip />} />
+                  <Tooltip content={<ChartTooltip fmt={fmt} />} />
                   <Bar dataKey="contrats" fill="#4361ee" radius={[4, 4, 0, 0]} />
                 </BarChart>
               </ResponsiveContainer>

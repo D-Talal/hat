@@ -126,7 +126,7 @@ export default function SuperAdmin() {
 }
 
 function OrgRow({ org, onValidate, onReject, actionLoading }) {
-  const registeredDate = org.created_at ? new Date(org.created_at).toLocaleDateString('en-CA') : '—';
+  const registeredDate = org.created_at ? new Date(org.created_at).toLocaleDateString(undefined) : '—';
   return (
     <div style={{
       background: 'var(--color-background-secondary, #f8f9fc)',

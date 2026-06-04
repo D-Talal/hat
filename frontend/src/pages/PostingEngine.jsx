@@ -45,7 +45,11 @@ function getEntryTypeColors(tc) { return {
 }; }
 
 function fmtAmt(v, cur = 'USD') {
-  return new Intl.NumberFormat('en-CA', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(v || 0);
+  try {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(v || 0);
+  } catch {
+    return `${cur} ${Number(v || 0).toFixed(2)}`;
+  }
 }
 
 

@@ -7,6 +7,7 @@ import { posting } from '../api';
 import { PageHeader } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
+import { useFormat } from '../data/format';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const money = (n, cur = '') => {
@@ -19,10 +20,14 @@ const moneyShort = (n) => {
   if (abs >= 1_000) return `${(n / 1_000).toFixed(0)}k`;
   return Number(n || 0).toFixed(0);
 };
-const fmtMonth = (dateStr, lang) => {
+const fmtMonth = (dateStr, locale) => {
   if (!dateStr) return '—';
   const d = new Date(dateStr);
-  return d.toLocaleDateString(lang === 'fr' ? 'fr-CA' : 'en-CA', { month: 'short', year: 'numeric' });
+  try {
+    return d.toLocaleDateString(locale || 'en-US', { month: 'short', year: 'numeric' });
+  } catch {
+    return d.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+  }
 };
 
 // ── Chart tooltip ─────────────────────────────────────────────────────────────
@@ -52,7 +57,8 @@ function Kpi({ label, value, sub, accent }) {
 }
 
 export default function Ifrs16() {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+  const { settings } = useFormat();
   const tc = t.commercial;
 
   const [schedules, setSchedules] = useState([]);
@@ -104,7 +110,7 @@ export default function Ifrs16() {
 
   // Chart data: liability vs RoU balance over time
   const chartData = lines.map(l => ({
-    label: fmtMonth(l.period_date, language),
+    label: fmtMonth(l.period_date, settings.locale),
     Passif: l.liability_close,
     RoU: l.rou_close,
   }));
@@ -252,7 +258,7 @@ export default function Ifrs16() {
                     <tbody>
                       {lines.map((l, i) => (
                         <tr key={i} style={{ borderBottom: '1px solid #f0f1f6', background: l.posted ? '#f8fdf9' : 'transparent' }}>
-                          <td style={{ padding: '7px 10px', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMonth(l.period_date, language)}</td>
+                          <td style={{ padding: '7px 10px', fontWeight: 600, whiteSpace: 'nowrap' }}>{fmtMonth(l.period_date, settings.locale)}</td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{money(l.lease_payment)}</td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace', color: '#dc2626' }}>{money(l.interest_charge)}</td>
                           <td style={{ padding: '7px 10px', textAlign: 'right', fontFamily: 'DM Mono, monospace' }}>{money(l.liability_repay)}</td>

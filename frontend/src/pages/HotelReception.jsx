@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
+import { useFormat } from '../data/format';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const card = {
@@ -145,6 +146,7 @@ function Column({ title, icon, count, color, children, emptyMsg }) {
 
 export default function HotelReception() {
   const { t } = useLanguage();
+  const { date: fmtDate } = useFormat();
   const th = t.hotel;
   const [data, setData]       = useState(null);
   const [hotels, setHotels]   = useState([]);
@@ -219,7 +221,7 @@ export default function HotelReception() {
     } catch { showToast('❌ Failed to download invoice'); }
   };
 
-  const today = new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+  const today = fmtDate(new Date(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (
     <div style={{ padding: '28px 24px' }}>
