@@ -21,6 +21,7 @@ import Contracts from './pages/Contracts';
 import Conditions from './pages/Conditions';
 import ServiceCharges from './pages/ServiceCharges';
 import PostingEngine from './pages/PostingEngine';
+import Ifrs16 from './pages/Ifrs16';
 import CsvImport from './pages/CsvImport';
 import Invoices from './pages/Invoices';
 import DepositContracts from './pages/DepositContracts';
@@ -100,6 +101,7 @@ function AppRoutes() {
       <Route path="/commercial/sales-declarations" element={<ProtectedRoute><AppLayout><SalesDeclarations /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/csv-import" element={<ProtectedRoute roles={['admin','manager']}><AppLayout><CsvImport /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/posting-engine" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><PostingEngine /></AppLayout></ProtectedRoute>} />
+      <Route path="/commercial/ifrs16" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><Ifrs16 /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/calendar" element={<ProtectedRoute><AppLayout><HotelCalendar /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/reception" element={<ProtectedRoute><AppLayout><HotelReception /></AppLayout></ProtectedRoute>} />
       <Route path="/hotel/dashboard" element={<ProtectedRoute><AppLayout><HotelDashboard /></AppLayout></ProtectedRoute>} />
