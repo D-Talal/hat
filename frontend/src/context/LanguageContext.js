@@ -56,6 +56,8 @@ const translations = {
       areaSqm: 'Area (m²)', spaceCode: 'Space Code', description: 'Description',
       status: 'Status', initialMeasurement: 'Initial Measurement (time-dependent)',
       validFrom: 'Valid From', allEntities: 'All Entities',
+      contractStatus: { draft: 'Draft', released: 'Released', terminated: 'Terminated', expired: 'Expired' },
+      allStatuses: 'All',
       // Business Partners
       partnersTitle: 'Business Partners', partnersSub: 'Tenants, landlords, guarantors and vendors',
       newPartner: 'New Partner', companyName: 'Company Name', tradeName: 'Trade Name',
@@ -264,6 +266,8 @@ const translations = {
       areaSqm: 'Superficie (m²)', spaceCode: 'Code espace', description: 'Description',
       status: 'Statut', initialMeasurement: 'Mesure initiale (time-dependent)',
       validFrom: 'Valide dès', allEntities: 'Toutes les entités',
+      contractStatus: { draft: 'Brouillon', released: 'Actif', terminated: 'Résilié', expired: 'Expiré' },
+      allStatuses: 'Tous',
       // Business Partners
       partnersTitle: 'Partenaires d\'affaires', partnersSub: 'Locataires, bailleurs, garants et fournisseurs',
       newPartner: 'Nouveau partenaire', companyName: 'Nom de la société', tradeName: 'Nom commercial',
