@@ -194,7 +194,14 @@ def get_me(current_user=Depends(get_current_user), db: Session = Depends(get_db)
         from app.models.organization import Organization
         o = db.query(Organization).filter(Organization.id == current_user.organization_id).first()
         if o:
-            org = {"id": o.id, "name": o.name, "slug": o.slug, "plan": o.plan}
+            org = {
+                "id": o.id, "name": o.name, "slug": o.slug, "plan": o.plan,
+                "default_currency": getattr(o, "default_currency", "USD"),
+                "country":          getattr(o, "country", "US"),
+                "locale":           getattr(o, "locale", "en-US"),
+                "timezone":         getattr(o, "timezone", "UTC"),
+                "area_unit":        getattr(o, "area_unit", "sqm"),
+            }
     return {
         "id": current_user.id,
         "email": current_user.email,
