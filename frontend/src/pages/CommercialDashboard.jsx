@@ -8,6 +8,7 @@ import API from '../api';
 import { useLanguage } from '../context/LanguageContext';
 import '../components/Dashboard.css';
 import { daysUntil } from '../data/dates';
+import { getContractStatus } from '../data/contractStatus';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -158,13 +159,12 @@ function OccupancyRing({ rate, label, total, occupied, vacant }) {
 
 const DONUT_COLORS = ['#4361ee', '#f59e0b', '#ef4444', '#9ea4be'];
 
-const STATUS_LABELS = { released: 'Actifs', draft: 'Brouillons', terminated: 'Résiliés', expired: 'Expirés' };
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
 export default function CommercialDashboard({ embedded = false }) {
   const navigate = useNavigate();
-  const { language } = useLanguage();
+  const { language, t } = useLanguage();
 
   const [finance,   setFinance]   = useState(null);
   const [occupancy, setOccupancy] = useState(null);
@@ -229,9 +229,9 @@ export default function CommercialDashboard({ embedded = false }) {
     contrats: item.occupied,
   }));
 
-  // Status donut
+  // Status donut — labels from shared translations
   const statusCounts = ['released', 'draft', 'terminated', 'expired']
-    .map(s => ({ name: STATUS_LABELS[s], value: contracts.filter(c => c.status === s).length }))
+    .map(s => ({ name: getContractStatus(s, t).label, value: contracts.filter(c => c.status === s).length }))
     .filter(d => d.value > 0);
 
   const occ      = occupancy?.commercial || {};

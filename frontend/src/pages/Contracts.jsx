@@ -8,14 +8,10 @@ import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
 import { daysUntil } from '../data/dates';
+import { getContractStatus } from '../data/contractStatus';
 
 
-const STATUS_COLORS = {
-  draft:       { bg: '#fff8e1', text: '#f57f17', label: 'Draft' },
-  released:    { bg: '#e8f5e9', text: '#2e7d32', label: 'Released' },
-  terminated:  { bg: '#fce4ec', text: '#c62828', label: 'Terminated' },
-  expired:     { bg: '#f5f5f5', text: '#757575', label: 'Expired' },
-};
+
 
 const CONDITION_TYPES = {
   base_rent: { label: 'Base Rent', color: '#1a237e', bg: '#e8eaf6' },
@@ -335,7 +331,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
       toast.error('Échec du téléchargement du PDF');
     }
   };
-  const s = STATUS_COLORS[contract.status] || STATUS_COLORS.draft;
+  const s = getContractStatus(contract.status, t);
   const days = daysUntil(contract.absolute_end_date);
   const expiringSoon = days !== null && days <= 90 && days > 0;
   const expired = days !== null && days <= 0;
@@ -706,8 +702,8 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
 }
 
 // ── Compact contract card for the left list panel ────────────────────────────
-function ContractListItem({ contract, active, onClick }) {
-  const s = STATUS_COLORS[contract.status] || STATUS_COLORS.draft;
+function ContractListItem({ contract, active, onClick, t }) {
+  const s = getContractStatus(contract.status, t);
   const days = daysUntil(contract.absolute_end_date);
   const expiring = days !== null && days <= 90 && days > 0 && contract.status === 'released';
   return (
@@ -866,7 +862,7 @@ export default function Contracts() {
             {['all', 'draft', 'released', 'terminated', 'expired'].map(f => (
               <button key={f} onClick={() => setFilter(f)}
                 style={{ padding: '4px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: filter === f ? 'var(--ink)' : 'white', color: filter === f ? 'var(--gold)' : 'var(--slate)', textTransform: 'capitalize' }}>
-                {f === 'all' ? 'Tous' : f} ({filterCounts[f]})
+                {f === 'all' ? (t.commercial?.allStatuses || 'Tous') : getContractStatus(f, t).label} ({filterCounts[f]})
               </button>
             ))}
           </div>
@@ -886,6 +882,7 @@ export default function Contracts() {
                   contract={c}
                   active={selected?.id === c.id}
                   onClick={() => { setSelected(c); setReleaseError(''); }}
+                  t={t}
                 />
               ))
             )}
