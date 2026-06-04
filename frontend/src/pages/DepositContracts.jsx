@@ -6,10 +6,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { CURRENCIES } from '../data/currencies';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { COMMON_CURRENCIES } from '../data/constants';
+import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
 
-const inputStyle = { width: '100%', padding: '10px 12px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14, boxSizing: 'border-box' };
-const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
-const btnSecondary = { padding: '10px 20px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans' };
 
 const STATUS = {
   active:   { bg: '#e8f5e9', text: '#2e7d32', label: 'Active' },

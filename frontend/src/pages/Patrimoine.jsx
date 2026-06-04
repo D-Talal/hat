@@ -6,6 +6,7 @@ import GeoSelect from '../components/shared/GeoSelect';
 import CurrencySelect from '../components/shared/CurrencySelect';
 import { SPACE_STATUSES, USAGE_TYPES } from '../data/constants';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
+import { btnPrimary, btnSecondary, btnAdd } from '../data/styles';
 
 const SPACE_STATUS_COLORS = Object.fromEntries(
   Object.entries(SPACE_STATUSES).map(([k, v]) => [k, { bg: v.bg, text: v.text }])
@@ -16,9 +17,6 @@ const inputStyle = {
   border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 14,
   boxSizing: 'border-box', outline: 'none',
 };
-const btnPrimary   = { padding: '10px 20px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
-const btnSecondary = { padding: '10px 20px', borderRadius: 8, border: '1.5px solid var(--border)', background: 'white', cursor: 'pointer', fontFamily: 'DM Sans' };
-const btnAdd       = { background: 'var(--ink)', color: 'var(--gold)', border: 'none', borderRadius: 8, padding: '6px 14px', cursor: 'pointer', fontSize: 12, fontFamily: 'DM Sans', fontWeight: 700 };
 
 function Badge({ status }) {
   const c = SPACE_STATUS_COLORS[status] || { bg: '#f5f5f5', text: '#666' };
