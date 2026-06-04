@@ -155,6 +155,7 @@ const translations = {
       conditionsUpdated: 'Conditions Updated',
       // IFRS16 Modal
       ifrs16ModalTitle: 'Setup IFRS 16 Schedule',
+      ifrs16Title: 'IFRS 16 — Schedules', ifrs16Sub: 'Right-of-use assets and lease liabilities',
       ifrs16Info: 'IFRS 16 initial recognition calculates the present value of all future lease payments using the Incremental Borrowing Rate (IBR). This builds the full amortization schedule.',
       discountRate: 'Discount Rate (IBR) — e.g. 0.045 for 4.5%',
       initialDirectCosts: 'Initial Direct Costs', buildSchedule: 'Build Schedule',
@@ -366,6 +367,7 @@ const translations = {
       conditionsUpdated: 'Conditions mises à jour',
       // IFRS16 Modal
       ifrs16ModalTitle: 'Configurer le planning IFRS 16',
+      ifrs16Title: 'IFRS 16 — Échéanciers', ifrs16Sub: "Actifs de droit d'utilisation et passifs locatifs",
       ifrs16Info: 'La reconnaissance initiale IFRS 16 calcule la valeur actuelle de tous les paiements futurs de loyer en utilisant le taux d\'emprunt marginal (IBR). Cela construit le tableau d\'amortissement complet.',
       discountRate: 'Taux d\'actualisation (IBR) — ex. 0.045 pour 4,5%',
       initialDirectCosts: 'Coûts directs initiaux', buildSchedule: 'Construire le planning',
