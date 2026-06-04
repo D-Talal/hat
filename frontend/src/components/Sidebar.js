@@ -38,6 +38,7 @@ export default function Sidebar() {
       { path: '/revenue-map', label: t.nav.revenueMap, icon: '◉' },
     ]},
     { section: t.nav.commercial, items: [
+      { path: '/commercial/dashboard',       label: language === 'fr' ? 'Vue d\'ensemble'   : 'Overview',          icon: '◈' },
       { path: '/commercial/patrimoine',      label: language === 'fr' ? 'Patrimoine'       : 'Patrimoine',        icon: '▦' },
       { path: '/commercial/partners',        label: language === 'fr' ? 'Partenaires'       : 'Business Partners', icon: '◉' },
       { path: '/commercial/contracts',       label: language === 'fr' ? 'Contrats'          : 'Contracts',         icon: '◇' },
