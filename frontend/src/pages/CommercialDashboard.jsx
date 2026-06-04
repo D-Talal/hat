@@ -165,7 +165,7 @@ const STATUS_LABELS = { released: 'Actifs', draft: 'Brouillons', terminated: 'R�
 
 // ── Main Page ─────────────────────────────────────────────────────────────────
 
-export default function CommercialDashboard() {
+export default function CommercialDashboard({ embedded = false }) {
   const navigate = useNavigate();
   const { language } = useLanguage();
 
@@ -243,62 +243,61 @@ export default function CommercialDashboard() {
   // ── Render ────────────────────────────────────────────────────────────────
 
   if (loading) {
-    return (
-      <div className="dashboard-root animate-fade">
-        <div className="dashboard-skeleton">
-          {[1, 2].map(i => (
-            <div key={i} className="skeleton-section">
-              <div className="skeleton-title" />
-              <div className="skeleton-cards">
-                {[1, 2, 3, 4].map(j => <div key={j} className="skeleton-card" />)}
-              </div>
-              <div className="skeleton-chart" />
+    const skel = (
+      <div className="dashboard-skeleton">
+        {[1, 2].map(i => (
+          <div key={i} className="skeleton-section">
+            <div className="skeleton-title" />
+            <div className="skeleton-cards">
+              {[1, 2, 3, 4].map(j => <div key={j} className="skeleton-card" />)}
             </div>
-          ))}
-        </div>
+            <div className="skeleton-chart" />
+          </div>
+        ))}
       </div>
     );
+    return embedded ? skel : <div className="dashboard-root animate-fade">{skel}</div>;
   }
 
   if (error) {
-    return (
-      <div className="dashboard-root">
-        <div className="dashboard-error">
-          <span>{error}</span>
-          <button onClick={load}>Réessayer</button>
-        </div>
+    const err = (
+      <div className="dashboard-error">
+        <span>{error}</span>
+        <button onClick={load}>Réessayer</button>
       </div>
     );
+    return embedded ? err : <div className="dashboard-root">{err}</div>;
   }
 
-  return (
-    <div className="dashboard-root animate-fade">
-
-      {/* ── Header ── */}
-      <div className="dashboard-header" style={{ marginBottom: 8 }}>
-        <div>
-          <h1 className="dashboard-title">Tableau de bord Commercial</h1>
-          {lastUpdated && (
-            <span className="dashboard-updated">
-              Mis à jour à {lastUpdated.toLocaleTimeString(language === 'fr' ? 'fr-CA' : 'en-CA', { hour: '2-digit', minute: '2-digit' })}
-            </span>
-          )}
+  const body = (
+    <>
+      {/* ── Header (standalone only) ── */}
+      {!embedded && (
+        <div className="dashboard-header" style={{ marginBottom: 8 }}>
+          <div>
+            <h1 className="dashboard-title">Tableau de bord Commercial</h1>
+            {lastUpdated && (
+              <span className="dashboard-updated">
+                Mis à jour à {lastUpdated.toLocaleTimeString(language === 'fr' ? 'fr-CA' : 'en-CA', { hour: '2-digit', minute: '2-digit' })}
+              </span>
+            )}
+          </div>
+          <div className="dashboard-controls">
+            <button onClick={load} className="refresh-btn" title="Rafraîchir">
+              <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+                <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
+                <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
+              </svg>
+            </button>
+            <button
+              onClick={() => navigate('/commercial/contracts')}
+              style={{ fontFamily: 'DM Sans', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 10, border: 'none', background: 'var(--db-blue)', color: '#fff', cursor: 'pointer' }}
+            >
+              + Nouveau contrat
+            </button>
+          </div>
         </div>
-        <div className="dashboard-controls">
-          <button onClick={load} className="refresh-btn" title="Rafraîchir">
-            <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
-              <polyline points="23 4 23 10 17 10" /><polyline points="1 20 1 14 7 14" />
-              <path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15" />
-            </svg>
-          </button>
-          <button
-            onClick={() => navigate('/commercial/contracts')}
-            style={{ fontFamily: 'DM Sans', fontSize: 13, fontWeight: 600, padding: '8px 18px', borderRadius: 10, border: 'none', background: 'var(--db-blue)', color: '#fff', cursor: 'pointer' }}
-          >
-            + Nouveau contrat
-          </button>
-        </div>
-      </div>
+      )}
 
       {/* ── Alert banner ── */}
       <AlertBanner alerts={alerts} />
@@ -552,6 +551,8 @@ export default function CommercialDashboard() {
         </div>
 
       </div>
-    </div>
+    </>
   );
+
+  return embedded ? body : <div className="dashboard-root animate-fade">{body}</div>;
 }

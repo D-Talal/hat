@@ -79,7 +79,7 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
-export default function HotelDashboard() {
+export default function HotelDashboard({ embedded = false }) {
   const { t } = useLanguage();
   const th = t.hotel;
   const [data, setData]         = useState(null);
@@ -128,19 +128,38 @@ export default function HotelDashboard() {
   });
 
   return (
-    <div style={{ padding: '28px 24px', maxWidth: 1200 }}>
+    <div style={embedded ? {} : { padding: '28px 24px', maxWidth: 1200 }}>
 
-      {/* Header */}
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, fontFamily: 'DM Serif Display, serif' }}>
-            🏨 Hotel Dashboard
-          </h1>
-          <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ea4be' }}>
-            Live performance metrics · {new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-          </p>
+      {/* Header (standalone only) */}
+      {!embedded && (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
+          <div>
+            <h1 style={{ margin: 0, fontSize: 22, fontWeight: 700, fontFamily: 'DM Serif Display, serif' }}>
+              🏨 Hotel Dashboard
+            </h1>
+            <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ea4be' }}>
+              Live performance metrics · {new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+            </p>
+          </div>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <select
+              value={selectedHotel}
+              onChange={e => setSelectedHotel(e.target.value)}
+              style={{ padding: '8px 14px', borderRadius: 8, border: '1.5px solid var(--color-border-tertiary, #e4e6ef)', fontFamily: 'DM Sans', fontSize: 13, background: 'white' }}
+            >
+              <option value="">All Hotels</option>
+              {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
+            </select>
+            <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1.5px solid var(--color-border-tertiary, #e4e6ef)', background: 'white', cursor: 'pointer', fontSize: 13, fontFamily: 'DM Sans' }}>
+              ↻ Refresh
+            </button>
+          </div>
         </div>
-        <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+      )}
+
+      {/* Hotel selector when embedded (kept accessible without the full header) */}
+      {embedded && hotels.length > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
           <select
             value={selectedHotel}
             onChange={e => setSelectedHotel(e.target.value)}
@@ -149,11 +168,8 @@ export default function HotelDashboard() {
             <option value="">All Hotels</option>
             {hotels.map(h => <option key={h.id} value={h.id}>{h.name}</option>)}
           </select>
-          <button onClick={load} style={{ padding: '8px 14px', borderRadius: 8, border: '1.5px solid var(--color-border-tertiary, #e4e6ef)', background: 'white', cursor: 'pointer', fontSize: 13, fontFamily: 'DM Sans' }}>
-            ↻ Refresh
-          </button>
         </div>
-      </div>
+      )}
 
       {/* Top KPI row */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 20 }}>

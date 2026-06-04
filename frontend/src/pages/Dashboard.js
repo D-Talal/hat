@@ -2,70 +2,112 @@ import { useState, useEffect, useCallback } from "react";
 import API from "../api";
 import "../components/Dashboard.css";
 import { useLanguage } from "../context/LanguageContext";
+import CommercialDashboard from "./CommercialDashboard";
+import HotelDashboard from "./HotelDashboard";
 import FinanceSection from "../components/dashboard/FinanceSection";
-import OccupancySection from "../components/dashboard/OccupancySection";
-import CashFlowSection from "../components/dashboard/CashFlowSection";
 import AssetsSection from "../components/dashboard/AssetsSection";
+
+const LS_KEY = "propmanager_dashboard_module";
+
+// ── Consolidated "Global" view — only what makes sense combined ──────────────
+function GlobalView() {
+  const { t } = useLanguage();
+  const d = t.dashboard;
+  const [data, setData] = useState(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+
+  const load = useCallback(async () => {
+    setLoading(true); setError(null);
+    try {
+      const params = { module: "all" };
+      const [finance, assets] = await Promise.all([
+        API.get("/dashboard/finance", { params }),
+        API.get("/dashboard/assets", { params }),
+      ]);
+      setData({ finance: finance.data, assets: assets.data });
+    } catch (e) {
+      setError(d.error || "Erreur de chargement");
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => { load(); }, [load]);
+
+  if (loading) {
+    return (
+      <div className="dashboard-skeleton">
+        {[1, 2].map(i => (
+          <div key={i} className="skeleton-section">
+            <div className="skeleton-title" />
+            <div className="skeleton-cards">
+              {[1, 2, 3, 4].map(j => <div key={j} className="skeleton-card" />)}
+            </div>
+            <div className="skeleton-chart" />
+          </div>
+        ))}
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="dashboard-error">
+        <span>⚠️ {error}</span>
+        <button onClick={load}>{d.retry || "Réessayer"}</button>
+      </div>
+    );
+  }
+
+  if (!data) return null;
+
+  return (
+    <div className="dashboard-sections">
+      <FinanceSection data={data.finance} module="all" />
+      <AssetsSection data={data.assets} module="all" />
+    </div>
+  );
+}
 
 export default function Dashboard() {
   const { t, language } = useLanguage();
   const d = t.dashboard;
+  const fr = language === "fr";
 
   const MODULES = [
-    { value: "all",        label: d.globalView },
-    { value: "commercial", label: d.commercial },
-    { value: "hotel",      label: d.hotels },
+    { value: "commercial", label: fr ? "Commercial" : "Commercial" },
+    { value: "hotel",      label: fr ? "Hôtellerie" : "Hospitality" },
+    { value: "all",        label: fr ? "Global"     : "Global" },
   ];
 
-  const [module, setModule] = useState("all");
-  const [data, setData] = useState(null);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
-  const [lastUpdated, setLastUpdated] = useState(null);
+  // Default to last-used module, fallback to commercial (the core module)
+  const [module, setModule] = useState(() => {
+    try { return localStorage.getItem(LS_KEY) || "commercial"; }
+    catch { return "commercial"; }
+  });
 
-  const fetchDashboard = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const params = { module };
-      const [finance, occupancy, cashflow, assets] = await Promise.all([
-        API.get("/dashboard/finance", { params }),
-        API.get("/dashboard/occupancy", { params }),
-        API.get("/dashboard/cashflow", { params }),
-        API.get("/dashboard/assets", { params }),
-      ]);
-      setData({
-        finance: finance.data,
-        occupancy: occupancy.data,
-        cashflow: cashflow.data,
-        assets: assets.data,
-      });
-      setLastUpdated(new Date());
-    } catch (err) {
-      setError(d.error);
-      console.error(err);
-    } finally {
-      setLoading(false);
-    }
-  }, [module]);
+  const selectModule = (m) => {
+    setModule(m);
+    try { localStorage.setItem(LS_KEY, m); } catch { /* ignore */ }
+  };
 
-  useEffect(() => { fetchDashboard(); }, [fetchDashboard]);
-
-  const activeModuleLabel = MODULES.find((m) => m.value === module)?.label;
-
-  const timeStr = lastUpdated?.toLocaleTimeString(
-    language === 'fr' ? 'fr-CA' : 'en-CA',
-    { hour: "2-digit", minute: "2-digit" }
-  );
+  const titleByModule = {
+    commercial: fr ? "Tableau de bord — Commercial" : "Dashboard — Commercial",
+    hotel:      fr ? "Tableau de bord — Hôtellerie" : "Dashboard — Hospitality",
+    all:        fr ? "Tableau de bord — Global"     : "Dashboard — Global",
+  };
 
   return (
-    <div className="dashboard-root">
-      <div className="dashboard-header">
+    <div className="dashboard-root animate-fade">
+
+      {/* ── Unified header with module toggle ── */}
+      <div className="dashboard-header" style={{ marginBottom: 20 }}>
         <div className="dashboard-title-block">
-          <h1 className="dashboard-title">{d.title}</h1>
-          {lastUpdated && (
-            <span className="dashboard-updated">{d.updatedAt} {timeStr}</span>
-          )}
+          <h1 className="dashboard-title">{titleByModule[module]}</h1>
+          <span className="dashboard-updated">
+            {new Date().toLocaleDateString(fr ? "fr-CA" : "en-CA", { weekday: "long", year: "numeric", month: "long", day: "numeric" })}
+          </span>
         </div>
 
         <div className="dashboard-controls">
@@ -74,55 +116,20 @@ export default function Dashboard() {
               <button
                 key={m.value}
                 className={`module-btn ${module === m.value ? "active" : ""}`}
-                onClick={() => setModule(m.value)}
+                onClick={() => selectModule(m.value)}
               >
                 {m.label}
               </button>
             ))}
           </div>
-
-          <button className="refresh-btn" onClick={fetchDashboard} disabled={loading} title={d.refresh}>
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
-              className={loading ? "spinning" : ""}>
-              <path d="M21 2v6h-6" />
-              <path d="M3 12a9 9 0 0 1 15-6.7L21 8" />
-              <path d="M3 22v-6h6" />
-              <path d="M21 12a9 9 0 0 1-15 6.7L3 16" />
-            </svg>
-          </button>
         </div>
       </div>
 
-      <div className="module-badge-row">
-        <span className="module-badge">{activeModuleLabel}</span>
-      </div>
+      {/* ── Routed content ── */}
+      {module === "commercial" && <CommercialDashboard embedded />}
+      {module === "hotel"      && <HotelDashboard embedded />}
+      {module === "all"        && <GlobalView />}
 
-      {error ? (
-        <div className="dashboard-error">
-          <span>⚠️ {error}</span>
-          <button onClick={fetchDashboard}>{d.retry}</button>
-        </div>
-      ) : loading ? (
-        <div className="dashboard-skeleton">
-          {[...Array(4)].map((_, i) => (
-            <div key={i} className="skeleton-section">
-              <div className="skeleton-title" />
-              <div className="skeleton-cards">
-                {[...Array(4)].map((_, j) => <div key={j} className="skeleton-card" />)}
-              </div>
-              <div className="skeleton-chart" />
-            </div>
-          ))}
-        </div>
-      ) : data ? (
-        <div className="dashboard-sections">
-          <FinanceSection data={data.finance} module={module} />
-          <OccupancySection data={data.occupancy} module={module} />
-          <CashFlowSection data={data.cashflow} />
-          <AssetsSection data={data.assets} module={module} />
-        </div>
-      ) : null}
     </div>
   );
 }
