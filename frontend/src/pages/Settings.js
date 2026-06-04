@@ -1,10 +1,51 @@
-import React, { useState } from 'react';
-import { authAPI } from '../api';
-import { Card, Btn, Input, PageHeader, Badge } from '../components/UI';
+import React, { useState, useEffect } from 'react';
+import { authAPI, orgSettingsAPI } from '../api';
+import { Card, Btn, Input, Select, PageHeader, Badge } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
+
+const CURRENCIES = [
+  ['USD', 'US Dollar ($)'], ['EUR', 'Euro (€)'], ['GBP', 'British Pound (£)'],
+  ['CAD', 'Canadian Dollar (C$)'], ['AUD', 'Australian Dollar (A$)'], ['CHF', 'Swiss Franc'],
+  ['JPY', 'Japanese Yen (¥)'], ['CNY', 'Chinese Yuan (¥)'], ['INR', 'Indian Rupee (₹)'],
+  ['BRL', 'Brazilian Real (R$)'], ['MXN', 'Mexican Peso'], ['ZAR', 'South African Rand'],
+  ['AED', 'UAE Dirham'], ['SAR', 'Saudi Riyal'], ['SGD', 'Singapore Dollar'],
+  ['HKD', 'Hong Kong Dollar'], ['SEK', 'Swedish Krona'], ['NOK', 'Norwegian Krone'],
+  ['DKK', 'Danish Krone'], ['PLN', 'Polish Zloty'],
+];
+
+const LOCALES = [
+  ['en-US', 'English (United States)'], ['en-GB', 'English (United Kingdom)'],
+  ['en-CA', 'English (Canada)'], ['fr-FR', 'Français (France)'],
+  ['fr-CA', 'Français (Canada)'], ['de-DE', 'Deutsch (Deutschland)'],
+  ['es-ES', 'Español (España)'], ['es-MX', 'Español (México)'],
+  ['it-IT', 'Italiano (Italia)'], ['pt-BR', 'Português (Brasil)'],
+  ['nl-NL', 'Nederlands'], ['ar-AE', 'العربية (الإمارات)'],
+  ['zh-CN', '中文 (简体)'], ['ja-JP', '日本語'],
+];
+
+const TIMEZONES = [
+  'UTC', 'America/New_York', 'America/Chicago', 'America/Denver', 'America/Los_Angeles',
+  'America/Toronto', 'America/Sao_Paulo', 'America/Mexico_City',
+  'Europe/London', 'Europe/Paris', 'Europe/Berlin', 'Europe/Madrid', 'Europe/Zurich',
+  'Africa/Johannesburg', 'Asia/Dubai', 'Asia/Riyadh', 'Asia/Kolkata',
+  'Asia/Singapore', 'Asia/Hong_Kong', 'Asia/Shanghai', 'Asia/Tokyo', 'Australia/Sydney',
+];
+
+// Live preview helpers — show the admin what their choices produce
+function previewMoney(s) {
+  try {
+    return new Intl.NumberFormat(s.locale, { style: 'currency', currency: s.default_currency }).format(1234567.89);
+  } catch { return `${s.default_currency} 1,234,567.89`; }
+}
+function previewDate(s) {
+  try {
+    return new Intl.DateTimeFormat(s.locale, { timeZone: s.timezone, dateStyle: 'long' }).format(new Date());
+  } catch { return new Date().toDateString(); }
+}
 
 export default function Settings() {
   const { user } = useAuth();
+  const isAdmin = user?.role === 'admin';
   const [qrCode, setQrCode] = useState(null);
   const [secret, setSecret] = useState('');
   const [confirmCode, setConfirmCode] = useState('');
@@ -12,6 +53,17 @@ export default function Settings() {
   const [pwForm, setPwForm] = useState({ current_password: '', new_password: '', confirm: '' });
   const [msg, setMsg] = useState('');
   const [err, setErr] = useState('');
+
+  // Org i18n settings
+  const [orgSettings, setOrgSettings] = useState(null);
+  const [orgSaving, setOrgSaving] = useState(false);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    orgSettingsAPI.get()
+      .then(r => setOrgSettings(r.data))
+      .catch(() => {});
+  }, [isAdmin]);
 
   const flash = (m, isErr = false) => { if (isErr) setErr(m); else setMsg(m); setTimeout(() => { setMsg(''); setErr(''); }, 3000); };
 
@@ -38,6 +90,21 @@ export default function Settings() {
       setPwForm({ current_password: '', new_password: '', confirm: '' });
     } catch (e) { flash(e.response?.data?.detail || 'Error', true); }
   };
+
+  const saveOrgSettings = async () => {
+    setOrgSaving(true);
+    try {
+      const r = await orgSettingsAPI.update(orgSettings);
+      setOrgSettings(r.data);
+      flash('Organization settings saved ✓ — applying…');
+      setTimeout(() => window.location.reload(), 1200);
+    } catch (e) {
+      flash(e.response?.data?.detail || 'Error saving settings', true);
+      setOrgSaving(false);
+    }
+  };
+
+  const setOrg = (k, v) => setOrgSettings(s => ({ ...s, [k]: v }));
 
   return (
     <div className="animate-fade">
@@ -70,6 +137,50 @@ export default function Settings() {
           </div>
         </div>
       </Card>
+
+      {/* Organization settings — admin only */}
+      {isAdmin && (
+        <Card style={{ marginBottom: 24 }}>
+          <h3 style={{ fontSize: 20, marginBottom: 8 }}>Organization & Regional Settings</h3>
+          <p style={{ color: 'var(--slate)', fontSize: 14, marginBottom: 20 }}>
+            These defaults control how currency, dates, and areas are displayed across the app for everyone in your organization.
+          </p>
+
+          {!orgSettings ? (
+            <p style={{ color: 'var(--slate)', fontSize: 14 }}>Loading…</p>
+          ) : (
+            <>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 640 }}>
+                <Select label="Default Currency" value={orgSettings.default_currency} onChange={e => setOrg('default_currency', e.target.value)}>
+                  {CURRENCIES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                </Select>
+
+                <Select label="Language & Region (locale)" value={orgSettings.locale} onChange={e => setOrg('locale', e.target.value)}>
+                  {LOCALES.map(([code, name]) => <option key={code} value={code}>{name}</option>)}
+                </Select>
+
+                <Select label="Time Zone" value={orgSettings.timezone} onChange={e => setOrg('timezone', e.target.value)}>
+                  {TIMEZONES.map(tz => <option key={tz} value={tz}>{tz}</option>)}
+                </Select>
+
+                <Select label="Area Unit" value={orgSettings.area_unit} onChange={e => setOrg('area_unit', e.target.value)}>
+                  <option value="sqm">Square meters (m²)</option>
+                  <option value="sqft">Square feet (ft²)</option>
+                </Select>
+              </div>
+
+              <div style={{ marginTop: 20, display: 'flex', alignItems: 'center', gap: 14 }}>
+                <Btn onClick={saveOrgSettings} disabled={orgSaving}>
+                  {orgSaving ? 'Saving…' : 'Save Settings'}
+                </Btn>
+                <span style={{ fontSize: 13, color: 'var(--slate)' }}>
+                  Preview: <strong>{previewMoney(orgSettings)}</strong> · {previewDate(orgSettings)}
+                </span>
+              </div>
+            </>
+          )}
+        </Card>
+      )}
 
       {/* 2FA */}
       <Card style={{ marginBottom: 24 }}>
