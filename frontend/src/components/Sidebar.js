@@ -173,6 +173,7 @@ export default function Sidebar() {
               <NavItem to="/commercial/sales-declarations"  icon="📊" label={fr ? 'Décl. CA'       : 'Sales Decl.'} />
               <NavItem to="/commercial/service-charges"     icon="⚖"  label={fr ? 'Charges'        : 'Svc Charges'} />
               <NavItem to="/commercial/posting-engine"      icon="⚡" label={fr ? 'Posting Engine' : 'Posting'} />
+              <NavItem to="/commercial/ifrs16"              icon="📋" label={fr ? 'IFRS 16'        : 'IFRS 16'} />
               <NavItem to="/commercial/csv-import"          icon="📂" label={fr ? 'Import CSV'     : 'CSV Import'} />
             </SubGroup>
           )}
