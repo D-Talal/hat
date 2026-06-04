@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import API from '../api';
 import { useToast } from '../context/ToastContext';
-import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
+import { PageHeader, Modal } from '../components/UI';
 import { DAY_COUNT_METHODS, CONTRACT_TYPES, PAYMENT_TIMINGS } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
@@ -718,6 +718,39 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
   );
 }
 
+// ── Compact contract card for the left list panel ────────────────────────────
+function ContractListItem({ contract, active, onClick }) {
+  const s = STATUS_COLORS[contract.status] || STATUS_COLORS.draft;
+  const days = daysUntil(contract.absolute_end_date);
+  const expiring = days !== null && days <= 90 && days > 0 && contract.status === 'released';
+  return (
+    <div
+      onClick={onClick}
+      style={{
+        padding: '12px 14px', borderRadius: 10, cursor: 'pointer', marginBottom: 6,
+        border: `1.5px solid ${active ? 'var(--ink)' : 'var(--border)'}`,
+        background: active ? 'var(--cream)' : 'white',
+        transition: 'all .12s',
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.borderColor = 'var(--gold)'; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.borderColor = 'var(--border)'; }}
+    >
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+        <span style={{ fontFamily: 'monospace', fontWeight: 700, fontSize: 13 }}>{contract.contract_number || `#${contract.id}`}</span>
+        <span style={{ background: s.bg, color: s.text, borderRadius: 5, padding: '1px 7px', fontSize: 10, fontWeight: 700 }}>{s.label}</span>
+      </div>
+      <div style={{ fontWeight: 600, fontSize: 14, marginBottom: 2 }}>{contract.business_partner?.company_name || '—'}</div>
+      <div style={{ fontSize: 12, color: 'var(--slate)' }}>{contract.business_entity?.name || '—'}</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 6 }}>
+        <span style={{ background: '#e3f2fd', color: '#1565c0', borderRadius: 4, padding: '1px 6px', fontSize: 10, fontWeight: 700 }}>{contract.contract_type === 'lease_out' ? 'LO' : 'LI'}</span>
+        {expiring && (
+          <span style={{ color: '#f57f17', fontSize: 11, fontWeight: 700 }}>⚠ {days}j</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function Contracts() {
   const toast = useToast();
   const { t } = useLanguage();
@@ -736,156 +769,200 @@ export default function Contracts() {
       toast.error('Échec du téléchargement du PDF');
     }
   };
+
   const [contracts, setContracts] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [modal, setModal] = useState(null);
-  const [selected, setSelected] = useState(null);
-  const [filter, setFilter] = useState('all');
-  const [confirm, setConfirm] = useState(null);
+  const [loading, setLoading]   = useState(true);
+  const [modal, setModal]       = useState(null);   // 'new' | 'edit' | null
+  const [selected, setSelected] = useState(null);   // contract shown in right panel
+  const [editTarget, setEditTarget] = useState(null);
+  const [filter, setFilter]     = useState('all');
+  const [search, setSearch]     = useState('');
+  const [confirm, setConfirm]   = useState(null);
+  const [releaseError, setReleaseError] = useState('');
 
   const load = useCallback(async () => {
     setLoading(true);
-    try { const r = await API.get('/commercial/contracts'); setContracts(r.data); }
-    catch { setContracts([]); } finally { setLoading(false); }
+    try {
+      const r = await API.get('/commercial/contracts');
+      setContracts(r.data);
+      // keep right-panel selection fresh after a reload
+      setSelected(prev => prev ? (r.data || []).find(c => c.id === prev.id) || null : null);
+    } catch {
+      setContracts([]);
+    } finally {
+      setLoading(false);
+    }
   }, []);
 
   useEffect(() => { load(); }, [load]);
-
-  const [releaseError, setReleaseError] = useState('');
 
   const release = async (id) => {
     setReleaseError('');
     try {
       await API.patch(`/commercial/contracts/${id}`, { status: 'released' });
-      await load();
-      // Refresh selected contract
       const r = await API.get('/commercial/contracts');
+      setContracts(r.data);
       const updated = (r.data || []).find(c => c.id === id);
       if (updated) setSelected(updated);
-      setModal('view');
     } catch (e) {
-      const msg = e.response?.data?.detail || 'Erreur lors de la mise en Released.';
-      setReleaseError(msg);
+      setReleaseError(e.response?.data?.detail || 'Erreur lors de la mise en Released.');
     }
   };
 
   const handleDelete = async (id) => {
-    try { await API.delete(`/commercial/contracts/${id}`); toast.success('Contrat supprimé'); load(); setConfirm(null); setModal(null); }
-    catch { toast.error(t.common.deleteFailed); }
+    try {
+      await API.delete(`/commercial/contracts/${id}`);
+      toast.success('Contrat supprimé');
+      setConfirm(null);
+      if (selected?.id === id) setSelected(null);
+      load();
+    } catch {
+      toast.error(t.common.deleteFailed);
+    }
   };
 
-  const filtered = filter === 'all' ? contracts : contracts.filter(c => c.status === filter);
+  // Filter + search
+  const filtered = contracts.filter(c => {
+    if (filter !== 'all' && c.status !== filter) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const hay = `${c.contract_number || ''} ${c.business_partner?.company_name || ''} ${c.business_entity?.name || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
 
-  // Contracts expiring in next 90 days
   const expiringCount = contracts.filter(c => {
     const d = daysUntil(c.absolute_end_date);
     return d !== null && d <= 90 && d > 0 && c.status === 'released';
   }).length;
+
+  const filterCounts = {
+    all: contracts.length,
+    draft: contracts.filter(c => c.status === 'draft').length,
+    released: contracts.filter(c => c.status === 'released').length,
+    terminated: contracts.filter(c => c.status === 'terminated').length,
+    expired: contracts.filter(c => c.status === 'expired').length,
+  };
 
   return (
     <div className="animate-fade">
       <PageHeader title={tc.contractsTitle} sub={tc.contractsSub} />
 
       {expiringCount > 0 && (
-        <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 13, color: '#e65100' }}>
-          ⚠ <strong>{expiringCount} contract{expiringCount > 1 ? 's' : ''}</strong> expiring within 90 days
+        <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#e65100' }}>
+          ⚠ <strong>{expiringCount} contrat{expiringCount > 1 ? 's' : ''}</strong> expire{expiringCount > 1 ? 'nt' : ''} dans les 90 prochains jours
         </div>
       )}
 
-      <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap', alignItems: 'center' }}>
-        {['all', 'draft', 'released', 'terminated', 'expired'].map(f => (
-          <button key={f} onClick={() => setFilter(f)}
-            style={{ padding: '7px 16px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 12, fontWeight: 600, cursor: 'pointer', background: filter === f ? 'var(--ink)' : 'white', color: filter === f ? 'var(--gold)' : 'var(--slate)', textTransform: 'capitalize' }}>
-            {f}
+      {/* ── Split panel layout ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '340px 1fr', gap: 16, alignItems: 'start' }}>
+
+        {/* ─── LEFT: list panel ─── */}
+        <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, padding: 14, position: 'sticky', top: 16, maxHeight: 'calc(100vh - 40px)', display: 'flex', flexDirection: 'column' }}>
+
+          {/* New button */}
+          <button onClick={() => { setEditTarget(null); setModal('new'); }} style={{ ...btnPrimary, width: '100%', marginBottom: 12 }}>
+            + {tc.newContract}
           </button>
-        ))}
-        <button onClick={() => { setSelected(null); setModal('new'); }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ {tc.newContract}</button>
+
+          {/* Search */}
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="🔍 Rechercher (n°, locataire, bien)…"
+            style={{ ...inputStyle, marginBottom: 10, fontSize: 13 }}
+          />
+
+          {/* Status filter pills */}
+          <div style={{ display: 'flex', gap: 4, marginBottom: 12, flexWrap: 'wrap' }}>
+            {['all', 'draft', 'released', 'terminated', 'expired'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                style={{ padding: '4px 10px', borderRadius: 6, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 11, fontWeight: 600, cursor: 'pointer', background: filter === f ? 'var(--ink)' : 'white', color: filter === f ? 'var(--gold)' : 'var(--slate)', textTransform: 'capitalize' }}>
+                {f === 'all' ? 'Tous' : f} ({filterCounts[f]})
+              </button>
+            ))}
+          </div>
+
+          {/* List */}
+          <div style={{ overflowY: 'auto', flex: 1, minHeight: 200 }}>
+            {loading ? (
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 13 }}>{t.common.loading}</div>
+            ) : filtered.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 32, color: 'var(--slate)', fontSize: 13 }}>
+                {contracts.length === 0 ? 'Aucun contrat. Créez-en un.' : 'Aucun résultat.'}
+              </div>
+            ) : (
+              filtered.map(c => (
+                <ContractListItem
+                  key={c.id}
+                  contract={c}
+                  active={selected?.id === c.id}
+                  onClick={() => { setSelected(c); setReleaseError(''); }}
+                />
+              ))
+            )}
+          </div>
+        </div>
+
+        {/* ─── RIGHT: detail panel ─── */}
+        <div style={{ background: 'white', border: '1px solid var(--border)', borderRadius: 14, padding: 24, minHeight: 400 }}>
+          {!selected ? (
+            <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: 400, color: 'var(--slate)', textAlign: 'center' }}>
+              <div style={{ fontSize: 42, marginBottom: 12, opacity: 0.4 }}>📄</div>
+              <div style={{ fontFamily: 'DM Serif Display', fontSize: 18, marginBottom: 6 }}>Sélectionnez un contrat</div>
+              <div style={{ fontSize: 13, maxWidth: 280 }}>Choisissez un contrat dans la liste pour voir ses détails, conditions et factures.</div>
+            </div>
+          ) : (
+            <>
+              {/* Detail header */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
+                <div>
+                  <div style={{ fontFamily: 'DM Serif Display', fontSize: 22 }}>{selected.contract_number || `#${selected.id}`}</div>
+                  <div style={{ fontSize: 13, color: 'var(--slate)', marginTop: 2 }}>{selected.business_partner?.company_name || '—'}</div>
+                </div>
+                <div style={{ display: 'flex', gap: 6 }}>
+                  <button onClick={() => downloadStatement(selected.id, selected.contract_number)} title="Télécharger le relevé PDF"
+                    style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 15 }}>📄</button>
+                  <button onClick={() => { setSelected(null); }} title="Fermer le détail"
+                    style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 8, padding: '6px 12px', cursor: 'pointer', fontSize: 13, fontFamily: 'DM Sans' }}>✕</button>
+                </div>
+              </div>
+
+              {releaseError && (
+                <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>
+                  ⚠️ {releaseError}
+                </div>
+              )}
+
+              <ContractDetail
+                key={selected.id}
+                contract={selected}
+                onClose={() => setSelected(null)}
+                onRelease={release}
+                onEdit={() => { setEditTarget(selected); setModal('edit'); }}
+                onDelete={() => setConfirm(selected)}
+                onRefresh={load}
+                t={t}
+              />
+            </>
+          )}
+        </div>
       </div>
 
-      {loading ? (
-        <div style={{ textAlign: 'center', padding: 64, color: 'var(--slate)', fontFamily: 'DM Serif Display', fontSize: 20 }}>{t.common.loading}</div>
-      ) : (
-        <div style={{ overflowX: 'auto' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
-            <thead>
-              <tr>
-                {['Contract #', 'Tenant', 'Business Entity', 'Type', 'Start', 'End (Abs.)', 'Status', ''].map(h => (
-                  <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', borderBottom: '2px solid var(--border)', whiteSpace: 'nowrap' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.map(c => {
-                const s = STATUS_COLORS[c.status] || STATUS_COLORS.draft;
-                const days = daysUntil(c.absolute_end_date);
-                const expiring = days !== null && days <= 90 && days > 0;
-                return (
-                  <tr key={c.id} style={{ background: expiring ? '#fffbf0' : 'transparent' }}
-                    onMouseEnter={e => e.currentTarget.style.background = expiring ? '#fff3cd' : 'var(--cream)'}
-                    onMouseLeave={e => e.currentTarget.style.background = expiring ? '#fffbf0' : 'transparent'}>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontFamily: 'monospace', fontWeight: 700 }}>{c.contract_number || `#${c.id}`}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>{c.business_partner?.company_name || '—'}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--slate)' }}>{c.business_entity?.name || '—'}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}><span style={{ background: '#e3f2fd', color: '#1565c0', borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{c.contract_type === 'lease_out' ? 'LO' : 'LI'}</span></td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--slate)' }}>{c.start_date || '—'}</td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-                      <span style={{ color: expiring ? '#f57f17' : 'var(--slate)', fontWeight: expiring ? 700 : 400 }}>
-                        {c.absolute_end_date || '—'} {expiring ? `(${days}d)` : ''}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}><span style={{ background: s.bg, color: s.text, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{s.label}</span></td>
-                    <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>
-                      <div style={{ display: 'flex', gap: 4 }}>
-                        <button onClick={() => { setSelected(c); setModal('view'); }} style={{ background: 'none', border: '1.5px solid var(--border)', borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 12, fontFamily: 'DM Sans' }}>View</button>
-                        <button onClick={() => downloadStatement(c.id, c.contract_number)} title="Download lease statement PDF" style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>📄</button>
-                        <button onClick={() => { setSelected(c); setModal('edit'); }} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>✏️</button>
-                        {c.status === 'draft' && <button onClick={() => setConfirm(c)} style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, color: '#dc2626', padding: '2px 4px' }}>🗑</button>}
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          {filtered.length === 0 && (
-            contracts.length === 0 ? (
-              <EmptyState
-                icon="📄"
-                title={tc.noContracts || 'Aucun contrat'}
-                description="Créez votre premier contrat de location pour commencer à gérer vos baux."
-                actionLabel={`+ ${tc.newContract}`}
-                onAction={() => { setSelected(null); setModal('new'); }}
-              />
-            ) : (
-              <EmptyState icon="🔍" title="Aucun résultat" description="Aucun contrat avec ce statut." subtle />
-            )
-          )}
-        </div>
-      )}
-
+      {/* ── New/Edit form modal (form input — modal is appropriate here) ── */}
       {(modal === 'new' || modal === 'edit') && (
-        <Modal title={modal === 'edit' ? `${t.common.edit} — ${selected?.contract_number || "#"+selected?.id}` : tc.newContract} onClose={() => setModal(null)}>
-          <ContractForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? selected : null} existingItems={contracts} />
+        <Modal title={modal === 'edit' ? `${t.common.edit} — ${editTarget?.contract_number || "#" + editTarget?.id}` : tc.newContract} onClose={() => setModal(null)}>
+          <ContractForm onSave={load} onClose={() => setModal(null)} initial={modal === 'edit' ? editTarget : null} existingItems={contracts} />
         </Modal>
       )}
 
-      {modal === 'view' && selected && (
-        <Modal title={`Contract ${selected.contract_number || `#${selected.id}`}`} onClose={() => { setModal(null); setReleaseError(''); }}>
-          {releaseError && (
-            <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>
-              ⚠️ {releaseError}
-            </div>
-          )}
-          <ContractDetail contract={selected} onClose={() => { setModal(null); setReleaseError(''); }} onRelease={release}
-            onEdit={() => setModal('edit')} onDelete={() => { setModal(null); setConfirm(selected); }} onRefresh={load} t={t} />
-        </Modal>
-      )}
-
+      {/* ── Delete confirm ── */}
       {confirm && (
         <Modal title={t.common.confirm + " " + t.common.delete} onClose={() => setConfirm(null)}>
-          <p style={{ fontSize: 14, marginBottom: 20 }}>Delete contract <strong>{confirm.contract_number}</strong>? {t.common.deleteConfirm}</p>
+          <p style={{ fontSize: 14, marginBottom: 20 }}>Supprimer le contrat <strong>{confirm.contract_number}</strong> ? {t.common.deleteConfirm}</p>
           <div style={{ display: 'flex', gap: 10 }}>
-            <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Delete</button>
+            <button onClick={() => handleDelete(confirm.id)} style={btnDanger}>Supprimer</button>
             <button onClick={() => setConfirm(null)} style={btnSecondary}>{t.common.cancel}</button>
           </div>
         </Modal>
