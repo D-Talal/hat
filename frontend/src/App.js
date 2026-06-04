@@ -15,6 +15,7 @@ import UsersPage from './pages/UsersPage';
 import AuditLog from './pages/AuditLog';
 import Settings from './pages/Settings';
 import Patrimoine from './pages/Patrimoine';
+import CommercialDashboard from './pages/CommercialDashboard';
 import BusinessPartners from './pages/BusinessPartners';
 import Contracts from './pages/Contracts';
 import Conditions from './pages/Conditions';
@@ -87,6 +88,7 @@ function AppRoutes() {
           : <Landing />
       } />
       <Route path="/revenue-map" element={<ProtectedRoute><AppLayout><RevenueMap /></AppLayout></ProtectedRoute>} />
+      <Route path="/commercial/dashboard" element={<ProtectedRoute><AppLayout><CommercialDashboard /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/patrimoine" element={<ProtectedRoute><AppLayout><Patrimoine /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/partners" element={<ProtectedRoute><AppLayout><BusinessPartners /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/contracts" element={<ProtectedRoute><AppLayout><Contracts /></AppLayout></ProtectedRoute>} />
