@@ -22,6 +22,11 @@ export const authAPI = {
   me: () => API.get('/auth/me'),
 };
 
+export const orgSettingsAPI = {
+  get: () => API.get('/org-settings'),
+  update: (d) => API.put('/org-settings', d),
+};
+
 export const usersAPI = {
   list: () => API.get('/users/'),
   create: (d) => API.post('/users/', d),
