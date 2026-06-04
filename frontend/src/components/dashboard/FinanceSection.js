@@ -1,29 +1,27 @@
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import KPICard from "../shared/KPICard";
 import { useLanguage } from "../../context/LanguageContext";
-
-const fmt = (n, lang) =>
-  new Intl.NumberFormat(lang === 'fr' ? 'fr-CA' : 'en-CA', {
-    style: "currency", currency: "CAD", maximumFractionDigits: 0
-  }).format(n || 0);
+import { useFormat } from "../../data/format";
 
 const pct = (current, previous) => {
   if (!previous) return null;
   return ((current - previous) / previous) * 100;
 };
 
-const CustomTooltip = ({ active, payload, label, lang }) => {
+const CustomTooltip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background: "#fff", border: "1.5px solid #e8eaf0", borderRadius: 10, padding: "10px 14px", fontSize: 13, boxShadow: "0 4px 16px rgba(15,17,40,0.08)" }}>
       <p style={{ color: "#9ea4be", marginBottom: 4, fontSize: 12 }}>{label}</p>
-      <p style={{ color: "#0f1117", fontFamily: "DM Mono, monospace", fontWeight: 500 }}>{fmt(payload[0].value, lang)}</p>
+      <p style={{ color: "#0f1117", fontFamily: "DM Mono, monospace", fontWeight: 500 }}>{fmt ? fmt(payload[0].value) : (payload[0].value || 0)}</p>
     </div>
   );
 };
 
 export default function FinanceSection({ data, module }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+  const { money, date: fmtDate } = useFormat();
+  const fmt = (n) => money(n, { maximumFractionDigits: 0 });
   const d = t.dashboard;
   if (!data) return null;
 
@@ -35,7 +33,7 @@ export default function FinanceSection({ data, module }) {
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return {
       ...item,
-      label: date.toLocaleDateString(language === 'fr' ? 'fr-CA' : 'en-CA', { month: "short", year: "2-digit" }),
+      label: fmtDate(date, { month: "short", year: "2-digit" }),
     };
   });
 
@@ -51,14 +49,14 @@ export default function FinanceSection({ data, module }) {
 
       {/* Revenue KPIs */}
       <div className="kpi-grid">
-        <KPICard label={d.revenueThisMonth} value={fmt(data.revenue_this_month, language)} color="blue"
+        <KPICard label={d.revenueThisMonth} value={fmt(data.revenue_this_month)} color="blue"
           trend={trend} trendLabel={d.vsPrevMonth} />
-        <KPICard label={d.totalRevenue} value={fmt(data.total_revenue, language)} sub={d.sinceBeginning} color="green" />
+        <KPICard label={d.totalRevenue} value={fmt(data.total_revenue)} sub={d.sinceBeginning} color="green" />
         {isCommercial && (
-          <KPICard label={d.pendingInvoices} value={fmt(data.outstanding_invoices, language)} color="orange" />
+          <KPICard label={d.pendingInvoices} value={fmt(data.outstanding_invoices)} color="orange" />
         )}
         {isCommercial && (
-          <KPICard label={d.overdueInvoices} value={fmt(data.overdue_invoices, language)} color="red" />
+          <KPICard label={d.overdueInvoices} value={fmt(data.overdue_invoices)} color="red" />
         )}
       </div>
 
@@ -89,7 +87,7 @@ export default function FinanceSection({ data, module }) {
               <XAxis dataKey="label" tick={{ fill: "#9ea4be", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#9ea4be", fontSize: 11 }} axisLine={false} tickLine={false}
                 tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip content={<CustomTooltip lang={language} />} cursor={{ fill: "rgba(67,97,238,0.05)", radius: 6 }} />
+              <Tooltip content={<CustomTooltip fmt={fmt} />} cursor={{ fill: "rgba(67,97,238,0.05)", radius: 6 }} />
               <Bar dataKey="amount" fill="#4361ee" radius={[6, 6, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

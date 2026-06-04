@@ -1,13 +1,9 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Legend } from "recharts";
 import KPICard from "../shared/KPICard";
 import { useLanguage } from "../../context/LanguageContext";
+import { useFormat } from "../../data/format";
 
-const fmt = (n, lang) =>
-  new Intl.NumberFormat(lang === 'fr' ? 'fr-CA' : 'en-CA', {
-    style: "currency", currency: "CAD", maximumFractionDigits: 0
-  }).format(n || 0);
-
-const CustomTooltip = ({ active, payload, label, lang, inLabel, outLabel }) => {
+const CustomTooltip = ({ active, payload, label, fmt, inLabel, outLabel }) => {
   if (!active || !payload?.length) return null;
   return (
     <div style={{ background: "#fff", border: "1.5px solid #e8eaf0", borderRadius: 10, padding: "12px 16px", fontSize: 13, minWidth: 180, boxShadow: "0 4px 16px rgba(15,17,40,0.08)" }}>
@@ -15,7 +11,7 @@ const CustomTooltip = ({ active, payload, label, lang, inLabel, outLabel }) => {
       {payload.map((p) => (
         <div key={p.dataKey} style={{ display: "flex", justifyContent: "space-between", gap: 20, marginBottom: 4 }}>
           <span style={{ color: p.color, fontWeight: 500 }}>{p.dataKey === 'inflow' ? inLabel : outLabel}</span>
-          <span style={{ fontFamily: "DM Mono", color: "#0f1117", fontWeight: 500 }}>{fmt(p.value, lang)}</span>
+          <span style={{ fontFamily: "DM Mono", color: "#0f1117", fontWeight: 500 }}>{fmt ? fmt(p.value) : (p.value || 0)}</span>
         </div>
       ))}
     </div>
@@ -23,7 +19,9 @@ const CustomTooltip = ({ active, payload, label, lang, inLabel, outLabel }) => {
 };
 
 export default function CashFlowSection({ data }) {
-  const { t, language } = useLanguage();
+  const { t } = useLanguage();
+  const { money, date: fmtDate } = useFormat();
+  const fmt = (n) => money(n, { maximumFractionDigits: 0 });
   const d = t.dashboard;
   if (!data) return null;
 
@@ -32,7 +30,7 @@ export default function CashFlowSection({ data }) {
     const date = new Date(parseInt(year), parseInt(month) - 1);
     return {
       ...item,
-      label: date.toLocaleDateString(language === 'fr' ? 'fr-CA' : 'en-CA', { month: "short", year: "2-digit" }),
+      label: fmtDate(date, { month: "short", year: "2-digit" }),
     };
   });
 
@@ -49,9 +47,9 @@ export default function CashFlowSection({ data }) {
       </div>
 
       <div className="kpi-grid">
-        <KPICard label={d.inflowThisMonth} value={fmt(data.inflow_this_month, language)} color="green" />
-        <KPICard label={d.outflowThisMonth} value={fmt(data.outflow_this_month, language)} color="orange" />
-        <KPICard label={d.netCashflow} value={fmt(data.net_cashflow, language)}
+        <KPICard label={d.inflowThisMonth} value={fmt(data.inflow_this_month)} color="green" />
+        <KPICard label={d.outflowThisMonth} value={fmt(data.outflow_this_month)} color="orange" />
+        <KPICard label={d.netCashflow} value={fmt(data.net_cashflow)}
           color={isPositive ? "blue" : "red"} sub={isPositive ? d.surplus : d.deficit} />
       </div>
 
@@ -74,7 +72,7 @@ export default function CashFlowSection({ data }) {
               <XAxis dataKey="label" tick={{ fill: "#9ea4be", fontSize: 11 }} axisLine={false} tickLine={false} />
               <YAxis tick={{ fill: "#9ea4be", fontSize: 11 }} axisLine={false} tickLine={false}
                 tickFormatter={(v) => `${(v / 1000).toFixed(0)}k`} />
-              <Tooltip content={<CustomTooltip lang={language} inLabel={d.inflows} outLabel={d.outflows} />} />
+              <Tooltip content={<CustomTooltip fmt={fmt} inLabel={d.inflows} outLabel={d.outflows} />} />
               <Legend wrapperStyle={{ fontSize: 12, color: "#9ea4be", paddingTop: 16 }}
                 formatter={(value) => value === 'inflow' ? d.inflows : d.outflows} />
               <Area type="monotone" dataKey="inflow"   name="inflow"   stroke="#10b981" strokeWidth={2.5} fill="url(#inflowGrad)"  dot={false} activeDot={{ r: 5, fill: "#10b981" }} />
