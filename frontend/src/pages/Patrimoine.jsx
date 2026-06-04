@@ -645,9 +645,137 @@ function SpaceDetail({ spaceId, onClose }) {
   );
 }
 
+// ── FLAT "ALL SPACES" VIEW — searchable, no tree navigation ──────────────────
+function AllSpacesView({ onOpenDetail }) {
+  const [spaces, setSpaces]     = useState([]);
+  const [loading, setLoading]   = useState(true);
+  const [search, setSearch]     = useState('');
+  const [statusFilter, setStatusFilter] = useState('all');
+  const [buildingFilter, setBuildingFilter] = useState('all');
+
+  useEffect(() => {
+    setLoading(true);
+    API.get('/commercial/spaces-leasable')
+      .then(r => setSpaces(r.data || []))
+      .catch(() => setSpaces([]))
+      .finally(() => setLoading(false));
+  }, []);
+
+  // Unique buildings for the filter dropdown
+  const buildings = Array.from(
+    new Map(
+      spaces.filter(s => s.building_id).map(s => [s.building_id, { id: s.building_id, name: s.building_name }])
+    ).values()
+  );
+
+  const filtered = spaces.filter(s => {
+    if (statusFilter !== 'all' && (s.status || '').toLowerCase() !== statusFilter) return false;
+    if (buildingFilter !== 'all' && String(s.building_id) !== String(buildingFilter)) return false;
+    if (search.trim()) {
+      const q = search.toLowerCase();
+      const hay = `${s.space_code || ''} ${s.usage_type || ''} ${s.description || ''} ${s.building_name || ''} ${s.business_entity_name || ''} ${s.cost_center || ''}`.toLowerCase();
+      if (!hay.includes(q)) return false;
+    }
+    return true;
+  });
+
+  const statusCounts = spaces.reduce((acc, s) => {
+    const st = (s.status || 'available').toLowerCase();
+    acc[st] = (acc[st] || 0) + 1;
+    return acc;
+  }, {});
+
+  const STATUS_COLOR = {
+    available:   { bg: '#dcfce7', text: '#15803d' },
+    occupied:    { bg: '#dbeafe', text: '#1e40af' },
+    vacant:      { bg: '#fee2e2', text: '#b91c1c' },
+    maintenance: { bg: '#fef3c7', text: '#92400e' },
+  };
+
+  return (
+    <div>
+      {/* Search + filters bar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="🔍 Rechercher un espace (code, usage, bâtiment, centre de coût)…"
+          style={{ ...inputStyle, flex: 1, minWidth: 260 }}
+        />
+        <select value={buildingFilter} onChange={e => setBuildingFilter(e.target.value)} style={{ ...inputStyle, width: 'auto', minWidth: 160 }}>
+          <option value="all">Tous les bâtiments</option>
+          {buildings.map(b => <option key={b.id} value={b.id}>{b.name}</option>)}
+        </select>
+      </div>
+
+      {/* Status filter pills */}
+      <div style={{ display: 'flex', gap: 6, marginBottom: 16, flexWrap: 'wrap' }}>
+        {['all', 'available', 'occupied', 'vacant', 'maintenance'].map(st => (
+          <button key={st} onClick={() => setStatusFilter(st)}
+            style={{
+              padding: '5px 12px', borderRadius: 7, border: '1.5px solid var(--border)',
+              fontFamily: 'DM Sans', fontSize: 12, fontWeight: 600, cursor: 'pointer',
+              background: statusFilter === st ? 'var(--ink)' : 'white',
+              color: statusFilter === st ? 'var(--gold)' : 'var(--slate)',
+              textTransform: 'capitalize',
+            }}>
+            {st === 'all' ? `Tous (${spaces.length})` : `${st} (${statusCounts[st] || 0})`}
+          </button>
+        ))}
+      </div>
+
+      {loading ? (
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--slate)', fontSize: 14 }}>Chargement des espaces…</div>
+      ) : filtered.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: 48, color: 'var(--slate)', fontSize: 14 }}>
+          {spaces.length === 0 ? 'Aucun espace dans le patrimoine.' : 'Aucun espace ne correspond à la recherche.'}
+        </div>
+      ) : (
+        <div style={{ border: '1.5px solid var(--border)', borderRadius: 14, overflow: 'hidden', background: 'white' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: '#fafafa' }}>
+                {['Code', 'Usage', 'Superficie', 'Localisation', 'Statut'].map(h => (
+                  <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.07em', color: 'var(--slate)', borderBottom: '1.5px solid var(--border)' }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.map(s => {
+                const sc = STATUS_COLOR[(s.status || '').toLowerCase()] || { bg: '#f3f4f6', text: '#374151' };
+                return (
+                  <tr key={s.id}
+                    onClick={() => onOpenDetail(s.id)}
+                    style={{ cursor: 'pointer', borderBottom: '1px solid var(--border)' }}
+                    onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
+                    onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                    <td style={{ padding: '11px 14px', fontWeight: 700, color: 'var(--ink)' }}>{s.space_code}</td>
+                    <td style={{ padding: '11px 14px', color: 'var(--slate)' }}>{s.usage_type || '—'}</td>
+                    <td style={{ padding: '11px 14px', color: 'var(--slate)' }}>{s.current_area_sqm ? `${s.current_area_sqm.toLocaleString()} m²` : '—'}</td>
+                    <td style={{ padding: '11px 14px', color: 'var(--slate)', fontSize: 12 }}>
+                      {s.building_name || '—'}{s.floor_number != null ? ` · Étage ${s.floor_number}` : ''}
+                      {s.business_entity_name ? <div style={{ fontSize: 11, color: '#9ea4be' }}>{s.business_entity_name}</div> : null}
+                    </td>
+                    <td style={{ padding: '11px 14px' }}>
+                      <span style={{ background: sc.bg, color: sc.text, borderRadius: 6, padding: '2px 10px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase' }}>{s.status}</span>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function Patrimoine() {
   const { t } = useLanguage();
   const tc = t.commercial;
+
+  // ── View mode: 'tree' (hierarchy) | 'flat' (all spaces searchable) ──
+  const [viewMode, setViewMode] = useState('tree');
 
   // ── Top-level state ──
   const [companyCodes, setCompanyCodes] = useState([]);
@@ -798,6 +926,38 @@ export default function Patrimoine() {
   return (
     <div className="animate-fade">
       <PageHeader title={tc.patrimoineTitle || 'Patrimoine'} sub={tc.patrimoineSub || 'Gestion hiérarchique du patrimoine'} />
+
+      {/* ── View mode toggle ── */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 18 }}>
+        <button onClick={() => setViewMode('tree')}
+          style={{
+            padding: '8px 18px', borderRadius: 9, border: '1.5px solid var(--border)',
+            fontFamily: 'DM Sans', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: viewMode === 'tree' ? 'var(--ink)' : 'white',
+            color: viewMode === 'tree' ? 'var(--gold)' : 'var(--slate)',
+          }}>
+          🗂 Hiérarchie
+        </button>
+        <button onClick={() => setViewMode('flat')}
+          style={{
+            padding: '8px 18px', borderRadius: 9, border: '1.5px solid var(--border)',
+            fontFamily: 'DM Sans', fontSize: 13, fontWeight: 600, cursor: 'pointer',
+            background: viewMode === 'flat' ? 'var(--ink)' : 'white',
+            color: viewMode === 'flat' ? 'var(--gold)' : 'var(--slate)',
+          }}>
+          🔍 Tous les espaces
+        </button>
+      </div>
+
+      {/* ── FLAT VIEW ── */}
+      {viewMode === 'flat' && (
+        <AllSpacesView onOpenDetail={(id) => { setDetailSpaceId(id); setModal('space-detail'); }} />
+      )}
+
+      {/* ── TREE VIEW (existing hierarchy) ── */}
+      {viewMode === 'tree' && (
+      <>
+
 
       {apiError && (
         <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 16px', fontSize: 13, color: '#dc2626', marginBottom: 16 }}>
@@ -1114,6 +1274,8 @@ export default function Patrimoine() {
           )}
         </div>
       </div>
+      </>
+      )}
 
       {/* ── Create modals ── */}
       {modal === 'cc' && !editTarget && (
