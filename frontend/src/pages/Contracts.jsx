@@ -6,6 +6,7 @@ import { DAY_COUNT_METHODS, CONTRACT_TYPES, PAYMENT_TIMINGS } from '../data/cons
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 
 const STATUS_COLORS = {
@@ -31,14 +32,6 @@ function daysUntil(dateStr) {
   return Math.ceil((new Date(dateStr) - new Date()) / (1000 * 60 * 60 * 24));
 }
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 24, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;

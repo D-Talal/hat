@@ -3,16 +3,9 @@ import API from '../api';
 import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 function VacancyForm({ onSave, onClose, initial, spaces }) {
   const [form, setForm] = useState({

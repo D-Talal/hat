@@ -6,6 +6,7 @@ import GeoSelect from '../components/shared/GeoSelect';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 const ROLES = ['master_tenant', 'guarantor', 'landlord', 'vendor', 'contact_person'];
 const ROLE_LABELS = {
@@ -17,14 +18,6 @@ const ROLE_LABELS = {
 };
 
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 function BPForm({ onSave, onClose, initial, existingItems = [] }) {
   const { t } = useLanguage();

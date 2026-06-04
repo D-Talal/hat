@@ -5,6 +5,7 @@ import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { CONDITION_TYPES as COND_TYPES_SHARED, COMMON_CURRENCIES } from '../data/constants';
 import { useLanguage } from '../context/LanguageContext';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 
 const STATUS = {
@@ -25,14 +26,6 @@ const COND_TYPES = {
   abatement:       { label: 'Abatement',        bg: '#fdf4ff', text: '#9333ea' },
 };
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 function StatusBadge({ status }) {
   const s = STATUS[status] || STATUS.pending;

@@ -7,6 +7,7 @@ import { CURRENCIES } from '../data/currencies';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { COMMON_CURRENCIES } from '../data/constants';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 
 const STATUS = {
@@ -15,14 +16,6 @@ const STATUS = {
   expired:  { bg: '#fff3e0', text: '#e65100', label: 'Expired' },
 };
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 function DepositForm({ onSave, onClose, initial, contracts, partners, existingDeposits = [] }) {
   const [form, setForm] = useState({

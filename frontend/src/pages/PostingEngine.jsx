@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { inputStyle, btnSecondary } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 const btnPrimary   = { padding: '11px 24px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 14 };
 const btnGreen     = { padding: '10px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -47,14 +48,6 @@ function fmtAmt(v, cur = 'USD') {
   return new Intl.NumberFormat('en-CA', { style: 'currency', currency: cur, maximumFractionDigits: 2 }).format(v || 0);
 }
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 
 function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 24, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;

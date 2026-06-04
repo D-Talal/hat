@@ -5,6 +5,7 @@ import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
+import { Field } from '../components/shared/FormHelpers';
 
 
 const CHARGE_CATEGORIES = ['general','utilities','waste','parking','security','marketing','insurance'];
@@ -16,14 +17,6 @@ const CATEGORY_COLORS = {
   insurance: { bg: '#f5f5f5', text: '#212121' },
 };
 
-function Field({ label, children }) {
-  return (
-    <div style={{ marginBottom: 16 }}>
-      <label style={{ display: 'block', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 6 }}>{label}</label>
-      {children}
-    </div>
-  );
-}
 function SectionTitle({ children }) {
   return <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', marginBottom: 12, marginTop: 20, paddingBottom: 8, borderBottom: '1px solid var(--border)' }}>{children}</div>;
 }
