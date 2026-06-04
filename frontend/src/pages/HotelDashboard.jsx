@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, PieChart, Pie, Cell, Legend } from 'recharts';
 import API from '../api';
 import { useLanguage } from '../context/LanguageContext';
+import { useFormat } from '../data/format';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const card = {
@@ -13,7 +14,6 @@ const card = {
 
 const COLORS = ['#4361ee','#10b981','#f97316','#8b5cf6','#ef4444','#06b6d4','#f59e0b'];
 
-const fmt = (n) => new Intl.NumberFormat('en-CA', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(n || 0);
 const fmtPct = (n) => `${(n || 0).toFixed(1)}%`;
 
 function KPI({ label, value, sub, color = '#4361ee', icon, highlight }) {
@@ -69,18 +69,21 @@ function AlertBadge({ count, label, color, bg, icon }) {
   );
 }
 
-const CustomTooltip = ({ active, payload, label }) => {
+const CustomTooltip = ({ active, payload, label, fmt }) => {
   if (!active || !payload?.length) return null;
+  const f = fmt || ((n) => Number(n || 0).toLocaleString());
   return (
     <div style={{ background: '#fff', border: '1.5px solid #e4e6ef', borderRadius: 10, padding: '10px 14px', fontSize: 13 }}>
       <p style={{ color: '#9ea4be', marginBottom: 4, fontSize: 12 }}>{label}</p>
-      <p style={{ color: '#0f1117', fontWeight: 600 }}>{fmt(payload[0].value)}</p>
+      <p style={{ color: '#0f1117', fontWeight: 600 }}>{f(payload[0].value)}</p>
     </div>
   );
 };
 
 export default function HotelDashboard({ embedded = false }) {
   const { t } = useLanguage();
+  const { money, date } = useFormat();
+  const fmt = (n) => money(n, { maximumFractionDigits: 0 });
   const th = t.hotel;
   const [data, setData]         = useState(null);
   const [hotels, setHotels]     = useState([]);
@@ -124,7 +127,7 @@ export default function HotelDashboard({ embedded = false }) {
   const chartData = (data.revenue_by_month || []).map(item => {
     const [y, m] = item.month.split('-');
     const d = new Date(parseInt(y), parseInt(m) - 1);
-    return { ...item, label: d.toLocaleDateString('en-CA', { month: 'short', year: '2-digit' }) };
+    return { ...item, label: date(d, { month: 'short', year: '2-digit' }) };
   });
 
   return (
@@ -138,7 +141,7 @@ export default function HotelDashboard({ embedded = false }) {
               🏨 Hotel Dashboard
             </h1>
             <p style={{ margin: '4px 0 0', fontSize: 13, color: '#9ea4be' }}>
-              Live performance metrics · {new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+              Live performance metrics · {date(new Date(), { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
             </p>
           </div>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
@@ -237,7 +240,7 @@ export default function HotelDashboard({ embedded = false }) {
                 <XAxis dataKey="label" tick={{ fill: '#9ea4be', fontSize: 11 }} axisLine={false} tickLine={false} />
                 <YAxis tick={{ fill: '#9ea4be', fontSize: 11 }} axisLine={false} tickLine={false}
                   tickFormatter={v => `${(v/1000).toFixed(0)}k`} />
-                <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(67,97,238,0.05)', radius: 6 }} />
+                <Tooltip content={<CustomTooltip fmt={fmt} />} cursor={{ fill: 'rgba(67,97,238,0.05)', radius: 6 }} />
                 <Bar dataKey="amount" fill="#4361ee" radius={[6,6,0,0]} />
               </BarChart>
             </ResponsiveContainer>
