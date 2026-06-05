@@ -305,6 +305,15 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
   const [termResult, setTermResult]   = useState(null);
   const [termError, setTermError]     = useState('');
 
+  // Renewal modal state
+  const [renewModal, setRenewModal]     = useState(false);
+  const [renewStart, setRenewStart]     = useState('');
+  const [renewEnd, setRenewEnd]         = useState('');
+  const [renewCopyConds, setRenewCopyConds] = useState(true);
+  const [renewLoading, setRenewLoading] = useState(false);
+  const [renewResult, setRenewResult]   = useState(null);
+  const [renewError, setRenewError]     = useState('');
+
   // Pre-fill quittancement with current month
   useEffect(() => {
     const now = new Date();
@@ -509,6 +518,26 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
             🛑 Résilier
           </button>
         )}
+        {['released', 'terminated', 'expired'].includes(contract.status) && (
+          <button onClick={() => {
+            setRenewResult(null); setRenewError('');
+            // Pre-fill: start = day after current end, end left blank (backend mirrors duration)
+            const end = contract.absolute_end_date || contract.probable_end_date || contract.first_end_date;
+            if (end) {
+              const d = new Date(end);
+              d.setDate(d.getDate() + 1);
+              setRenewStart(d.toISOString().slice(0, 10));
+            } else {
+              setRenewStart('');
+            }
+            setRenewEnd('');
+            setRenewCopyConds(true);
+            setRenewModal(true);
+          }}
+            style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#4361ee', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 }}>
+            🔄 Renouveler
+          </button>
+        )}
         {contract.status === 'draft' && <button onClick={onDelete} style={btnDanger}>🗑 Delete</button>}
       </div>
 
@@ -691,6 +720,71 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                     {termLoading ? 'Résiliation…' : '🛑 Confirmer la résiliation'}
                   </button>
                   <button onClick={() => setTermModal(false)} style={btnSecondary}>Annuler</button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Renewal modal ── */}
+      {renewModal && (
+        <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,.5)', zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ background: 'white', borderRadius: 14, padding: 28, width: 460, boxShadow: '0 20px 60px rgba(0,0,0,.2)' }}>
+            <div style={{ fontFamily: 'DM Serif Display', fontSize: 20, marginBottom: 4 }}>🔄 Renouveler le contrat</div>
+            <div style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 20 }}>
+              Crée un nouveau contrat en <strong>brouillon</strong> à partir de {contract.contract_number}, avec les mêmes espaces, partenaire et conditions.
+            </div>
+
+            {renewResult ? (
+              <div>
+                <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: 10, padding: '14px 16px', marginBottom: 16 }}>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: '#15803d', marginBottom: 4 }}>✓ Contrat renouvelé</div>
+                  <div style={{ fontSize: 13, color: '#166534' }}>
+                    Nouveau contrat <strong>{renewResult.contract_number}</strong> créé en brouillon.
+                    Vérifiez les conditions puis activez-le (Release).
+                  </div>
+                </div>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={() => { setRenewModal(false); if (onRefresh) onRefresh(); }} style={btnPrimary}>Fermer</button>
+                </div>
+              </div>
+            ) : (
+              <>
+                {renewError && (
+                  <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>
+                    ⚠️ {renewError}
+                  </div>
+                )}
+                <Field label="Date de début du nouveau contrat">
+                  <input type="date" value={renewStart} onChange={e => setRenewStart(e.target.value)} style={inputStyle} />
+                </Field>
+                <Field label="Date de fin (optionnel — sinon même durée que l'original)">
+                  <input type="date" value={renewEnd} onChange={e => setRenewEnd(e.target.value)} style={inputStyle} />
+                </Field>
+                <label style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--slate)', marginBottom: 20, cursor: 'pointer' }}>
+                  <input type="checkbox" checked={renewCopyConds} onChange={e => setRenewCopyConds(e.target.checked)} />
+                  Copier les conditions (loyers, charges) sur le nouveau contrat
+                </label>
+                <div style={{ display: 'flex', gap: 10 }}>
+                  <button onClick={async () => {
+                    setRenewLoading(true); setRenewError('');
+                    try {
+                      const params = new URLSearchParams();
+                      if (renewStart) params.set('new_start_date', renewStart);
+                      if (renewEnd) params.set('new_end_date', renewEnd);
+                      params.set('copy_conditions', renewCopyConds);
+                      const r = await API.post(`/commercial/contracts/${contract.id}/renew?${params.toString()}`);
+                      setRenewResult(r.data);
+                    } catch (e) {
+                      setRenewError(e.response?.data?.detail || 'Erreur lors du renouvellement.');
+                    } finally {
+                      setRenewLoading(false);
+                    }
+                  }} style={{ ...btnPrimary, background: '#4361ee', color: 'white' }} disabled={renewLoading}>
+                    {renewLoading ? '...' : '🔄 Créer le renouvellement'}
+                  </button>
+                  <button onClick={() => setRenewModal(false)} style={btnSecondary}>Annuler</button>
                 </div>
               </>
             )}
