@@ -900,6 +900,129 @@ def terminate_contract(
     }
 
 
+@router.post("/contracts/{id}/renew", response_model=ContractOut)
+def renew_contract(
+    id: int,
+    new_start_date: Optional[date] = Query(None, description="Start of the renewed contract (default: day after current end)"),
+    new_end_date:   Optional[date] = Query(None, description="Absolute end of the renewed contract (default: same duration as original)"),
+    copy_conditions: bool = Query(True, description="Clone the conditions (rents, charges) onto the new contract"),
+    db: Session = Depends(get_db),
+    u=Depends(require_permission("create")),
+):
+    """
+    Renew a contract by cloning it into a new Draft contract.
+
+    - The new contract starts the day after the source's end date (or a supplied date).
+    - Same business partner, business entity, spaces, and contract settings.
+    - Conditions are cloned with their validity shifted to the new period.
+    - The new contract is created as Draft so it can be reviewed before release.
+    - The source contract is left untouched.
+    """
+    from datetime import timedelta
+    import calendar
+
+    def _add_months(d: date, months: int) -> date:
+        """Add a number of months to a date, clamping the day to month length."""
+        total = (d.year * 12 + (d.month - 1)) + months
+        y, m = divmod(total, 12)
+        m += 1
+        last_day = calendar.monthrange(y, m)[1]
+        return date(y, m, min(d.day, last_day))
+
+    source = db.query(Contract).options(
+        joinedload(Contract.conditions),
+        joinedload(Contract.contract_objects),
+    ).filter(Contract.id == id).first()
+    if not source:
+        raise HTTPException(404, "Contract not found")
+
+    # Determine the anchor end date of the source
+    source_end = source.absolute_end_date or source.probable_end_date or source.first_end_date
+    if not source_end and not new_start_date:
+        raise HTTPException(400, "Source contract has no end date; please supply new_start_date explicitly.")
+
+    # New start: supplied, else day after source end
+    start = new_start_date or (source_end + timedelta(days=1))
+
+    # New end: supplied, else mirror the original duration (in whole months)
+    if new_end_date:
+        end = new_end_date
+    elif source.start_date and source_end:
+        months_span = (source_end.year - source.start_date.year) * 12 + (source_end.month - source.start_date.month)
+        end = _add_months(start, months_span)
+    else:
+        end = None
+
+    if end and end < start:
+        raise HTTPException(400, "New end date cannot be before the new start date.")
+
+    # Generate a fresh contract number
+    count = db.query(Contract).count()
+    prefix = "LI" if source.contract_type == ContractType.lease_in else "LO"
+    new_number = f"{prefix}-{count + 1:05d}"
+
+    # Clone the contract (Draft status, new dates, new number)
+    renewed = Contract(
+        contract_number=new_number,
+        business_partner_id=source.business_partner_id,
+        business_entity_id=source.business_entity_id,
+        contract_type=source.contract_type,
+        status=ContractStatus.draft,
+        start_date=start,
+        first_end_date=end,
+        probable_end_date=end,
+        absolute_end_date=end,
+        signing_date=date.today(),
+        relevant_to_sales=source.relevant_to_sales,
+        is_multi_object=source.is_multi_object,
+        payment_timing=source.payment_timing,
+        day_count_method=source.day_count_method,
+        pro_rata_enabled=source.pro_rata_enabled,
+        notes=f"[Renouvellement de {source.contract_number}]" + (f"\n{source.notes}" if source.notes else ""),
+    )
+    db.add(renewed)
+    db.flush()
+
+    # Clone contract objects (spaces), validity starting at the new start
+    for co in source.contract_objects:
+        db.add(ContractObject(
+            contract_id=renewed.id,
+            space_id=co.space_id,
+            valid_from=start,
+            valid_to=end,
+            object_group=co.object_group,
+        ))
+
+    # Clone conditions, shifting validity into the new period
+    cloned_conditions = 0
+    if copy_conditions:
+        for c in source.conditions:
+            db.add(Condition(
+                contract_id=renewed.id,
+                condition_type=c.condition_type,
+                condition_code=c.condition_code,
+                valid_from=start,
+                valid_to=end,
+                amount=c.amount,
+                currency=c.currency,
+                frequency=c.frequency,
+                payment_timing=c.payment_timing,
+                ipc_enabled=c.ipc_enabled,
+                ipc_base_index=c.ipc_base_index,
+                ipc_reference_date=c.ipc_reference_date,
+                is_flat_rate=c.is_flat_rate,
+                markup_rate=c.markup_rate,
+                notes=c.notes,
+            ))
+            cloned_conditions += 1
+
+    db.commit()
+    db.refresh(renewed)
+    audit(db, u, "CREATE", "re_contracts", renewed.id,
+          f"renewed from {source.contract_number} ({cloned_conditions} conditions)")
+    return renewed
+
+
 @router.post("/contracts/{id}/generate-invoices")
 def generate_invoices_for_contract(
     id: int,
