@@ -267,9 +267,30 @@ class ContractCreate(BaseModel):
 
 class ContractPatch(BaseModel):
     status: Optional[str] = None
+    business_partner_id: Optional[int] = None
+    contract_type: Optional[str] = None
+    start_date: Optional[date] = None
+    first_end_date: Optional[date] = None
     probable_end_date: Optional[date] = None
     absolute_end_date: Optional[date] = None
+    notice_date: Optional[date] = None
+    signing_date: Optional[date] = None
+    payment_timing: Optional[str] = None
+    day_count_method: Optional[str] = None
+    pro_rata_enabled: Optional[bool] = None
+    relevant_to_sales: Optional[bool] = None
     notes: Optional[str] = None
+
+    @field_validator(
+        'start_date', 'first_end_date', 'probable_end_date', 'absolute_end_date',
+        'notice_date', 'signing_date',
+        mode='before'
+    )
+    @classmethod
+    def _empty_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
 
 class BusinessEntityMini(BaseModel):
     id: int
@@ -343,6 +364,18 @@ class ConditionCreate(BaseModel):
     is_flat_rate: Optional[bool] = False
     markup_rate: Optional[float] = None
     notes: Optional[str] = None
+
+    @field_validator(
+        'valid_to', 'amount', 'ipc_base_index', 'ipc_reference_date',
+        'markup_rate', 'condition_code', 'notes',
+        mode='before'
+    )
+    @classmethod
+    def _empty_to_none(cls, v):
+        # Frontend sends "" for blank optional fields; treat as missing.
+        if v == "" or v is None:
+            return None
+        return v
 
     @field_validator('condition_type')
     @classmethod
@@ -844,9 +877,33 @@ def patch_contract(id: int, data: ContractPatch, db: Session = Depends(get_db), 
         condition_count = db.query(Condition).filter(Condition.contract_id == id).count()
         if condition_count == 0:
             raise HTTPException(400, "Cannot release: contract has no conditions. Add at least one condition (base rent, etc.) before releasing.")
-    for k, v in data.dict(exclude_none=True).items(): setattr(obj, k, v)
+
+    updates = data.dict(exclude_none=True)
+
+    # On released/terminated contracts, only a few fields may change. Structural
+    # fields (partner, type, start date, etc.) are locked once the contract is live.
+    if obj.status != "draft":
+        allowed = {"status", "probable_end_date", "absolute_end_date", "notes"}
+        blocked = set(updates) - allowed
+        if blocked:
+            raise HTTPException(
+                400,
+                f"Ces champs ne peuvent être modifiés que sur un contrat brouillon : {', '.join(sorted(blocked))}"
+            )
+
+    for k, v in updates.items():
+        setattr(obj, k, v)
     db.commit(); db.refresh(obj)
-    audit(db, u, "UPDATE", "re_contracts", id, f"status={obj.status}"); return obj
+    audit(db, u, "UPDATE", "re_contracts", id, f"status={obj.status}")
+    # Reload with relations for clean serialization
+    obj = db.query(Contract).options(
+        joinedload(Contract.business_partner),
+        joinedload(Contract.business_entity),
+        joinedload(Contract.contract_objects),
+    ).filter(Contract.id == id).first()
+    out = ContractOut.model_validate(obj)
+    out.space_ids = [co.space_id for co in (obj.contract_objects or []) if co.space_id is not None]
+    return out
 
 @router.delete("/contracts/{id}")
 def delete_contract(id: int, db: Session = Depends(get_db), u=Depends(require_permission("delete"))):
