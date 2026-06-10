@@ -282,23 +282,49 @@ class BusinessEntityMini(BaseModel):
 class ContractOut(BaseModel):
     id: int
     contract_number: Optional[str] = None
-    contract_type: str
-    status: str
+    contract_type: str = "lease_out"
+    status: str = "draft"
     start_date: date
     first_end_date: Optional[date] = None
     probable_end_date: Optional[date] = None
     absolute_end_date: Optional[date] = None
     notice_date: Optional[date] = None
     signing_date: Optional[date] = None
-    relevant_to_sales: bool
-    is_multi_object: bool
-    payment_timing: str
-    day_count_method: str
-    pro_rata_enabled: bool
+    relevant_to_sales: bool = False
+    is_multi_object: bool = False
+    payment_timing: str = "in_advance"
+    day_count_method: str = "act_365"
+    pro_rata_enabled: bool = True
     notes: Optional[str] = None
     created_at: datetime
     business_partner: Optional[BusinessPartnerOut] = None
     business_entity: Optional[BusinessEntityMini] = None
+    space_ids: List[int] = []
+
+    @field_validator('contract_type', mode='before')
+    @classmethod
+    def _ct(cls, v):
+        if v is None: return "lease_out"
+        return v.value if hasattr(v, 'value') else str(v)
+
+    @field_validator('status', mode='before')
+    @classmethod
+    def _st(cls, v):
+        if v is None: return "draft"
+        return v.value if hasattr(v, 'value') else str(v)
+
+    @field_validator('payment_timing', mode='before')
+    @classmethod
+    def _pt(cls, v):
+        if v is None: return "in_advance"
+        return v.value if hasattr(v, 'value') else str(v)
+
+    @field_validator('day_count_method', mode='before')
+    @classmethod
+    def _dcm(cls, v):
+        if v is None: return "act_365"
+        return v.value if hasattr(v, 'value') else str(v)
+
     class Config: from_attributes = True
 
 class ConditionCreate(BaseModel):
@@ -772,7 +798,14 @@ def list_contracts(status: Optional[str] = None, db: Session = Depends(get_db), 
             (BusinessEntity.org_id == u.organization_id) | (BusinessEntity.org_id == None)
         )
     if status: q = q.filter(Contract.status == status)
-    return q.all()
+    contracts = q.all()
+    # Populate space_ids from contract_objects for each contract
+    result = []
+    for c in contracts:
+        out = ContractOut.model_validate(c)
+        out.space_ids = [co.space_id for co in (c.contract_objects or []) if co.space_id is not None]
+        result.append(out)
+    return result
 
 @router.post("/contracts", response_model=ContractOut)
 def create_contract(data: ContractCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
