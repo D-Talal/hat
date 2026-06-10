@@ -3,6 +3,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { ToastProvider } from './context/ToastContext';
+import ErrorBoundary from './components/ErrorBoundary';
 import Sidebar from './components/Sidebar';
 import Login from './pages/Login';
 import Dashboard from './pages/Dashboard';
@@ -69,7 +70,7 @@ function AppLayout({ children }) {
           padding: '40px 48px',
           boxSizing: 'border-box',
         }}>
-          {children}
+          <ErrorBoundary>{children}</ErrorBoundary>
         </div>
       </main>
     </div>
