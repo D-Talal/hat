@@ -228,6 +228,18 @@ class ContractCreate(BaseModel):
     notes: Optional[str] = None
     space_ids: Optional[List[int]] = []
 
+    @field_validator(
+        'first_end_date', 'probable_end_date', 'absolute_end_date',
+        'notice_date', 'signing_date', 'start_date',
+        mode='before'
+    )
+    @classmethod
+    def _empty_str_to_none(cls, v):
+        # Frontend date inputs send "" when left blank; treat as missing.
+        if v == "" or v is None:
+            return None
+        return v
+
     @field_validator('contract_number')
     @classmethod
     def v_num(cls, v): return validate_contract_number(v)
@@ -777,7 +789,13 @@ def create_contract(data: ContractCreate, db: Session = Depends(get_db), u=Depen
         sp = db.query(Space).filter(Space.id == sid).first()
         if sp: sp.status = SpaceStatus.occupied
     db.commit(); db.refresh(obj)
-    audit(db, u, "CREATE", "re_contracts", obj.id); return obj
+    audit(db, u, "CREATE", "re_contracts", obj.id)
+    # Reload with relations so ContractOut serializes business_partner/entity cleanly
+    obj = db.query(Contract).options(
+        joinedload(Contract.business_partner),
+        joinedload(Contract.business_entity),
+    ).filter(Contract.id == obj.id).first()
+    return obj
 
 @router.patch("/contracts/{id}", response_model=ContractOut)
 def patch_contract(id: int, data: ContractPatch, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
