@@ -219,6 +219,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           pro_rata_enabled: form.pro_rata_enabled,
           relevant_to_sales: form.relevant_to_sales,
           notes: form.notes,
+          space_ids: selectedObjects,
         }) : clean({
           title: form.title,
           jurisdiction: form.jurisdiction,
