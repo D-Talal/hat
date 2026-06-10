@@ -10,6 +10,25 @@ import { Field } from '../components/shared/FormHelpers';
 import { daysUntil } from '../data/dates';
 import { getContractStatus } from '../data/contractStatus';
 
+// Turn any API error into a readable string — never returns an object/array,
+// which would crash React rendering (the cause of the blank page on 422s).
+function parseApiError(e) {
+  const detail = e?.response?.data?.detail;
+  if (!detail) return e?.message || 'Une erreur est survenue.';
+  if (typeof detail === 'string') return detail;
+  // FastAPI/Pydantic 422: detail is an array of { loc, msg, ... }
+  if (Array.isArray(detail)) {
+    return detail
+      .map(d => {
+        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : '';
+        return field ? `${field}: ${d.msg}` : d.msg;
+      })
+      .join(' · ');
+  }
+  if (typeof detail === 'object') return detail.msg || JSON.stringify(detail);
+  return String(detail);
+}
+
 
 
 
@@ -116,21 +135,100 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
 
   const toggleObject = id => setSelectedObjects(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
+  // Validate date coherence before submitting. Returns an error string or null.
+  const validateDates = () => {
+    const { start_date, first_end_date, probable_end_date, absolute_end_date, notice_date, signing_date } = form;
+
+    if (!start_date) return "La date de début est obligatoire.";
+
+    const d = (v) => (v ? new Date(v) : null);
+    const s = d(start_date);
+    const fe = d(first_end_date);
+    const pe = d(probable_end_date);
+    const ae = d(absolute_end_date);
+    const nd = d(notice_date);
+    const sd = d(signing_date);
+
+    // All end dates must be after the start date
+    if (fe && fe <= s) return "La première date de fin doit être postérieure à la date de début.";
+    if (pe && pe <= s) return "La date de fin probable doit être postérieure à la date de début.";
+    if (ae && ae <= s) return "La date de fin absolue doit être postérieure à la date de début.";
+
+    // Logical ordering between end dates: first ≤ probable ≤ absolute
+    if (fe && pe && pe < fe) return "La date de fin probable ne peut pas être antérieure à la première date de fin.";
+    if (pe && ae && ae < pe) return "La date de fin absolue ne peut pas être antérieure à la date de fin probable.";
+    if (fe && ae && ae < fe) return "La date de fin absolue ne peut pas être antérieure à la première date de fin.";
+
+    // Notice date should fall within the contract window
+    if (nd && nd < s) return "La date de préavis ne peut pas être antérieure à la date de début.";
+    if (nd && ae && nd > ae) return "La date de préavis ne peut pas être postérieure à la date de fin absolue.";
+
+    // Signing date sanity: not absurdly far before start (> 1 year) and not after end
+    if (sd && ae && sd > ae) return "La date de signature ne peut pas être postérieure à la fin du contrat.";
+
+    return null;
+  };
+
   const save = async () => {
     setFormError('');
+
+    // Required relations
+    if (!form.business_entity_id) { setFormError("Veuillez sélectionner une Business Entity."); return; }
+    if (!form.business_partner_id) { setFormError("Veuillez sélectionner un Business Partner."); return; }
+
+    // Date coherence
+    const dateErr = validateDates();
+    if (dateErr) { setFormError(dateErr); return; }
+
     // Only check duplicate on manual contract_number (non-empty, non-edit)
     if (!initial?.id && form.contract_number.trim()) {
       const dupErr = checkDuplicate(form);
       if (dupErr) { setFormError(dupErr); return; }
     }
+
+    // Strip empty-string fields so the backend receives null, not ""
+    const clean = (obj) => {
+      const out = {};
+      for (const [k, v] of Object.entries(obj)) {
+        out[k] = v === '' ? null : v;
+      }
+      return out;
+    };
+
     try {
-      if (initial?.id) await API.patch(`/commercial/contracts/${initial.id}`, { probable_end_date: form.probable_end_date, absolute_end_date: form.absolute_end_date, notes: form.notes });
-      else await API.post('/commercial/contracts', { ...form, space_ids: selectedObjects });
+      if (initial?.id) {
+        await API.patch(`/commercial/contracts/${initial.id}`, clean({
+          probable_end_date: form.probable_end_date,
+          absolute_end_date: form.absolute_end_date,
+          notes: form.notes,
+        }));
+      } else {
+        await API.post('/commercial/contracts', { ...clean(form), space_ids: selectedObjects });
+      }
       onSave(); onClose();
-    } catch (e) { setFormError(e.response?.data?.detail || 'Error'); }
+    } catch (e) {
+      setFormError(parseApiError(e));
+    }
   };
 
   const isEdit = !!initial?.id;
+
+  // Red border when a date field is invalid
+  const dateInputStyle = (invalid) => invalid
+    ? { ...inputStyle, border: '1.5px solid #dc2626', background: '#fef2f2' }
+    : inputStyle;
+
+  // Live coherence hint shown under the dates block (non-blocking, informative)
+  const liveDateHint = (() => {
+    const d = (v) => (v ? new Date(v) : null);
+    const s = d(form.start_date), fe = d(form.first_end_date), pe = d(form.probable_end_date), ae = d(form.absolute_end_date);
+    if (fe && s && fe <= s) return "La première date de fin doit être après la date de début.";
+    if (pe && s && pe <= s) return "La date de fin probable doit être après la date de début.";
+    if (ae && s && ae <= s) return "La date de fin absolue doit être après la date de début.";
+    if (fe && pe && pe < fe) return "Fin probable antérieure à la première date de fin.";
+    if (pe && ae && ae < pe) return "Fin absolue antérieure à la fin probable.";
+    return null;
+  })();
 
   return (
     <>
@@ -171,13 +269,18 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
       <div style={{ background: '#f0f7ff', borderRadius: 10, padding: 16, marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: '#1565c0', marginBottom: 12 }}>ℹ Any modification to these dates creates a new time slot.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-          <Field label={tc.startDate + " *"}><input style={inputStyle} type="date" value={form.start_date} onChange={set('start_date')} disabled={isEdit} /></Field>
-          <Field label={tc.firstEndDate}><input style={inputStyle} type="date" value={form.first_end_date} onChange={set('first_end_date')} disabled={isEdit} /></Field>
-          <Field label={tc.probableEndDate}><input style={inputStyle} type="date" value={form.probable_end_date} onChange={set('probable_end_date')} /></Field>
-          <Field label={tc.absoluteEndDate}><input style={inputStyle} type="date" value={form.absolute_end_date} onChange={set('absolute_end_date')} /></Field>
-          <Field label={tc.noticeDate}><input style={inputStyle} type="date" value={form.notice_date} onChange={set('notice_date')} disabled={isEdit} /></Field>
+          <Field label={tc.startDate + " *"}><input style={dateInputStyle(!form.start_date)} type="date" value={form.start_date} onChange={set('start_date')} disabled={isEdit} /></Field>
+          <Field label={tc.firstEndDate}><input style={dateInputStyle(form.first_end_date && form.start_date && new Date(form.first_end_date) <= new Date(form.start_date))} type="date" value={form.first_end_date} onChange={set('first_end_date')} disabled={isEdit} min={form.start_date || undefined} /></Field>
+          <Field label={tc.probableEndDate}><input style={dateInputStyle(form.probable_end_date && form.start_date && new Date(form.probable_end_date) <= new Date(form.start_date))} type="date" value={form.probable_end_date} onChange={set('probable_end_date')} min={form.start_date || undefined} /></Field>
+          <Field label={tc.absoluteEndDate}><input style={dateInputStyle(form.absolute_end_date && form.start_date && new Date(form.absolute_end_date) <= new Date(form.start_date))} type="date" value={form.absolute_end_date} onChange={set('absolute_end_date')} min={form.start_date || undefined} /></Field>
+          <Field label={tc.noticeDate}><input style={inputStyle} type="date" value={form.notice_date} onChange={set('notice_date')} disabled={isEdit} min={form.start_date || undefined} /></Field>
           <Field label={tc.signingDate}><input style={inputStyle} type="date" value={form.signing_date} onChange={set('signing_date')} disabled={isEdit} /></Field>
         </div>
+        {liveDateHint && (
+          <div style={{ marginTop: 10, fontSize: 12, color: '#c62828', display: 'flex', alignItems: 'center', gap: 6 }}>
+            ⚠ {liveDateHint}
+          </div>
+        )}
       </div>
 
       {!isEdit && (
