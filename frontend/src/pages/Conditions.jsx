@@ -51,7 +51,16 @@ function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
   });
 
   useEffect(() => {
-    if (!initial?.contract_id) API.get('/commercial/contracts?status=released').then(r => setContracts(r.data || [])).catch(() => {});
+    if (!initial?.contract_id) {
+      API.get('/commercial/contracts')
+        .then(r => {
+          // Conditions can be added to draft (before release) or released contracts.
+          // Draft is the important case: a contract needs ≥1 condition to be released.
+          const eligible = (r.data || []).filter(c => c.status === 'draft' || c.status === 'released');
+          setContracts(eligible);
+        })
+        .catch(() => {});
+    }
   }, [initial]);
 
   // Inherit currency from selected contract's BusinessEntity
@@ -82,10 +91,14 @@ function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
       {formError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{formError}</div>}
       <SectionTitle>Condition Details</SectionTitle>
       {!isEdit && (
-        <Field label="Contract (Released only)">
+        <Field label="Contract">
           <select style={inputStyle} value={form.contract_id} onChange={set('contract_id')}>
             <option value="">— Select —</option>
-            {contracts.map(c => <option key={c.id} value={c.id}>{c.contract_number || `#${c.id}`} — {c.business_partner?.company_name}</option>)}
+            {contracts.map(c => (
+              <option key={c.id} value={c.id}>
+                {c.contract_number || `#${c.id}`} — {c.business_partner?.company_name || '—'} ({c.status === 'draft' ? 'Brouillon' : 'Actif'})
+              </option>
+            ))}
           </select>
           {selectedContract && (
             <div style={{ marginTop: 4, display: 'flex', gap: 6, flexWrap: 'wrap' }}>

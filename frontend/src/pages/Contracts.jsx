@@ -55,7 +55,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   const [partners, setPartners] = useState([]);
   const [entities, setEntities] = useState([]);
   const [spaces, setSpaces] = useState([]);
-  const [selectedObjects, setSelectedObjects] = useState([]);
+  const [selectedObjects, setSelectedObjects] = useState(initial?.space_ids || []);
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     contract_number: initial?.contract_number || '',
@@ -108,30 +108,55 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     }
   }, [form.business_entity_id, selectedEntity]);
 
-  // Reload rental objects whenever business_entity_id changes
+  // Reload leasable spaces whenever business_entity_id changes
   useEffect(() => {
     if (!form.business_entity_id) {
       setSpaces([]);
-      setSelectedObjects([]);
+      // Only clear selection when creating; keep it when editing
+      if (!initial?.id) setSelectedObjects([]);
       return;
     }
     setLoadingRO(true);
     API.get('/commercial/spaces-leasable')
-      .then(r => {
+      .then(async (r) => {
         const all = r.data || [];
-        // Filter by business entity — match on building_entity_id OR building.business_entity_id
         const forEntity = all.filter(ro => {
           const beId = ro.business_entity_id;
-          // If no entity info at all, include it (show all for safety)
           if (beId == null) return true;
           return String(beId) === String(form.business_entity_id);
         });
+
+        // In edit mode, the contract's own spaces are "occupied" and won't appear
+        // in spaces-leasable. Fetch their details so they show up (pre-checked).
+        const linkedIds = initial?.space_ids || [];
+        const missingIds = linkedIds.filter(id => !forEntity.some(s => s.id === id));
+        if (missingIds.length > 0) {
+          const fetched = await Promise.all(
+            missingIds.map(id =>
+              API.get(`/commercial/spaces/${id}/detail`)
+                .then(res => res.data)
+                .catch(() => null)
+            )
+          );
+          fetched.filter(Boolean).forEach(sp => {
+            forEntity.push({
+              id: sp.id,
+              space_code: sp.space_code,
+              usage_type: sp.usage_type,
+              status: sp.status,
+              area_sqm: sp.area_sqm ?? sp.current_area_sqm,
+              business_entity_id: form.business_entity_id,
+            });
+          });
+        }
+
         setSpaces(forEntity);
-        setSelectedObjects([]);
+        // Preserve selection in edit mode; reset only when creating
+        if (!initial?.id) setSelectedObjects([]);
       })
       .catch(() => setSpaces([]))
       .finally(() => setLoadingRO(false));
-  }, [form.business_entity_id, refreshRO]);
+  }, [form.business_entity_id, refreshRO, initial]);
 
   const toggleObject = id => setSelectedObjects(s => s.includes(id) ? s.filter(x => x !== id) : [...s, id]);
 
@@ -332,23 +357,26 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 8, marginBottom: 16 }}>
               {spaces.map(ro => {
                 const s = (ro.status || '').toLowerCase();
-                const isLeasable = s === 'available' || s === 'vacant';
                 const isSelected = selectedObjects.includes(ro.id);
+                // A space is clickable if it's leasable OR already selected
+                // (so an occupied space linked to THIS contract can be unchecked).
+                const isLeasable = s === 'available' || s === 'vacant';
+                const isClickable = isLeasable || isSelected;
                 return (
                   <div key={ro.id}
-                    onClick={() => isLeasable && toggleObject(ro.id)}
+                    onClick={() => isClickable && toggleObject(ro.id)}
                     style={{
                       padding: '10px 14px', borderRadius: 8, fontSize: 13, transition: 'all .12s',
                       border: `2px solid ${isSelected ? 'var(--gold)' : 'var(--border)'}`,
                       background: isSelected ? '#fffbf0' : isLeasable ? 'white' : '#f9fafb',
-                      cursor: isLeasable ? 'pointer' : 'not-allowed',
-                      opacity: isLeasable ? 1 : 0.5,
+                      cursor: isClickable ? 'pointer' : 'not-allowed',
+                      opacity: isClickable ? 1 : 0.5,
                     }}>
                     <div style={{ fontWeight: 700 }}>{ro.space_code}</div>
                     <div style={{ color: 'var(--slate)', fontSize: 11, marginTop: 2 }}>{ro.usage_type || '—'}{ro.current_area_sqm ? ` · ${ro.current_area_sqm} m²` : ''}</div>
                     <div style={{ fontSize: 10, marginTop: 2, fontWeight: 600, textTransform: 'uppercase',
                       color: s === 'available' ? '#15803d' : s === 'vacant' ? '#dc2626' : '#6b7280' }}>
-                      {ro.status}
+                      {ro.status}{isSelected && !isLeasable ? ' · lié à ce contrat' : ''}
                     </div>
                     {ro.building_name && <div style={{ fontSize: 10, color: '#9ea4be', marginTop: 2 }}>🏗 {ro.building_name} · Étage {ro.floor_number}</div>}
                   </div>
