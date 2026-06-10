@@ -8,6 +8,7 @@ import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
 import { daysUntil } from '../data/dates';
+import { getCountries } from '../data/geo';
 import { getContractStatus } from '../data/contractStatus';
 import { parseApiError } from '../data/apiError';
 
@@ -41,6 +42,8 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     contract_number: initial?.contract_number || '',
+    title: initial?.title || '',
+    jurisdiction: initial?.jurisdiction || '',
     business_partner_id: initial?.business_partner_id || initial?.business_partner?.id || '',
     business_entity_id: initial?.business_entity_id || initial?.business_entity?.id || '',
     contract_type: initial?.contract_type || 'lease_out',
@@ -90,57 +93,47 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     }
   }, [form.business_entity_id, selectedEntity]);
 
-  // Reload leasable spaces whenever business_entity_id changes
+  // Load spaces: leasable ones for the entity + the contract's own linked spaces
   useEffect(() => {
     if (!form.business_entity_id) {
       setSpaces([]);
-      // Only clear selection when creating; keep it when editing
       if (!initial?.id) setSelectedObjects([]);
       return;
     }
     setLoadingRO(true);
-    API.get('/commercial/spaces-leasable')
-      .then(async (r) => {
-        const all = r.data || [];
-        const forEntity = all.filter(ro => {
+
+    const leasableReq = API.get('/commercial/spaces-leasable')
+      .then(r => r.data || [])
+      .catch(() => []);
+
+    // In edit mode, also fetch the contract's own spaces (they're occupied, so
+    // they won't show in spaces-leasable). Self-contained endpoint.
+    const linkedReq = initial?.id
+      ? API.get(`/commercial/contracts/${initial.id}/spaces`).then(r => r.data || []).catch(() => [])
+      : Promise.resolve([]);
+
+    Promise.all([leasableReq, linkedReq])
+      .then(([leasable, linked]) => {
+        const forEntity = leasable.filter(ro => {
           const beId = ro.business_entity_id;
           if (beId == null) return true;
           return String(beId) === String(form.business_entity_id);
         });
 
-        // In edit mode, the contract's own spaces are "occupied" and won't appear
-        // in spaces-leasable. Fetch their details so they show up (pre-checked).
-        const linkedIds = initial?.space_ids || [];
-        const missingIds = linkedIds.filter(id => !forEntity.some(s => s.id === id));
-        if (missingIds.length > 0) {
-          const fetched = await Promise.all(
-            missingIds.map(id =>
-              API.get(`/commercial/spaces/${id}/detail`)
-                .then(res => res.data)
-                .catch(() => null)
-            )
-          );
-          fetched.filter(Boolean).forEach(d => {
-            // /detail returns { space: {...}, current_area_sqm, hierarchy, ... }
-            const sp = d.space || d;
-            forEntity.push({
-              id: sp.id,
-              space_code: sp.space_code,
-              usage_type: sp.usage_type,
-              status: sp.status,
-              current_area_sqm: d.current_area_sqm ?? sp.area_sqm,
-              building_name: d.hierarchy?.building_name,
-              floor_number: d.hierarchy?.floor_number,
-              business_entity_id: form.business_entity_id,
-            });
-          });
-        }
+        // Merge linked spaces that aren't already in the leasable list
+        linked.forEach(sp => {
+          if (!forEntity.some(s => s.id === sp.id)) forEntity.push(sp);
+        });
 
         setSpaces(forEntity);
-        // Preserve selection in edit mode; reset only when creating
-        if (!initial?.id) setSelectedObjects([]);
+
+        if (initial?.id) {
+          // Pre-select the contract's linked spaces
+          setSelectedObjects(linked.map(sp => sp.id));
+        } else {
+          setSelectedObjects([]);
+        }
       })
-      .catch(() => setSpaces([]))
       .finally(() => setLoadingRO(false));
   }, [form.business_entity_id, refreshRO, initial]);
 
@@ -211,6 +204,8 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
         const isDraft = initial.status === 'draft';
         // Draft contracts: full edit. Released/terminated: only end dates + notes.
         const patch = isDraft ? clean({
+          title: form.title,
+          jurisdiction: form.jurisdiction,
           business_partner_id: form.business_partner_id,
           contract_type: form.contract_type,
           start_date: form.start_date,
@@ -225,6 +220,8 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           relevant_to_sales: form.relevant_to_sales,
           notes: form.notes,
         }) : clean({
+          title: form.title,
+          jurisdiction: form.jurisdiction,
           probable_end_date: form.probable_end_date,
           absolute_end_date: form.absolute_end_date,
           notes: form.notes,
@@ -264,6 +261,9 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
     <>
       {formError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{formError}</div>}
       <SectionTitle>Contract Information</SectionTitle>
+      <Field label="Contract Title / Name">
+        <input style={inputStyle} value={form.title} onChange={set('title')} placeholder="e.g. Lease — Acme Retail, Ground Floor Unit A" />
+      </Field>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
         <Field label={tc.contractNumber}>
           <input style={inputStyle} value={form.contract_number} onChange={set('contract_number')} placeholder="Auto-generated if empty" disabled={isEdit} />
@@ -274,6 +274,13 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
             <option value="lease_out">Lease Out (LO) — Landlord → Tenant</option>
             <option value="lease_in">Lease In (LI) — Tenant from Landlord</option>
           </select>
+        </Field>
+        <Field label="Jurisdiction (tax)">
+          <select style={inputStyle} value={form.jurisdiction} onChange={set('jurisdiction')}>
+            <option value="">— Select —</option>
+            {getCountries().map(c => <option key={c} value={c}>{c}</option>)}
+          </select>
+          <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 4 }}>Détermine le régime fiscal applicable au contrat.</div>
         </Field>
         <Field label={tc.businessEntity + " *"}>
           <select style={inputStyle} value={form.business_entity_id} onChange={set('business_entity_id')} disabled={isEdit}>
@@ -1132,8 +1139,11 @@ export default function Contracts() {
               {/* Detail header */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 16, borderBottom: '1px solid var(--border)' }}>
                 <div>
-                  <div style={{ fontFamily: 'DM Serif Display', fontSize: 22 }}>{selected.contract_number || `#${selected.id}`}</div>
-                  <div style={{ fontSize: 13, color: 'var(--slate)', marginTop: 2 }}>{selected.business_partner?.company_name || '—'}</div>
+                  <div style={{ fontFamily: 'DM Serif Display', fontSize: 22 }}>{selected.title || selected.contract_number || `#${selected.id}`}</div>
+                  <div style={{ fontSize: 13, color: 'var(--slate)', marginTop: 2 }}>
+                    {selected.title ? `${selected.contract_number || `#${selected.id}`} · ` : ''}{selected.business_partner?.company_name || '—'}
+                    {selected.jurisdiction ? ` · ⚖ ${selected.jurisdiction}` : ''}
+                  </div>
                 </div>
                 <div style={{ display: 'flex', gap: 6 }}>
                   <button onClick={() => downloadStatement(selected.id, selected.contract_number)} title="Télécharger le relevé PDF"
