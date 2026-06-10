@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { PageHeader, Card } from '../components/UI';
 import { mapAPI } from '../api';
+import { useFormat } from '../data/format';
 
 const COUNTRIES = {
   'USA':          { lat: 37,   lon: -95,  continent: 'North America' },
@@ -47,12 +48,21 @@ const COUNTRIES = {
   'Morocco':      { lat: 32,   lon: -5,   continent: 'Africa' },
 };
 
-function fmtRev(v) {
-  if (!v) return '$0';
-  if (v >= 1e9) return `$${(v / 1e9).toFixed(2)}B`;
-  if (v >= 1e6) return `$${(v / 1e6).toFixed(1)}M`;
-  return `$${v.toLocaleString()}`;
+function fmtRev(v, cur = '$') {
+  if (!v) return `${cur}0`;
+  if (v >= 1e9) return `${cur}${(v / 1e9).toFixed(2)}B`;
+  if (v >= 1e6) return `${cur}${(v / 1e6).toFixed(1)}M`;
+  if (v >= 1e3) return `${cur}${(v / 1e3).toFixed(0)}k`;
+  return `${cur}${v.toLocaleString()}`;
 }
+
+// Map ISO currency to a short display symbol for the compact map labels.
+const CURRENCY_SYMBOL = {
+  USD: '$', EUR: '€', GBP: '£', CAD: 'CA$', AUD: 'A$', CHF: 'CHF ',
+  JPY: '¥', CNY: '¥', INR: '₹', BRL: 'R$', MXN: 'MX$', ZAR: 'R',
+  AED: 'AED ', SAR: 'SAR ', SGD: 'S$', HKD: 'HK$', SEK: 'kr ',
+  NOK: 'kr ', DKK: 'kr ', PLN: 'zł ',
+};
 
 function ensureLeafletCSS() {
   const id = 'leaflet-css';
@@ -77,7 +87,7 @@ function loadScript(src, globalKey) {
   });
 }
 
-function LeafletMap({ byCountry, onCountryClick }) {
+function LeafletMap({ byCountry, onCountryClick, cur = '$' }) {
   const containerRef = useRef(null);
   const mapInstanceRef = useRef(null);
 
@@ -136,7 +146,7 @@ function LeafletMap({ byCountry, onCountryClick }) {
       circle.bindTooltip(`
         <div style="font-family:'DM Sans',sans-serif;padding:6px 2px;min-width:140px">
           <div style="font-size:13px;font-weight:700;margin-bottom:4px">${country}</div>
-          <div style="font-size:17px;font-weight:700;color:#C9A84C">${fmtRev(rev)}</div>
+          <div style="font-size:17px;font-weight:700;color:#C9A84C">${fmtRev(rev, cur)}</div>
           <div style="font-size:11px;opacity:0.5;margin-top:3px">${stats.count} propert${stats.count === 1 ? 'y' : 'ies'}</div>
         </div>
       `, {
@@ -152,7 +162,7 @@ function LeafletMap({ byCountry, onCountryClick }) {
       map.remove();
       mapInstanceRef.current = null;
     };
-  }, [byCountry, onCountryClick]);
+  }, [byCountry, onCountryClick, cur]);
 
   return (
     <>
@@ -182,7 +192,9 @@ function LeafletMap({ byCountry, onCountryClick }) {
 }
 
 export default function RevenueMap() {
-  const [module, setModule] = useState('hotel');
+  const { settings } = useFormat();
+  const cur = CURRENCY_SYMBOL[settings.default_currency] || '$';
+  const [module, setModule] = useState('retail');
   const [view, setView] = useState('world');
   const [selectedContinent, setSelectedContinent] = useState(null);
   const [data, setData] = useState(null);
@@ -216,28 +228,42 @@ export default function RevenueMap() {
 
   return (
     <div className="animate-fade">
-      <PageHeader title="Revenue Map" sub="Global portfolio performance by region and country" />
+      <PageHeader title="Revenue Map" sub="Your global portfolio at a glance — revenue by region, country, and property" />
 
       <div style={{ display: 'flex', gap: 8, marginBottom: 24 }}>
-        {['hotel', 'retail'].map(m => (
+        {['retail', 'hotel'].map(m => (
           <button key={m}
             onClick={() => { setModule(m); setView('world'); setSelectedContinent(null); }}
             style={{ padding: '8px 20px', borderRadius: 8, border: '1.5px solid var(--border)', fontFamily: 'DM Sans', fontSize: 13, fontWeight: 600, cursor: 'pointer', background: module === m ? 'var(--ink)' : 'white', color: module === m ? 'var(--gold)' : 'var(--slate)', transition: 'all 0.15s' }}>
-            {m === 'hotel' ? '▲ Hospitality' : '▦ Commercial'}
+            {m === 'retail' ? '▦ Commercial' : '▲ Hospitality'}
           </button>
         ))}
       </div>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 16, marginBottom: 24 }}>
         {[
-          { label: 'Total Revenue', value: fmtRev(totalRevenue) },
-          { label: 'Properties', value: totalProperties.toLocaleString() },
-          { label: 'Countries', value: totalCountries },
-          { label: 'Continents', value: Object.keys(data?.by_continent || {}).length },
+          { label: 'Total Revenue', value: fmtRev(totalRevenue, cur), icon: '◆', accent: true },
+          { label: 'Properties', value: totalProperties.toLocaleString(), icon: '▦' },
+          { label: 'Countries', value: totalCountries, icon: '◉' },
+          { label: 'Continents', value: Object.keys(data?.by_continent || {}).length, icon: '✦' },
         ].map(s => (
-          <div key={s.label} style={{ background: 'var(--ink)', borderRadius: 12, padding: '20px 24px', color: 'white' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.1em', opacity: 0.6, marginBottom: 8 }}>{s.label}</div>
-            <div style={{ fontSize: 28, fontFamily: 'DM Serif Display' }}>{loading ? '…' : s.value}</div>
+          <div key={s.label} style={{
+            position: 'relative', overflow: 'hidden',
+            background: s.accent
+              ? 'linear-gradient(135deg, #1a1d2e 0%, #0f1117 100%)'
+              : 'var(--ink)',
+            borderRadius: 14, padding: '22px 24px', color: 'white',
+            border: s.accent ? '1px solid rgba(201,168,76,0.35)' : '1px solid rgba(255,255,255,0.06)',
+          }}>
+            <div style={{
+              position: 'absolute', top: 16, right: 18, fontSize: 18,
+              color: s.accent ? 'var(--gold)' : 'rgba(255,255,255,0.18)',
+            }}>{s.icon}</div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.12em', opacity: 0.55, marginBottom: 10 }}>{s.label}</div>
+            <div style={{
+              fontSize: 30, fontFamily: 'DM Serif Display', lineHeight: 1,
+              color: s.accent ? 'var(--gold)' : 'white',
+            }}>{loading ? '…' : s.value}</div>
           </div>
         ))}
       </div>
@@ -269,6 +295,7 @@ export default function RevenueMap() {
                 key={module}
                 byCountry={data.by_country || {}}
                 onCountryClick={handleCountryClick}
+                cur={cur}
               />
             )}
           </>
@@ -285,7 +312,7 @@ export default function RevenueMap() {
             <div style={{ padding: 24 }}>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
                 {[
-                  { label: 'Total Revenue', value: fmtRev(totalRev), color: 'var(--ink)' },
+                  { label: 'Total Revenue', value: fmtRev(totalRev, cur), color: 'var(--ink)' },
                   { label: 'Properties', value: (contData?.count || 0).toLocaleString(), color: '#2D4A3E' },
                   { label: 'Countries', value: countries.length, color: '#3D3520' },
                 ].map(s => (
@@ -303,27 +330,41 @@ export default function RevenueMap() {
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                     <thead>
                       <tr>
-                        {['Country', 'Revenue', 'Properties', 'Revenue Share'].map(h => (
-                          <th key={h} style={{ textAlign: 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', borderBottom: '2px solid var(--border)' }}>{h}</th>
+                        {['#', 'Country', 'Revenue', 'Properties', 'Revenue Share'].map(h => (
+                          <th key={h} style={{ textAlign: h === '#' ? 'center' : 'left', padding: '10px 14px', fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--slate)', borderBottom: '2px solid var(--border)' }}>{h}</th>
                         ))}
                       </tr>
                     </thead>
                     <tbody>
-                      {countries.map(([country, stats]) => {
+                      {countries.map(([country, stats], i) => {
                         const share = totalRev > 0 ? (stats.revenue / totalRev * 100).toFixed(1) : 0;
+                        const isTop = i === 0;
                         return (
                           <tr key={country}
                             onMouseEnter={e => e.currentTarget.style.background = 'var(--cream)'}
-                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}>
+                            onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                            style={{ transition: 'background 0.12s' }}>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', textAlign: 'center' }}>
+                              <span style={{
+                                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                                width: 24, height: 24, borderRadius: 6, fontSize: 12, fontWeight: 700,
+                                background: isTop ? 'var(--gold)' : 'var(--border)',
+                                color: isTop ? 'var(--ink)' : 'var(--slate)',
+                              }}>{i + 1}</span>
+                            </td>
                             <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>{country}</td>
-                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--sage)', fontWeight: 600 }}>{fmtRev(stats.revenue)}</td>
-                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)' }}>{stats.count}</td>
-                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', minWidth: 160 }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                <div style={{ flex: 1, height: 6, background: 'var(--border)', borderRadius: 3 }}>
-                                  <div style={{ width: `${share}%`, height: '100%', background: 'var(--gold)', borderRadius: 3 }} />
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', fontFamily: 'DM Mono, monospace', fontWeight: 600, color: 'var(--ink)' }}>{fmtRev(stats.revenue, cur)}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', color: 'var(--slate)' }}>{stats.count}</td>
+                            <td style={{ padding: '12px 14px', borderBottom: '1px solid var(--border)', minWidth: 180 }}>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                <div style={{ flex: 1, height: 8, background: 'var(--border)', borderRadius: 4, overflow: 'hidden' }}>
+                                  <div style={{
+                                    width: `${share}%`, height: '100%', borderRadius: 4,
+                                    background: 'linear-gradient(90deg, #C9A84C 0%, #E0C46A 100%)',
+                                    transition: 'width 0.5s ease',
+                                  }} />
                                 </div>
-                                <span style={{ fontSize: 12, minWidth: 36 }}>{share}%</span>
+                                <span style={{ fontSize: 12, fontWeight: 600, minWidth: 42, fontFamily: 'DM Mono, monospace' }}>{share}%</span>
                               </div>
                             </td>
                           </tr>
