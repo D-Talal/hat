@@ -120,13 +120,17 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
                 .catch(() => null)
             )
           );
-          fetched.filter(Boolean).forEach(sp => {
+          fetched.filter(Boolean).forEach(d => {
+            // /detail returns { space: {...}, current_area_sqm, hierarchy, ... }
+            const sp = d.space || d;
             forEntity.push({
               id: sp.id,
               space_code: sp.space_code,
               usage_type: sp.usage_type,
               status: sp.status,
-              area_sqm: sp.area_sqm ?? sp.current_area_sqm,
+              current_area_sqm: d.current_area_sqm ?? sp.area_sqm,
+              building_name: d.hierarchy?.building_name,
+              floor_number: d.hierarchy?.floor_number,
               business_entity_id: form.business_entity_id,
             });
           });
@@ -551,7 +555,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                   return (
                     <tr key={c.id}>
                       <td style={{ padding: '10px', borderBottom: '1px solid var(--border)' }}>
-                        <span style={{ background: ct.bg, color: ct.color, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{ct.label || c.condition_type}</span>
+                        <span style={{ background: ct.bg, color: ct.text, borderRadius: 5, padding: '2px 8px', fontSize: 11, fontWeight: 700 }}>{ct.label || c.condition_type}</span>
                       </td>
                       <td style={{ padding: '10px', borderBottom: '1px solid var(--border)', fontWeight: 600 }}>{c.amount ? `${Number(c.amount).toLocaleString()} ${c.currency}` : c.condition_type === 'markup_fee' ? `${((c.markup_rate || 0) * 100).toFixed(0)}%` : '—'}</td>
                       <td style={{ padding: '10px', borderBottom: '1px solid var(--border)', color: 'var(--slate)' }}>{c.frequency}</td>
