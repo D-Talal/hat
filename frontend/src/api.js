@@ -39,17 +39,7 @@ export const mapAPI = {
   stats: (module) => API.get(`/map/stats?module=${module}`),
 };
 
-export const retail = {
-  stats: () => API.get('/retail/stats'),
-  properties: { list: () => API.get('/retail/properties'), create: (d) => API.post('/retail/properties', d), update: (id, d) => API.put(`/retail/properties/${id}`, d), delete: (id) => API.delete(`/retail/properties/${id}`) },
-  units: { list: () => API.get('/retail/units'), create: (d) => API.post('/retail/units', d), update: (id, d) => API.put(`/retail/units/${id}`, d), delete: (id) => API.delete(`/retail/units/${id}`) },
-  tenants: { list: () => API.get('/retail/tenants'), create: (d) => API.post('/retail/tenants', d), update: (id, d) => API.put(`/retail/tenants/${id}`, d), delete: (id) => API.delete(`/retail/tenants/${id}`) },
-  invoices: { list: () => API.get('/retail/invoices'), create: (d) => API.post('/retail/invoices', d), update: (id, d) => API.put(`/retail/invoices/${id}`, d), delete: (id) => API.delete(`/retail/invoices/${id}`) },
-  maintenance: { list: () => API.get('/retail/maintenance'), create: (d) => API.post('/retail/maintenance', d), update: (id, d) => API.put(`/retail/maintenance/${id}`, d), delete: (id) => API.delete(`/retail/maintenance/${id}`) },
-};
-
 export const hotel = {
-  stats: () => API.get('/hotel/stats'),
   hotelPdf: {
     stayInvoice: (bookingId) => API.get(`/pdf/hotel-stay/${bookingId}`, { responseType: 'blob' }),
   },
