@@ -41,8 +41,8 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   const [formError, setFormError] = useState('');
   const [form, setForm] = useState({
     contract_number: initial?.contract_number || '',
-    business_partner_id: initial?.business_partner_id || '',
-    business_entity_id: initial?.business_entity_id || '',
+    business_partner_id: initial?.business_partner_id || initial?.business_partner?.id || '',
+    business_entity_id: initial?.business_entity_id || initial?.business_entity?.id || '',
     contract_type: initial?.contract_type || 'lease_out',
     start_date: initial?.start_date || '',
     first_end_date: initial?.first_end_date || '',
