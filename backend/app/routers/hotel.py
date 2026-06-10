@@ -60,6 +60,12 @@ class RoomOut(RoomCreate):
     hotel_id: int
     class Config: from_attributes = True
 
+class RoomOutWithHotel(RoomOut):
+    hotel_name: Optional[str] = None
+
+class RoomCreateGlobal(RoomCreate):
+    hotel_id: int
+
 class GuestCreate(BaseModel):
     first_name: str
     last_name: str
@@ -162,6 +168,36 @@ def delete_room(id: int, db: Session = Depends(get_db), u=Depends(require_permis
     if not obj: raise HTTPException(404, "Room not found")
     db.delete(obj); db.commit()
     return {"ok": True}
+
+# ── ROOMS (org-wide, for the Rooms management page) ───────────────────────────
+
+@router.get("/rooms", response_model=List[RoomOutWithHotel])
+def list_all_rooms(db: Session = Depends(get_db), u=Depends(get_current_user), org=Depends(get_current_org)):
+    """List every room across all hotels of the current organization."""
+    rows = (
+        db.query(Room, Hotel.name)
+        .join(Hotel, Room.hotel_id == Hotel.id)
+        .filter(Hotel.org_id == org.id)
+        .all()
+    )
+    result = []
+    for room, hotel_name in rows:
+        data = RoomOutWithHotel.model_validate(room).model_dump()
+        data["hotel_name"] = hotel_name
+        result.append(data)
+    return result
+
+@router.post("/rooms", response_model=RoomOut)
+def create_room_global(data: RoomCreateGlobal, db: Session = Depends(get_db), u=Depends(require_permission("create")), org=Depends(get_current_org)):
+    """Create a room, taking hotel_id from the request body (org-wide page)."""
+    hotel = db.query(Hotel).filter(Hotel.id == data.hotel_id, Hotel.org_id == org.id).first()
+    if not hotel: raise HTTPException(404, "Hotel not found")
+    payload = data.model_dump()
+    hotel_id = payload.pop("hotel_id")
+    obj = Room(**payload, hotel_id=hotel_id)
+    db.add(obj); db.commit(); db.refresh(obj)
+    audit(db, u, "CREATE", "hotel_rooms", obj.id)
+    return obj
 
 # ── GUESTS ─────────────────────────────────────────────────────────────────────
 
