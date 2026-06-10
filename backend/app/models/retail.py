@@ -182,6 +182,8 @@ class Contract(Base):
     __table_args__ = {'extend_existing': True}
     id = Column(Integer, primary_key=True, index=True)
     contract_number = Column(String(50), unique=True)
+    title = Column(String(200))
+    jurisdiction = Column(String(100))
     business_partner_id = Column(Integer, ForeignKey("re_business_partners.id"), nullable=False)
     business_entity_id = Column(Integer, ForeignKey("re_business_entities.id"), nullable=False)
     contract_type = Column(Enum(ContractType), default=ContractType.lease_out)
