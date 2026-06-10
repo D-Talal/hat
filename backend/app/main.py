@@ -95,6 +95,9 @@ def startup():
     db = SessionLocal()
     try:
         migrations = [
+            # Contract: title + jurisdiction (jurisdiction impacts tax handling)
+            "ALTER TABLE re_contracts ADD COLUMN IF NOT EXISTS title VARCHAR(200)",
+            "ALTER TABLE re_contracts ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(100)",
             # Multi-tenancy
             "CREATE TABLE IF NOT EXISTS organizations (id SERIAL PRIMARY KEY, name VARCHAR(255) NOT NULL, slug VARCHAR(100) UNIQUE NOT NULL, plan VARCHAR(50) DEFAULT 'trial', is_active BOOLEAN DEFAULT true, created_at TIMESTAMPTZ DEFAULT now())",
             "INSERT INTO organizations (name, slug, plan, is_active) SELECT 'Default', 'default', 'trial', true WHERE NOT EXISTS (SELECT 1 FROM organizations WHERE slug='default')",
