@@ -41,19 +41,17 @@ WHITE    = colors.white
 
 
 def _styles():
-    s = getSampleStyleSheet()
-    base = dict(fontName="Helvetica", textColor=DARK)
     return {
-        "title":    ParagraphStyle("title",    **base, fontSize=22, leading=26, spaceAfter=2),
-        "subtitle": ParagraphStyle("subtitle", **base, fontName="Helvetica-Oblique", fontSize=10, textColor=GREY),
-        "h2":       ParagraphStyle("h2",       **base, fontName="Helvetica-Bold", fontSize=12, spaceBefore=14, spaceAfter=6),
-        "body":     ParagraphStyle("body",     **base, fontSize=9,  leading=14),
-        "body_r":   ParagraphStyle("body_r",   **base, fontSize=9,  leading=14, alignment=TA_RIGHT),
-        "small":    ParagraphStyle("small",    **base, fontSize=8,  textColor=GREY),
-        "label":    ParagraphStyle("label",    **base, fontName="Helvetica-Bold", fontSize=8, textColor=GREY),
-        "bold":     ParagraphStyle("bold",     **base, fontName="Helvetica-Bold", fontSize=9),
-        "footer":   ParagraphStyle("footer",   **base, fontSize=7,  textColor=GREY, alignment=TA_CENTER),
-        "amount":   ParagraphStyle("amount",   fontName="Helvetica-Bold", fontSize=14, textColor=BLUE, alignment=TA_RIGHT),
+        "title":    ParagraphStyle("title",    fontName="Helvetica",         fontSize=22, leading=26, spaceAfter=2, textColor=DARK),
+        "subtitle": ParagraphStyle("subtitle", fontName="Helvetica-Oblique", fontSize=10, textColor=GREY),
+        "h2":       ParagraphStyle("h2",       fontName="Helvetica-Bold",    fontSize=12, spaceBefore=14, spaceAfter=6, textColor=DARK),
+        "body":     ParagraphStyle("body",     fontName="Helvetica",         fontSize=9,  leading=14, textColor=DARK),
+        "body_r":   ParagraphStyle("body_r",   fontName="Helvetica",         fontSize=9,  leading=14, alignment=TA_RIGHT, textColor=DARK),
+        "small":    ParagraphStyle("small",    fontName="Helvetica",         fontSize=8,  textColor=GREY),
+        "label":    ParagraphStyle("label",    fontName="Helvetica-Bold",    fontSize=8,  textColor=GREY),
+        "bold":     ParagraphStyle("bold",     fontName="Helvetica-Bold",    fontSize=9,  textColor=DARK),
+        "footer":   ParagraphStyle("footer",   fontName="Helvetica",         fontSize=7,  textColor=GREY, alignment=TA_CENTER),
+        "amount":   ParagraphStyle("amount",   fontName="Helvetica-Bold",    fontSize=14, textColor=BLUE, alignment=TA_RIGHT),
     }
 
 
