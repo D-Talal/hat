@@ -360,6 +360,18 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
               title="Actualiser la liste"
             >↻ Actualiser</button>
           </SectionTitle>
+          {isEdit && (
+            lockStructural ? (
+              <div style={{ background: '#fff8e1', border: '1px solid #f59e0b', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#92400e' }}>
+                🔒 Ce contrat est <strong>actif</strong> — les espaces ne peuvent pas être modifiés.
+                Pour changer les espaces, résiliez puis renouvelez le contrat, ou créez-en un nouveau.
+              </div>
+            ) : (
+              <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: 10, padding: '10px 14px', marginBottom: 12, fontSize: 13, color: '#166534' }}>
+                ✏️ Ce contrat est en <strong>brouillon</strong> — vous pouvez ajouter ou retirer des espaces, puis enregistrer.
+              </div>
+            )
+          )}
           {!form.business_entity_id ? (
             <div style={{ background: '#f0f7ff', border: '1px solid #93c5fd', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#1e40af' }}>
               ℹ️ Sélectionnez d'abord une <strong>Business Entity</strong> pour voir les espaces disponibles.
@@ -379,7 +391,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
                 // A space is clickable if it's leasable OR already selected
                 // (so an occupied space linked to THIS contract can be unchecked).
                 const isLeasable = s === 'available' || s === 'vacant';
-                const isClickable = isLeasable || isSelected;
+                const isClickable = !lockStructural && (isLeasable || isSelected);
                 return (
                   <div key={ro.id}
                     onClick={() => isClickable && toggleObject(ro.id)}
