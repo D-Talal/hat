@@ -9,25 +9,7 @@ import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles'
 import { Field } from '../components/shared/FormHelpers';
 import { daysUntil } from '../data/dates';
 import { getContractStatus } from '../data/contractStatus';
-
-// Turn any API error into a readable string — never returns an object/array,
-// which would crash React rendering (the cause of the blank page on 422s).
-function parseApiError(e) {
-  const detail = e?.response?.data?.detail;
-  if (!detail) return e?.message || 'Une erreur est survenue.';
-  if (typeof detail === 'string') return detail;
-  // FastAPI/Pydantic 422: detail is an array of { loc, msg, ... }
-  if (Array.isArray(detail)) {
-    return detail
-      .map(d => {
-        const field = Array.isArray(d.loc) ? d.loc[d.loc.length - 1] : '';
-        return field ? `${field}: ${d.msg}` : d.msg;
-      })
-      .join(' · ');
-  }
-  if (typeof detail === 'object') return detail.msg || JSON.stringify(detail);
-  return String(detail);
-}
+import { parseApiError } from '../data/apiError';
 
 
 
@@ -222,11 +204,28 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
 
     try {
       if (initial?.id) {
-        await API.patch(`/commercial/contracts/${initial.id}`, clean({
+        const isDraft = initial.status === 'draft';
+        // Draft contracts: full edit. Released/terminated: only end dates + notes.
+        const patch = isDraft ? clean({
+          business_partner_id: form.business_partner_id,
+          contract_type: form.contract_type,
+          start_date: form.start_date,
+          first_end_date: form.first_end_date,
+          probable_end_date: form.probable_end_date,
+          absolute_end_date: form.absolute_end_date,
+          notice_date: form.notice_date,
+          signing_date: form.signing_date,
+          payment_timing: form.payment_timing,
+          day_count_method: form.day_count_method,
+          pro_rata_enabled: form.pro_rata_enabled,
+          relevant_to_sales: form.relevant_to_sales,
+          notes: form.notes,
+        }) : clean({
           probable_end_date: form.probable_end_date,
           absolute_end_date: form.absolute_end_date,
           notes: form.notes,
-        }));
+        });
+        await API.patch(`/commercial/contracts/${initial.id}`, patch);
       } else {
         await API.post('/commercial/contracts', { ...clean(form), space_ids: selectedObjects });
       }
@@ -237,6 +236,8 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   };
 
   const isEdit = !!initial?.id;
+  const isDraft = !isEdit || initial?.status === 'draft';
+  const lockStructural = isEdit && !isDraft; // released/terminated: lock structural fields
 
   // Red border when a date field is invalid
   const dateInputStyle = (invalid) => invalid
@@ -265,7 +266,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           {!isEdit && form.contract_number && <DuplicateWarning value={form.contract_number} field="contract_number" />}
         </Field>
         <Field label={tc.contractType}>
-          <select style={inputStyle} value={form.contract_type} onChange={set('contract_type')} disabled={isEdit}>
+          <select style={inputStyle} value={form.contract_type} onChange={set('contract_type')} disabled={lockStructural}>
             <option value="lease_out">Lease Out (LO) — Landlord → Tenant</option>
             <option value="lease_in">Lease In (LI) — Tenant from Landlord</option>
           </select>
@@ -283,7 +284,7 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           )}
         </Field>
         <Field label={tc.businessPartner + " *"}>
-          <select style={inputStyle} value={form.business_partner_id} onChange={set('business_partner_id')} disabled={isEdit}>
+          <select style={inputStyle} value={form.business_partner_id} onChange={set('business_partner_id')} disabled={lockStructural}>
             <option value="">— Select —</option>
             {partners.map(p => <option key={p.id} value={p.id}>{p.company_name}</option>)}
           </select>
@@ -294,12 +295,12 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
       <div style={{ background: '#f0f7ff', borderRadius: 10, padding: 16, marginBottom: 8 }}>
         <div style={{ fontSize: 12, color: '#1565c0', marginBottom: 12 }}>ℹ Any modification to these dates creates a new time slot.</div>
         <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16 }}>
-          <Field label={tc.startDate + " *"}><input style={dateInputStyle(!form.start_date)} type="date" value={form.start_date} onChange={set('start_date')} disabled={isEdit} /></Field>
-          <Field label={tc.firstEndDate}><input style={dateInputStyle(form.first_end_date && form.start_date && new Date(form.first_end_date) <= new Date(form.start_date))} type="date" value={form.first_end_date} onChange={set('first_end_date')} disabled={isEdit} min={form.start_date || undefined} /></Field>
+          <Field label={tc.startDate + " *"}><input style={dateInputStyle(!form.start_date)} type="date" value={form.start_date} onChange={set('start_date')} disabled={lockStructural} /></Field>
+          <Field label={tc.firstEndDate}><input style={dateInputStyle(form.first_end_date && form.start_date && new Date(form.first_end_date) <= new Date(form.start_date))} type="date" value={form.first_end_date} onChange={set('first_end_date')} disabled={lockStructural} min={form.start_date || undefined} /></Field>
           <Field label={tc.probableEndDate}><input style={dateInputStyle(form.probable_end_date && form.start_date && new Date(form.probable_end_date) <= new Date(form.start_date))} type="date" value={form.probable_end_date} onChange={set('probable_end_date')} min={form.start_date || undefined} /></Field>
           <Field label={tc.absoluteEndDate}><input style={dateInputStyle(form.absolute_end_date && form.start_date && new Date(form.absolute_end_date) <= new Date(form.start_date))} type="date" value={form.absolute_end_date} onChange={set('absolute_end_date')} min={form.start_date || undefined} /></Field>
-          <Field label={tc.noticeDate}><input style={inputStyle} type="date" value={form.notice_date} onChange={set('notice_date')} disabled={isEdit} min={form.start_date || undefined} /></Field>
-          <Field label={tc.signingDate}><input style={inputStyle} type="date" value={form.signing_date} onChange={set('signing_date')} disabled={isEdit} /></Field>
+          <Field label={tc.noticeDate}><input style={inputStyle} type="date" value={form.notice_date} onChange={set('notice_date')} disabled={lockStructural} min={form.start_date || undefined} /></Field>
+          <Field label={tc.signingDate}><input style={inputStyle} type="date" value={form.signing_date} onChange={set('signing_date')} disabled={lockStructural} /></Field>
         </div>
         {liveDateHint && (
           <div style={{ marginTop: 10, fontSize: 12, color: '#c62828', display: 'flex', alignItems: 'center', gap: 6 }}>

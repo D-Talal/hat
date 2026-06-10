@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 
 // Using shared constants from ../data/constants
@@ -73,15 +74,20 @@ function ConditionForm({ onSave, onClose, initial, existingItems = [] }) {
 
   const save = async () => {
     setFormError('');
+    if (!form.contract_id) { setFormError('Veuillez sélectionner un contrat.'); return; }
+    if (!form.valid_from) { setFormError('La date de début (valid from) est obligatoire.'); return; }
     if (form.condition_code.trim()) {
       const dupErr = checkDuplicate(form);
       if (dupErr) { setFormError(dupErr); return; }
     }
+    // Strip empty strings so the backend receives null, not "" (avoids 422)
+    const payload = {};
+    for (const [k, v] of Object.entries(form)) payload[k] = v === '' ? null : v;
     try {
-      if (initial?.id) await API.put(`/commercial/conditions/${initial.id}`, form);
-      else await API.post('/commercial/conditions', form);
+      if (initial?.id) await API.put(`/commercial/conditions/${initial.id}`, payload);
+      else await API.post('/commercial/conditions', payload);
       onSave(); onClose();
-    } catch (e) { setFormError(e.response?.data?.detail || 'Error'); }
+    } catch (e) { setFormError(parseApiError(e)); }
   };
 
   const isEdit = !!initial?.id;
