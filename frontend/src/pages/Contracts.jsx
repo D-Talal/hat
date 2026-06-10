@@ -346,6 +346,11 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
               </label>
             ))}
           </div>
+        </>
+      )}
+
+      {/* Rental spaces — shown in both create and edit modes */}
+      <>
           <SectionTitle>
             Espaces locatifs
             <button
@@ -397,7 +402,6 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
             </div>
           )}
         </>
-      )}
 
       <Field label={tc.notes}><textarea style={{ ...inputStyle, minHeight: 72, resize: 'vertical' }} value={form.notes} onChange={set('notes')} /></Field>
 
