@@ -432,7 +432,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
 
   const downloadInvoicePdf = async (invoiceId) => {
     try {
-      const res = await API.get(`/commercial/invoices/${invoiceId}/pdf`, { responseType: 'blob' });
+      const res = await API.get(`/pdf/invoice/${invoiceId}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
@@ -938,7 +938,7 @@ export default function Contracts() {
 
   const downloadStatement = async (contractId, contractNumber) => {
     try {
-      const res = await API.get(`/commercial/contracts/${contractId}/pdf`, { responseType: 'blob' });
+      const res = await API.get(`/pdf/lease-statement/${contractId}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a');
       a.href = url;
