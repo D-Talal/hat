@@ -318,6 +318,8 @@ class ContractOut(BaseModel):
     pro_rata_enabled: bool = True
     notes: Optional[str] = None
     created_at: datetime
+    business_partner_id: Optional[int] = None
+    business_entity_id: Optional[int] = None
     business_partner: Optional[BusinessPartnerOut] = None
     business_entity: Optional[BusinessEntityMini] = None
     space_ids: List[int] = []
