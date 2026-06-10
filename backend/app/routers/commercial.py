@@ -284,6 +284,7 @@ class ContractPatch(BaseModel):
     pro_rata_enabled: Optional[bool] = None
     relevant_to_sales: Optional[bool] = None
     notes: Optional[str] = None
+    space_ids: Optional[List[int]] = None  # None = don't touch; [] = clear all
 
     @field_validator(
         'start_date', 'first_end_date', 'probable_end_date', 'absolute_end_date',
@@ -927,8 +928,11 @@ def patch_contract(id: int, data: ContractPatch, db: Session = Depends(get_db), 
 
     updates = data.dict(exclude_none=True)
 
+    # space_ids is handled separately (it's a relationship sync, not a column set)
+    new_space_ids = updates.pop("space_ids", None)
+
     # On released/terminated contracts, only a few fields may change. Structural
-    # fields (partner, type, start date, etc.) are locked once the contract is live.
+    # fields (partner, type, start date, spaces, etc.) are locked once live.
     if obj.status != "draft":
         allowed = {"status", "title", "jurisdiction", "probable_end_date", "absolute_end_date", "notes"}
         blocked = set(updates) - allowed
@@ -937,9 +941,36 @@ def patch_contract(id: int, data: ContractPatch, db: Session = Depends(get_db), 
                 400,
                 f"Ces champs ne peuvent être modifiés que sur un contrat brouillon : {', '.join(sorted(blocked))}"
             )
+        if new_space_ids is not None:
+            raise HTTPException(400, "Les espaces ne peuvent être modifiés que sur un contrat brouillon.")
 
     for k, v in updates.items():
         setattr(obj, k, v)
+
+    # Sync rental spaces (draft only, guarded above)
+    if new_space_ids is not None:
+        existing = db.query(ContractObject).filter(ContractObject.contract_id == id).all()
+        existing_ids = {co.space_id for co in existing}
+        target_ids = set(new_space_ids)
+
+        # Remove links no longer wanted → free those spaces back to vacant
+        for co in existing:
+            if co.space_id not in target_ids:
+                sp = db.query(Space).filter(Space.id == co.space_id).first()
+                if sp:
+                    sp.status = SpaceStatus.vacant
+                db.delete(co)
+
+        # Add new links → mark those spaces occupied
+        for sid in target_ids - existing_ids:
+            db.add(ContractObject(
+                contract_id=id, space_id=sid,
+                valid_from=obj.start_date or date.today(),
+            ))
+            sp = db.query(Space).filter(Space.id == sid).first()
+            if sp:
+                sp.status = SpaceStatus.occupied
+
     db.commit(); db.refresh(obj)
     audit(db, u, "UPDATE", "re_contracts", id, f"status={obj.status}")
     # Reload with relations for clean serialization
