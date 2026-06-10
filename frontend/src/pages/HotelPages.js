@@ -94,7 +94,9 @@ export function HotelRooms() {
   return <CrudPage title="Rooms" sub="Room inventory and availability" api={hotel.rooms}
     emptyForm={{ hotel_id: '', room_number: '', floor: '', room_type: '', bed_type: '', capacity: 2, area_sqft: '', base_rate: '', status: 'available', amenities: '' }}
     columns={[
-      { key: 'room_number', label: 'Room' }, { key: 'room_type', label: 'Type' }, { key: 'bed_type', label: 'Bed' },
+      { key: 'room_number', label: 'Room' },
+      { key: 'hotel_name', label: 'Hotel', render: v => v || '—' },
+      { key: 'room_type', label: 'Type' }, { key: 'bed_type', label: 'Bed' },
       { key: 'capacity', label: 'Capacity', render: v => `${v} guests` },
       { key: 'base_rate', label: 'Rate/night', render: v => v ? `$${Number(v).toLocaleString()}` : '—' },
       { key: 'status', label: 'Status', badge: true },
