@@ -211,6 +211,8 @@ class BusinessPartnerOut(BaseModel):
 
 class ContractCreate(BaseModel):
     contract_number: Optional[str] = None
+    title: Optional[str] = None
+    jurisdiction: Optional[str] = None
     business_partner_id: int
     business_entity_id: int
     contract_type: Optional[str] = "lease_out"
@@ -267,6 +269,8 @@ class ContractCreate(BaseModel):
 
 class ContractPatch(BaseModel):
     status: Optional[str] = None
+    title: Optional[str] = None
+    jurisdiction: Optional[str] = None
     business_partner_id: Optional[int] = None
     contract_type: Optional[str] = None
     start_date: Optional[date] = None
@@ -303,6 +307,8 @@ class BusinessEntityMini(BaseModel):
 class ContractOut(BaseModel):
     id: int
     contract_number: Optional[str] = None
+    title: Optional[str] = None
+    jurisdiction: Optional[str] = None
     contract_type: str = "lease_out"
     status: str = "draft"
     start_date: date
@@ -842,6 +848,45 @@ def list_contracts(status: Optional[str] = None, db: Session = Depends(get_db), 
         result.append(out)
     return result
 
+@router.get("/contracts/{id}/spaces")
+def get_contract_spaces(id: int, db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """
+    Return the spaces linked to a contract, with everything the edit form needs
+    to render them (code, usage, status, area, building/floor). Self-contained so
+    the frontend doesn't have to stitch together spaces-leasable + space detail.
+    """
+    contract = db.query(Contract).filter(Contract.id == id).first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+
+    cos = db.query(ContractObject).options(
+        joinedload(ContractObject.space).joinedload(Space.floor).joinedload(Floor.building),
+        joinedload(ContractObject.space).joinedload(Space.measurements),
+    ).filter(ContractObject.contract_id == id).all()
+
+    out = []
+    for co in cos:
+        sp = co.space
+        if not sp:
+            continue
+        st = sp.status
+        status_str = st.value if hasattr(st, 'value') else (str(st).split('.')[-1] if st else "available")
+        floor = sp.floor
+        building = floor.building if floor else None
+        # current area = measurement with no valid_to
+        current_m = next((m for m in (sp.measurements or []) if not m.valid_to), None)
+        out.append({
+            "id": sp.id,
+            "space_code": sp.space_code,
+            "usage_type": sp.usage_type,
+            "status": status_str,
+            "current_area_sqm": float(current_m.area_sqm) if current_m else None,
+            "building_name": building.name if building else None,
+            "floor_number": floor.floor_number if floor else None,
+            "business_entity_id": building.business_entity_id if building else None,
+        })
+    return out
+
 @router.post("/contracts", response_model=ContractOut)
 def create_contract(data: ContractCreate, db: Session = Depends(get_db), u=Depends(require_permission("create"))):
     space_ids = data.space_ids or []
@@ -885,7 +930,7 @@ def patch_contract(id: int, data: ContractPatch, db: Session = Depends(get_db), 
     # On released/terminated contracts, only a few fields may change. Structural
     # fields (partner, type, start date, etc.) are locked once the contract is live.
     if obj.status != "draft":
-        allowed = {"status", "probable_end_date", "absolute_end_date", "notes"}
+        allowed = {"status", "title", "jurisdiction", "probable_end_date", "absolute_end_date", "notes"}
         blocked = set(updates) - allowed
         if blocked:
             raise HTTPException(
