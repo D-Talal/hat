@@ -144,3 +144,76 @@ def test_cannot_edit_spaces_on_released(client, db_session, admin_user, partner_
         json={"space_ids": [1, 2]},
     )
     assert r.status_code == 400
+
+
+# ── Amendments (avenants) ─────────────────────────────────────────────────────
+
+def test_amend_draft_rejected(client, db_session, admin_user, partner_and_entity):
+    """An amendment only applies to an active (released) contract."""
+    bp, be = partner_and_entity
+    contract = _make_contract(db_session, bp, be, status=ContractStatus.draft, number="LO-AMD-D")
+    r = client.post(
+        f"/api/commercial/contracts/{contract.id}/amend",
+        headers=auth_headers(admin_user),
+        json={"effective_date": "2026-06-01"},
+    )
+    assert r.status_code == 400
+
+
+def test_amend_rent_change_creates_dated_condition(client, db_session, admin_user, partner_and_entity):
+    bp, be = partner_and_entity
+    contract = _make_contract(db_session, bp, be, status=ContractStatus.released, number="LO-AMD-R")
+    db_session.add(Condition(
+        contract_id=contract.id, condition_type=ConditionType.base_rent,
+        valid_from=date(2026, 1, 1), amount=2000, currency="EUR",
+    ))
+    db_session.commit()
+
+    r = client.post(
+        f"/api/commercial/contracts/{contract.id}/amend",
+        headers=auth_headers(admin_user),
+        json={"effective_date": "2026-06-01", "new_rent": {"condition_type": "base_rent", "amount": 3000}},
+    )
+    assert r.status_code == 200
+    body = r.json()
+    assert body["amendment_number"].startswith("AV-")
+
+    # The old rent period is closed, a new one opens at the effective date
+    conds = db_session.query(Condition).filter(
+        Condition.contract_id == contract.id,
+        Condition.condition_type == ConditionType.base_rent,
+    ).all()
+    assert len(conds) == 2
+    amounts = sorted(float(c.amount) for c in conds)
+    assert amounts == [2000, 3000]
+
+
+def test_amend_extends_end_date(client, db_session, admin_user, partner_and_entity):
+    bp, be = partner_and_entity
+    contract = _make_contract(db_session, bp, be, status=ContractStatus.released, number="LO-AMD-E")
+    r = client.post(
+        f"/api/commercial/contracts/{contract.id}/amend",
+        headers=auth_headers(admin_user),
+        json={"effective_date": "2026-06-01", "new_end_date": "2027-12-31"},
+    )
+    assert r.status_code == 200
+    db_session.refresh(contract)
+    assert contract.absolute_end_date == date(2027, 12, 31)
+
+
+def test_list_amendments(client, db_session, admin_user, partner_and_entity):
+    bp, be = partner_and_entity
+    contract = _make_contract(db_session, bp, be, status=ContractStatus.released, number="LO-AMD-L")
+    client.post(
+        f"/api/commercial/contracts/{contract.id}/amend",
+        headers=auth_headers(admin_user),
+        json={"effective_date": "2026-06-01", "reason": "Test", "new_end_date": "2027-01-01"},
+    )
+    r = client.get(
+        f"/api/commercial/contracts/{contract.id}/amendments",
+        headers=auth_headers(admin_user),
+    )
+    assert r.status_code == 200
+    rows = r.json()
+    assert len(rows) == 1
+    assert rows[0]["reason"] == "Test"
