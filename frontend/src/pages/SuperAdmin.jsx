@@ -3,6 +3,7 @@ import API from '../api';
 import { useToast } from '../context/ToastContext';
 import { useAuth } from '../context/AuthContext';
 import { PageHeader } from '../components/UI';
+import { parseApiError } from '../data/apiError';
 
 function StatusBadge({ validated, active }) {
   if (!active)    return <span style={{ padding: '2px 10px', borderRadius: 20, fontSize: 11, fontWeight: 700, background: '#fef2f2', color: '#dc2626' }}>REJECTED</span>;
@@ -24,7 +25,7 @@ export default function SuperAdmin() {
       const res = await API.get('/super-admin/orgs');
       setOrgs(res.data);
     } catch (e) {
-      setError(e.response?.data?.detail || 'Access denied');
+      setError(parseApiError(e, 'Access denied'));
     } finally {
       setLoading(false);
     }
@@ -38,7 +39,7 @@ export default function SuperAdmin() {
       await API.post(`/super-admin/orgs/${id}/validate`);
       await load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Échec');
+      toast.error(parseApiError(e, 'Échec'));
     } finally {
       setActionLoading(null);
     }
@@ -51,7 +52,7 @@ export default function SuperAdmin() {
       await API.post(`/super-admin/orgs/${id}/reject`);
       await load();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Échec');
+      toast.error(parseApiError(e, 'Échec'));
     } finally {
       setActionLoading(null);
     }

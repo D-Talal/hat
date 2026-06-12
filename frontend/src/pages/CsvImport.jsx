@@ -3,6 +3,7 @@ import API from "../api";
 import { useToast } from "../context/ToastContext";
 import { useLanguage } from "../context/LanguageContext";
 import { PageHeader, Card } from "../components/UI";
+import { parseApiError } from '../data/apiError';
 
 const STEPS = [
   {
@@ -115,7 +116,7 @@ function ImportStep({ step, language }) {
       setResult(res.data);
       setFile(null);
     } catch (e) {
-      setResult({ imported: 0, skipped: 0, errors: [{ row: '?', error: e.response?.data?.detail || e.message }] });
+      setResult({ imported: 0, skipped: 0, errors: [{ row: '?', error: parseApiError(e)}] });
     } finally {
       setLoading(false);
     }

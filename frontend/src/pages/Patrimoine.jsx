@@ -7,6 +7,7 @@ import CurrencySelect from '../components/shared/CurrencySelect';
 import { SPACE_STATUSES, USAGE_TYPES } from '../data/constants';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { btnPrimary, btnSecondary, btnAdd } from '../data/styles';
+import { parseApiError } from '../data/apiError';
 
 const SPACE_STATUS_COLORS = Object.fromEntries(
   Object.entries(SPACE_STATUSES).map(([k, v]) => [k, { bg: v.bg, text: v.text }])
@@ -109,7 +110,7 @@ function CompanyCodeForm({ onSave, onClose, t, initial, existingItems = [] }) {
       if (initial) await loc.companyCodes.update(initial.id, payload);
       else         await loc.companyCodes.create(payload);
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || t.common.error); }
+    } catch (e) { setError(parseApiError(e, t.common.error)); }
     finally { setSaving(false); }
   };
 
@@ -181,7 +182,7 @@ function BusinessEntityForm({ onSave, onClose, t, initial, companyCodeId, existi
       if (initial) await loc.businessEntities.update(initial.id, form);
       else         await loc.businessEntities.create(form);
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || t.common.error); }
+    } catch (e) { setError(parseApiError(e, t.common.error)); }
     finally { setSaving(false); }
   };
 
@@ -244,7 +245,7 @@ function BuildingForm({ beId, onSave, onClose, t, initial, existingBuildings = [
       if (initial) await loc.buildings.update(initial.id, payload);
       else         await loc.buildings.create(beId, payload);
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || t.common.error); }
+    } catch (e) { setError(parseApiError(e, t.common.error)); }
     finally { setSaving(false); }
   };
 
@@ -311,7 +312,7 @@ function FloorForm({ buildingId, onSave, onClose, t, initial, buildingTotalSqm, 
       if (initial) await loc.floors.update(initial.id, payload);
       else         await loc.floors.create(buildingId, payload);
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || t.common.error); }
+    } catch (e) { setError(parseApiError(e, t.common.error)); }
     finally { setSaving(false); }
   };
 
@@ -384,7 +385,7 @@ function SpaceForm({ floorId, onSave, onClose, t, initial, floorAreaSqm, existin
       if (initial) await loc.spaces.update(initial.id, payload);
       else         await loc.spaces.create(floorId, payload);
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || t.common.error); }
+    } catch (e) { setError(parseApiError(e, t.common.error)); }
     finally { setSaving(false); }
   };
 
@@ -474,7 +475,7 @@ function SpaceDetail({ spaceId, onClose }) {
     setLoading(true);
     API.get(`/commercial/spaces/${spaceId}/detail`)
       .then(r => setData(r.data))
-      .catch(e => setError(e.response?.data?.detail || 'Erreur de chargement'))
+      .catch(e => setError(parseApiError(e, 'Erreur de chargement')))
       .finally(() => setLoading(false));
   }, [spaceId]);
 
@@ -886,7 +887,7 @@ export default function Patrimoine() {
         await loc.spaces.delete(confirm.id);
         if (selectedFloor) loadSpaces(selectedFloor.id);
       }
-    } catch (e) { setApiError(e.response?.data?.detail || t.common.error); }
+    } catch (e) { setApiError(parseApiError(e, t.common.error)); }
     setConfirm(null);
   };
 

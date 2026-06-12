@@ -3,6 +3,7 @@ import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGri
 import API from '../api';
 import { useLanguage } from '../context/LanguageContext';
 import { useFormat } from '../data/format';
+import { parseApiError } from '../data/apiError';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const card = {
@@ -101,7 +102,7 @@ export default function HotelDashboard({ embedded = false }) {
       setData(dashRes.data);
       setHotels(hotelsRes.data || []);
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to load dashboard');
+      setError(parseApiError(e, 'Failed to load dashboard'));
     } finally { setLoading(false); }
   }, [selectedHotel]);
 

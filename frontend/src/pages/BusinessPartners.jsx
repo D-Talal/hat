@@ -7,6 +7,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 const ROLES = ['master_tenant', 'guarantor', 'landlord', 'vendor', 'contact_person'];
 const ROLE_LABELS = {
@@ -63,7 +64,7 @@ function BPForm({ onSave, onClose, initial, existingItems = [] }) {
       if (initial?.id) await API.put(`/commercial/business-partners/${initial.id}`, { ...form, roles });
       else             await API.post('/commercial/business-partners', { ...form, roles });
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
+    } catch (e) { setError(parseApiError(e, 'Error')); }
   };
 
   return (

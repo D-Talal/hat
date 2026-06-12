@@ -743,7 +743,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                     try {
                       const r = await API.post(`/commercial/contracts/${contract.id}/generate-invoices?period_from=${qFrom}&period_to=${qTo}`);
                       setQResult(r.data);
-                    } catch(e) { setQError(e.response?.data?.detail || 'Erreur lors de la génération'); }
+                    } catch(e) { setQError(parseApiError(e, 'Erreur lors de la génération')); }
                     finally { setQLoading(false); }
                   }} style={btnPrimary} disabled={qLoading}>
                     {qLoading ? 'Génération…' : '⚡ Générer'}
@@ -798,7 +798,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                     try {
                       const r = await API.post(`/commercial/contracts/${contract.id}/apply-ipc?new_index=${ipcIndex}&applied_date=${ipcDate}`);
                       setIpcResult(r.data);
-                    } catch(e) { setIpcError(e.response?.data?.detail || 'Erreur lors de la révision IPC'); }
+                    } catch(e) { setIpcError(parseApiError(e, 'Erreur lors de la révision IPC')); }
                     finally { setIpcLoading(false); }
                   }} style={{ ...btnPrimary, background: '#ca8a04' }} disabled={ipcLoading}>
                     {ipcLoading ? 'Application…' : '📈 Appliquer'}
@@ -874,7 +874,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                       if (termReason) url += `&reason=${encodeURIComponent(termReason)}`;
                       const r = await API.post(url);
                       setTermResult(r.data);
-                    } catch(e) { setTermError(e.response?.data?.detail || 'Erreur lors de la résiliation'); }
+                    } catch(e) { setTermError(parseApiError(e, 'Erreur lors de la résiliation')); }
                     finally { setTermLoading(false); }
                   }} style={{ ...btnPrimary, background: '#dc2626' }} disabled={termLoading}>
                     {termLoading ? 'Résiliation…' : '🛑 Confirmer la résiliation'}
@@ -937,7 +937,7 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
                       const r = await API.post(`/commercial/contracts/${contract.id}/renew?${params.toString()}`);
                       setRenewResult(r.data);
                     } catch (e) {
-                      setRenewError(e.response?.data?.detail || 'Erreur lors du renouvellement.');
+                      setRenewError(parseApiError(e, 'Erreur lors du renouvellement.'));
                     } finally {
                       setRenewLoading(false);
                     }
@@ -1042,7 +1042,7 @@ export default function Contracts() {
       const updated = (r.data || []).find(c => c.id === id);
       if (updated) setSelected(updated);
     } catch (e) {
-      setReleaseError(e.response?.data?.detail || 'Erreur lors de la mise en Released.');
+      setReleaseError(parseApiError(e, 'Erreur lors de la mise en Released.'));
     }
   };
 

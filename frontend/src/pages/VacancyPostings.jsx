@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 
 
@@ -83,12 +84,12 @@ export default function VacancyPostings() {
 
   const handleReverse = async (id) => {
     try { await API.patch(`/commercial/vacancy-postings/${id}/reverse`); load(); }
-    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); }
+    catch (e) { toast.error(parseApiError(e, 'Erreur')); }
   };
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/vacancy-postings/${id}`); setConfirm(null); load(); }
-    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); setConfirm(null); }
+    catch (e) { toast.error(parseApiError(e, 'Erreur')); setConfirm(null); }
   };
 
   const filtered = filter === 'all' ? items

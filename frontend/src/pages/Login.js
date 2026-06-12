@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { authAPI } from '../api';
+import { parseApiError } from '../data/apiError';
 
 export default function Login() {
   const [step, setStep] = useState('credentials'); // credentials | 2fa
@@ -28,7 +29,7 @@ export default function Login() {
         navigate('/');
       }
     } catch (e) {
-      setError(e.response?.data?.detail || 'Invalid email or password');
+      setError(parseApiError(e, 'Invalid email or password'));
     } finally { setLoading(false); }
   };
 
@@ -40,7 +41,7 @@ export default function Login() {
       login(res.data.access_token, res.data.user);
       navigate('/');
     } catch (e) {
-      setError(e.response?.data?.detail || 'Invalid 2FA code');
+      setError(parseApiError(e, 'Invalid 2FA code'));
     } finally { setLoading(false); }
   };
 

@@ -4,6 +4,7 @@ import { useToast } from '../context/ToastContext';
 import { PageHeader, Card, Modal, EmptyState } from '../components/UI';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 
 
@@ -127,7 +128,7 @@ export default function SalesDeclarations() {
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/sales-declarations/${id}`); setConfirm(null); load(); }
-    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); setConfirm(null); }
+    catch (e) { toast.error(parseApiError(e, 'Erreur')); setConfirm(null); }
   };
 
   const totalDeclared   = items.reduce((s, i) => s + parseFloat(i.declared_amount || 0), 0);

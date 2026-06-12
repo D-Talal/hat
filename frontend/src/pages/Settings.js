@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { authAPI, orgSettingsAPI } from '../api';
 import { Card, Btn, Input, Select, PageHeader, Badge } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
+import { parseApiError } from '../data/apiError';
 
 const CURRENCIES = [
   ['USD', 'US Dollar ($)'], ['EUR', 'Euro (€)'], ['GBP', 'British Pound (£)'],
@@ -69,17 +70,17 @@ export default function Settings() {
 
   const setup2fa = async () => {
     try { const r = await authAPI.setup2fa(); setQrCode(r.data.qr_code); setSecret(r.data.secret); }
-    catch (e) { flash(e.response?.data?.detail || 'Error', true); }
+    catch (e) { flash(parseApiError(e, 'Error'), true); }
   };
 
   const confirm2fa = async () => {
     try { await authAPI.confirm2fa({ code: confirmCode }); flash('2FA enabled successfully! ✓'); setQrCode(null); window.location.reload(); }
-    catch (e) { flash(e.response?.data?.detail || 'Invalid code', true); }
+    catch (e) { flash(parseApiError(e, 'Invalid code'), true); }
   };
 
   const disable2fa = async () => {
     try { await authAPI.disable2fa({ code: disableCode }); flash('2FA disabled'); window.location.reload(); }
-    catch (e) { flash(e.response?.data?.detail || 'Invalid code', true); }
+    catch (e) { flash(parseApiError(e, 'Invalid code'), true); }
   };
 
   const changePw = async () => {
@@ -88,7 +89,7 @@ export default function Settings() {
       await authAPI.changePassword({ current_password: pwForm.current_password, new_password: pwForm.new_password });
       flash('Password changed successfully ✓');
       setPwForm({ current_password: '', new_password: '', confirm: '' });
-    } catch (e) { flash(e.response?.data?.detail || 'Error', true); }
+    } catch (e) { flash(parseApiError(e, 'Error'), true); }
   };
 
   const saveOrgSettings = async () => {
@@ -99,7 +100,7 @@ export default function Settings() {
       flash('Organization settings saved ✓ — applying…');
       setTimeout(() => window.location.reload(), 1200);
     } catch (e) {
-      flash(e.response?.data?.detail || 'Error saving settings', true);
+      flash(parseApiError(e, 'Error saving settings'), true);
       setOrgSaving(false);
     }
   };

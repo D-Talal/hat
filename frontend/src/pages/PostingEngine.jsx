@@ -5,6 +5,7 @@ import { PageHeader, Card, Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { inputStyle, btnSecondary } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 const btnPrimary   = { padding: '11px 24px', borderRadius: 8, border: 'none', background: 'var(--ink)', color: 'var(--gold)', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700, fontSize: 14 };
 const btnGreen     = { padding: '10px 20px', borderRadius: 8, border: 'none', background: '#10b981', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 };
@@ -340,7 +341,7 @@ export default function PostingEngine() {
       setSelectedRun(r.data);
       load();
     } catch (e) {
-      toast.error('Échec du run : ' + (e.response?.data?.detail || e.message));
+      toast.error('Échec du run : ' + (parseApiError(e)));
     } finally { setRunning(false); }
   };
 

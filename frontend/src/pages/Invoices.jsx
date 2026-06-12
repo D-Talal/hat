@@ -6,6 +6,7 @@ import { CONDITION_TYPES as COND_TYPES_SHARED, COMMON_CURRENCIES } from '../data
 import { useLanguage } from '../context/LanguageContext';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 
 const STATUS = {
@@ -65,7 +66,7 @@ function InvoiceForm({ onSave, onClose, initial, contracts }) {
       }
       onSave();
     } catch (e) {
-      toast.error(e.response?.data?.detail || 'Erreur lors de la sauvegarde');
+      toast.error(parseApiError(e, 'Erreur lors de la sauvegarde'));
     } finally {
       setSaving(false);
     }

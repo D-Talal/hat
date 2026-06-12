@@ -3,6 +3,7 @@ import API from '../api';
 import { Modal } from '../components/UI';
 import { useLanguage } from '../context/LanguageContext';
 import { useFormat } from '../data/format';
+import { parseApiError } from '../data/apiError';
 
 // ── Styles ─────────────────────────────────────────────────────────────────────
 const card = {
@@ -171,7 +172,7 @@ export default function HotelReception() {
       setData(recRes.data);
       setHotels(hotRes.data || []);
     } catch (e) {
-      setError(e.response?.data?.detail || 'Failed to load reception');
+      setError(parseApiError(e, 'Failed to load reception'));
     } finally { setLoading(false); }
   }, [selectedHotel]);
 
@@ -183,7 +184,7 @@ export default function HotelReception() {
       const res = await API.post(`/hotel/bookings/${id}/checkin`);
       showToast(`✓ ${res.data.message}`);
       load();
-    } catch (e) { showToast(`❌ ${e.response?.data?.detail || 'Error'}`); }
+    } catch (e) { showToast(`❌ ${parseApiError(e, 'Error')}`); }
     finally { setActionLoading(null); }
   };
 
@@ -194,7 +195,7 @@ export default function HotelReception() {
       const bal = res.data.balance;
       showToast(`✓ ${res.data.message}${bal > 0 ? ` — Balance due: $${bal.toFixed(2)}` : ' — Fully paid'}`);
       load();
-    } catch (e) { showToast(`❌ ${e.response?.data?.detail || 'Error'}`); }
+    } catch (e) { showToast(`❌ ${parseApiError(e, 'Error')}`); }
     finally { setActionLoading(null); }
   };
 
@@ -205,7 +206,7 @@ export default function HotelReception() {
       await API.post(`/hotel/bookings/${id}/cancel`);
       showToast('Booking cancelled');
       load();
-    } catch (e) { showToast(`❌ ${e.response?.data?.detail || 'Error'}`); }
+    } catch (e) { showToast(`❌ ${parseApiError(e, 'Error')}`); }
     finally { setActionLoading(null); }
   };
 

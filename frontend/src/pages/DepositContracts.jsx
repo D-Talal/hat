@@ -8,6 +8,7 @@ import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { COMMON_CURRENCIES } from '../data/constants';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 
 const STATUS = {
@@ -147,12 +148,12 @@ export default function DepositContracts() {
 
   const handleRefund = async (id) => {
     try { await API.patch(`/commercial/deposit-contracts/${id}/refund`); load(); }
-    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); }
+    catch (e) { toast.error(parseApiError(e, 'Erreur')); }
   };
 
   const handleDelete = async (id) => {
     try { await API.delete(`/commercial/deposit-contracts/${id}`); setConfirm(null); load(); }
-    catch (e) { toast.error(e.response?.data?.detail || 'Erreur'); setConfirm(null); }
+    catch (e) { toast.error(parseApiError(e, 'Erreur')); setConfirm(null); }
   };
 
   const filtered = filter === 'all' ? items : items.filter(i => i.status === filter);

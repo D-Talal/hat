@@ -3,6 +3,7 @@ import { usersAPI } from '../api';
 import { Card, Btn, Badge, Table, Modal, PageHeader, Input, Select } from '../components/UI';
 import { useAuth } from '../context/AuthContext';
 import { useToast } from '../context/ToastContext';
+import { parseApiError } from '../data/apiError';
 
 export default function UsersPage() {
   const toast = useToast();
@@ -22,7 +23,7 @@ export default function UsersPage() {
       if (editing) await usersAPI.update(editing.id, { full_name: form.full_name, role: form.role, is_active: form.is_active });
       else await usersAPI.create(form);
       load(); setModal(false);
-    } catch (e) { toast.error(e.response?.data?.detail || 'Erreur lors de la sauvegarde'); }
+    } catch (e) { toast.error(parseApiError(e, 'Erreur lors de la sauvegarde')); }
   };
 
   const remove = async (id) => {

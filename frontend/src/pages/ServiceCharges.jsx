@@ -6,6 +6,7 @@ import { useLanguage } from '../context/LanguageContext';
 import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
+import { parseApiError } from '../data/apiError';
 
 
 const CHARGE_CATEGORIES = ['general','utilities','waste','parking','security','marketing','insurance'];
@@ -64,7 +65,7 @@ function PGForm({ onSave, onClose, initial, existingItems = [] }) {
         await API.post('/commercial/participation-groups', { ...form, members });
       }
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
+    } catch (e) { setError(parseApiError(e, 'Error')); }
   };
 
   return (
@@ -162,7 +163,7 @@ function CostCollectorForm({ pgId, onSave, onClose, initial }) {
         await API.post('/commercial/cost-collectors', { ...form, net_pool: netPool });
       }
       onSave(); onClose();
-    } catch (e) { setError(e.response?.data?.detail || 'Error'); }
+    } catch (e) { setError(parseApiError(e, 'Error')); }
   };
   return (
     <>
