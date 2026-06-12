@@ -8,6 +8,8 @@ import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
 import { parseApiError } from '../data/apiError';
+import { exportAPI } from '../api';
+import { downloadBlob } from '../data/download';
 
 
 // Using shared constants from ../data/constants
@@ -244,6 +246,10 @@ export default function Conditions() {
           {Object.entries(CONDITION_TYPES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
         </select>
         <button onClick={() => { setSelected(null); setModal('new'); }} style={{ ...btnPrimary, marginLeft: 'auto' }}>+ {tc.newCondition}</button>
+        <button onClick={async () => {
+          try { downloadBlob(await exportAPI.conditions(), 'conditions.csv'); }
+          catch { toast.error('Échec de l\'export'); }
+        }} style={btnSecondary} title="Exporter en CSV">⬇ Exporter CSV</button>
       </div>
 
       {loading ? (
