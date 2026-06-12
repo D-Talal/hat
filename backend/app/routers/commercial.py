@@ -24,6 +24,7 @@ from app.models.retail import (
     BusinessEntity, Building, Floor, Space, SpaceMeasurement,
     BusinessPartner, BusinessPartnerRole,
     Contract, ContractDateSlot, ContractObject, ContractAmendment,
+    ContractType, ContractStatus,
     Condition, SalesRule, SalesDeclaration,
     ParticipationGroup, ParticipationGroupMember, SettlementUnit, CostCollector,
     DepositContract, VacancyPosting, Invoice, MaintenanceRequest,
