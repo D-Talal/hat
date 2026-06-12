@@ -2,9 +2,10 @@
 // Rendering a raw object/array as a React child throws (React error #31), which
 // is what happens when a Pydantic 422 (detail = array of { type, loc, msg, ... })
 // is put straight into JSX. Always run API errors through this before display.
-export function parseApiError(e) {
+// Optional `fallback` is used when the error carries no usable detail/message.
+export function parseApiError(e, fallback) {
   const detail = e?.response?.data?.detail;
-  if (!detail) return e?.message || 'Une erreur est survenue.';
+  if (!detail) return e?.message || fallback || 'Une erreur est survenue.';
   if (typeof detail === 'string') return detail;
   // FastAPI/Pydantic 422: detail is an array of { loc, msg, ... }
   if (Array.isArray(detail)) {
