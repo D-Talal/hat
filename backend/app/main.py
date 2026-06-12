@@ -12,12 +12,14 @@ from app.routers.dashboard import router as dashboard_router
 from app.routers.commercial import router as commercial_router
 from app.routers.posting import router as posting_router
 from app.routers.org_settings import router as org_settings_router
+from app.routers.export import router as export_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 from app.models.organization import Organization  # noqa — ensures Organization is registered in Base.metadata
-Base.metadata.create_all(bind=engine)
+if os.getenv("TESTING") != "1":
+    Base.metadata.create_all(bind=engine)
 ENVIRONMENT = os.getenv("ENVIRONMENT", "development")
 
 # ── Startup security checks ────────────────────────────────────────────────────
@@ -69,6 +71,7 @@ app.include_router(posting_router, prefix="/api/posting", tags=["posting"])
 app.include_router(pdf_router_module.router, prefix="/api/pdf", tags=["pdf"])
 app.include_router(alerts_router_module.router, prefix="/api/alerts", tags=["alerts"])
 app.include_router(csv_import_router.router, prefix="/api/import", tags=["import"])
+app.include_router(export_router, prefix="/api/export", tags=["export"])
 app.include_router(super_admin_router.router, prefix="/api/super-admin", tags=["super-admin"])
 app.include_router(org_settings_router)
 
@@ -89,12 +92,18 @@ def health():
 
 @app.on_event("startup")
 def startup():
+    # In tests, the schema and data are managed by fixtures; skip migrations,
+    # seeding, and the background scheduler entirely.
+    if os.getenv("TESTING") == "1":
+        return
     from app.models.user import User, UserRole
     from app.core.auth import hash_password
     from sqlalchemy import text
     db = SessionLocal()
     try:
         migrations = [
+            # Contract amendments (avenants)
+            "CREATE TABLE IF NOT EXISTS re_contract_amendments (id SERIAL PRIMARY KEY, contract_id INTEGER NOT NULL REFERENCES re_contracts(id), amendment_number VARCHAR(50), effective_date DATE NOT NULL, title VARCHAR(200), reason TEXT, change_summary TEXT, created_at TIMESTAMPTZ DEFAULT now())",
             # Contract: title + jurisdiction (jurisdiction impacts tax handling)
             "ALTER TABLE re_contracts ADD COLUMN IF NOT EXISTS title VARCHAR(200)",
             "ALTER TABLE re_contracts ADD COLUMN IF NOT EXISTS jurisdiction VARCHAR(100)",
