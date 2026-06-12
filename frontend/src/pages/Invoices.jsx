@@ -7,6 +7,8 @@ import { useLanguage } from '../context/LanguageContext';
 import { inputStyle, btnPrimary, btnSecondary } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
 import { parseApiError } from '../data/apiError';
+import { exportAPI } from '../api';
+import { downloadBlob } from '../data/download';
 
 
 const STATUS = {
@@ -136,15 +138,21 @@ export default function Invoices() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Load independently: a failure on one must not blank out the other.
+    // (Previously a single Promise.all + catch wiped both lists on any error.)
     try {
-      const [invRes, cRes] = await Promise.all([
-        API.invoices.list(),
-        API.get('/commercial/contracts'),
-      ]);
-      setInvoices(invRes.data || []);
+      const cRes = await API.get('/commercial/contracts');
       setContracts(cRes.data || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    } catch (e) {
+      console.error('Failed to load contracts', e);
+    }
+    try {
+      const invRes = await API.invoices.list();
+      setInvoices(invRes.data || []);
+    } catch (e) {
+      console.error('Failed to load invoices', e);
+    }
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);
@@ -192,9 +200,15 @@ export default function Invoices() {
     <div style={{ padding: '32px 24px' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <PageHeader title={tc.invoicesTitle || 'Invoices'} sub={tc.invoicesSub || 'All billing records'} />
-        <button style={btnPrimary} onClick={() => { setSelected(null); setModal('create'); }}>
-          + {tc.newInvoice || 'New Invoice'}
-        </button>
+        <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+          <button style={btnSecondary} onClick={async () => {
+            try { downloadBlob(await exportAPI.invoices(), 'invoices.csv'); }
+            catch { toast.error('Échec de l\'export'); }
+          }} title="Exporter en CSV">⬇ Exporter CSV</button>
+          <button style={btnPrimary} onClick={() => { setSelected(null); setModal('create'); }}>
+            + {tc.newInvoice || 'New Invoice'}
+          </button>
+        </div>
       </div>
 
       {/* KPI row */}
