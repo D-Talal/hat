@@ -23,7 +23,7 @@ from app.models.retail import (
     CompanyCode,
     BusinessEntity, Building, Floor, Space, SpaceMeasurement,
     BusinessPartner, BusinessPartnerRole,
-    Contract, ContractDateSlot, ContractObject,
+    Contract, ContractDateSlot, ContractObject, ContractAmendment,
     Condition, SalesRule, SalesDeclaration,
     ParticipationGroup, ParticipationGroupMember, SettlementUnit, CostCollector,
     DepositContract, VacancyPosting, Invoice, MaintenanceRequest,
@@ -991,6 +991,149 @@ def delete_contract(id: int, db: Session = Depends(get_db), u=Depends(require_pe
 
 
 # ── CONTRACT ACTIONS ──────────────────────────────────────────────────────────
+
+class AmendmentRentChange(BaseModel):
+    condition_type: str = "base_rent"
+    amount: float
+    currency: Optional[str] = None
+    frequency: Optional[str] = "monthly"
+
+
+class AmendmentCreate(BaseModel):
+    effective_date: date
+    title: Optional[str] = None
+    reason: Optional[str] = None
+    # Optional changes — any combination:
+    new_rent: Optional[AmendmentRentChange] = None          # supersede rent
+    add_space_ids: Optional[List[int]] = None               # spaces to add
+    remove_space_ids: Optional[List[int]] = None            # spaces to remove
+    new_end_date: Optional[date] = None                     # extend/shorten term
+
+    @field_validator('effective_date', 'new_end_date', mode='before')
+    @classmethod
+    def _empty_to_none(cls, v):
+        if v == "" or v is None:
+            return None
+        return v
+
+
+@router.post("/contracts/{id}/amend")
+def amend_contract(id: int, data: AmendmentCreate, db: Session = Depends(get_db), u=Depends(require_permission("update"))):
+    """
+    Apply a dated amendment (avenant) to an active contract while preserving
+    history. Each change closes the prior period at effective_date - 1 and opens
+    a new one at effective_date, so the contract's state at any past date is
+    still reconstructable.
+    """
+    from datetime import timedelta
+
+    contract = db.query(Contract).filter(Contract.id == id).first()
+    if not contract:
+        raise HTTPException(404, "Contract not found")
+    if contract.status != ContractStatus.released:
+        raise HTTPException(400, "Seuls les contrats actifs (released) peuvent recevoir un avenant.")
+
+    eff = data.effective_date
+    day_before = eff - timedelta(days=1)
+    summary_parts = []
+
+    # 1. Rent change → close current base-rent conditions, open a new one
+    if data.new_rent:
+        active_rents = db.query(Condition).filter(
+            Condition.contract_id == id,
+            Condition.condition_type == data.new_rent.condition_type,
+        ).filter(
+            (Condition.valid_to.is_(None)) | (Condition.valid_to >= eff)
+        ).all()
+        for cond in active_rents:
+            if cond.valid_from < eff:
+                cond.valid_to = day_before  # close the old period
+        _entity = db.query(BusinessEntity).filter(BusinessEntity.id == contract.business_entity_id).first()
+        _default_cur = (_entity.currency if _entity and _entity.currency else "USD")
+        new_cond = Condition(
+            contract_id=id,
+            condition_type=data.new_rent.condition_type,
+            valid_from=eff,
+            amount=data.new_rent.amount,
+            currency=data.new_rent.currency or _default_cur,
+            frequency=data.new_rent.frequency or "monthly",
+        )
+        db.add(new_cond)
+        summary_parts.append(f"Loyer → {data.new_rent.amount} à partir du {eff}")
+
+    # 2. Add spaces → new ContractObject links from effective_date, mark occupied
+    if data.add_space_ids:
+        for sid in data.add_space_ids:
+            exists = db.query(ContractObject).filter(
+                ContractObject.contract_id == id,
+                ContractObject.space_id == sid,
+            ).filter((ContractObject.valid_to.is_(None)) | (ContractObject.valid_to >= eff)).first()
+            if exists:
+                continue
+            db.add(ContractObject(contract_id=id, space_id=sid, valid_from=eff))
+            sp = db.query(Space).filter(Space.id == sid).first()
+            if sp:
+                sp.status = SpaceStatus.occupied
+        summary_parts.append(f"+{len(data.add_space_ids)} espace(s)")
+
+    # 3. Remove spaces → close their link at effective_date - 1, free the space
+    if data.remove_space_ids:
+        for sid in data.remove_space_ids:
+            links = db.query(ContractObject).filter(
+                ContractObject.contract_id == id,
+                ContractObject.space_id == sid,
+            ).filter((ContractObject.valid_to.is_(None)) | (ContractObject.valid_to >= eff)).all()
+            for link in links:
+                link.valid_to = day_before
+            sp = db.query(Space).filter(Space.id == sid).first()
+            if sp:
+                sp.status = SpaceStatus.vacant
+        summary_parts.append(f"-{len(data.remove_space_ids)} espace(s)")
+
+    # 4. Term change
+    if data.new_end_date:
+        contract.absolute_end_date = data.new_end_date
+        summary_parts.append(f"Fin → {data.new_end_date}")
+
+    # 5. Record the amendment itself
+    count = db.query(ContractAmendment).filter(ContractAmendment.contract_id == id).count()
+    amendment = ContractAmendment(
+        contract_id=id,
+        amendment_number=f"AV-{count + 1:02d}",
+        effective_date=eff,
+        title=data.title or f"Avenant {count + 1}",
+        reason=data.reason,
+        change_summary=" · ".join(summary_parts) if summary_parts else "Aucun changement",
+    )
+    db.add(amendment)
+    db.commit()
+    db.refresh(amendment)
+    audit(db, u, "AMEND", "re_contracts", id, amendment.change_summary)
+    return {
+        "id": amendment.id,
+        "amendment_number": amendment.amendment_number,
+        "effective_date": amendment.effective_date.isoformat(),
+        "title": amendment.title,
+        "change_summary": amendment.change_summary,
+    }
+
+
+@router.get("/contracts/{id}/amendments")
+def list_amendments(id: int, db: Session = Depends(get_db), u=Depends(get_current_user)):
+    """List all amendments of a contract, most recent first."""
+    rows = db.query(ContractAmendment).filter(
+        ContractAmendment.contract_id == id
+    ).order_by(ContractAmendment.effective_date.desc()).all()
+    return [{
+        "id": a.id,
+        "amendment_number": a.amendment_number,
+        "effective_date": a.effective_date.isoformat() if a.effective_date else None,
+        "title": a.title,
+        "reason": a.reason,
+        "change_summary": a.change_summary,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    } for a in rows]
+
 
 @router.post("/contracts/{id}/terminate")
 def terminate_contract(
