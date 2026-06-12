@@ -1048,9 +1048,21 @@ def amend_contract(id: int, data: AmendmentCreate, db: Session = Depends(get_db)
 
     # 1. Rent change → close current base-rent conditions, open a new one
     if data.new_rent:
+        # Coerce strings to enums so DB comparisons/inserts work on Postgres AND
+        # SQLite (SQLite won't match an Enum column against a raw string).
+        from app.models.retail import ConditionType as _CT, ConditionFrequency as _CF
+        try:
+            _ct_enum = _CT(data.new_rent.condition_type)
+        except (ValueError, TypeError):
+            _ct_enum = _CT.base_rent
+        try:
+            _freq_enum = _CF(data.new_rent.frequency or "monthly")
+        except (ValueError, TypeError):
+            _freq_enum = _CF.monthly
+
         active_rents = db.query(Condition).filter(
             Condition.contract_id == id,
-            Condition.condition_type == data.new_rent.condition_type,
+            Condition.condition_type == _ct_enum,
         ).filter(
             (Condition.valid_to.is_(None)) | (Condition.valid_to >= eff)
         ).all()
@@ -1061,11 +1073,11 @@ def amend_contract(id: int, data: AmendmentCreate, db: Session = Depends(get_db)
         _default_cur = (_entity.currency if _entity and _entity.currency else "USD")
         new_cond = Condition(
             contract_id=id,
-            condition_type=data.new_rent.condition_type,
+            condition_type=_ct_enum,
             valid_from=eff,
             amount=data.new_rent.amount,
             currency=data.new_rent.currency or _default_cur,
-            frequency=data.new_rent.frequency or "monthly",
+            frequency=_freq_enum,
         )
         db.add(new_cond)
         summary_parts.append(f"Loyer → {data.new_rent.amount} à partir du {eff}")
