@@ -151,3 +151,9 @@ export const posting = {
   createFxRate:(d) => API.post('/posting/fx-rates', d),
   simulateSales:(d) => API.post('/posting/sales/simulate', d),
 };
+
+export const exportAPI = {
+  contracts:  () => API.get('/export/contracts',  { responseType: 'blob' }),
+  invoices:   () => API.get('/export/invoices',   { responseType: 'blob' }),
+  conditions: () => API.get('/export/conditions', { responseType: 'blob' }),
+};
