@@ -15,7 +15,14 @@ def get_current_user(
     payload = decode_token(token)
     if not payload:
         raise HTTPException(status_code=401, detail="Invalid or expired token")
-    user = db.query(User).filter(User.id == payload.get("sub")).first()
+    # sub is stored as a string in the JWT; coerce to int so the lookup works
+    # consistently across Postgres and SQLite (SQLite won't coerce int==str).
+    sub = payload.get("sub")
+    try:
+        user_id = int(sub) if sub is not None else None
+    except (TypeError, ValueError):
+        user_id = None
+    user = db.query(User).filter(User.id == user_id).first()
     if not user or not user.is_active:
         raise HTTPException(status_code=401, detail="User not found or inactive")
     return user
