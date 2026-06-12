@@ -206,6 +206,7 @@ class Contract(Base):
     business_entity = relationship("BusinessEntity")
     contract_objects = relationship("ContractObject", back_populates="contract")
     conditions = relationship("Condition", back_populates="contract")
+    amendments = relationship("ContractAmendment", back_populates="contract", order_by="ContractAmendment.effective_date")
     date_slots = relationship("ContractDateSlot", back_populates="contract")
     sales_declarations = relationship("SalesDeclaration", back_populates="contract")
     invoices = relationship("Invoice", back_populates="contract")
@@ -449,3 +450,25 @@ class MaintenanceRequest(Base):
     resolved_at = Column(DateTime(timezone=True))
     contract = relationship("Contract", back_populates="maintenance_requests")
     space = relationship("Space", back_populates="maintenance_requests")
+
+
+class ContractAmendment(Base):
+    """
+    A dated amendment (avenant) to an active contract. Records a revision —
+    rent change, space addition/removal, term extension — that takes effect on
+    effective_date while preserving the prior periods for history.
+    """
+    __tablename__ = "re_contract_amendments"
+    __table_args__ = {"extend_existing": True}
+
+    id = Column(Integer, primary_key=True, index=True)
+    contract_id = Column(Integer, ForeignKey("re_contracts.id"), nullable=False)
+    amendment_number = Column(String(50))
+    effective_date = Column(Date, nullable=False)
+    title = Column(String(200))
+    reason = Column(Text)
+    # JSON-ish summary stored as text (what changed), for traceability/audit
+    change_summary = Column(Text)
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    contract = relationship("Contract", back_populates="amendments")
