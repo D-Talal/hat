@@ -9,6 +9,8 @@ import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles'
 import { Field } from '../components/shared/FormHelpers';
 import { daysUntil } from '../data/dates';
 import { getCountries } from '../data/geo';
+import { exportAPI } from '../api';
+import { downloadBlob } from '../data/download';
 import { getContractStatus } from '../data/contractStatus';
 import { parseApiError } from '../data/apiError';
 
@@ -474,6 +476,21 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
   const [renewResult, setRenewResult]   = useState(null);
   const [renewError, setRenewError]     = useState('');
 
+  // Amendment (avenant) modal state
+  const [amendModal, setAmendModal]     = useState(false);
+  const [amendLoading, setAmendLoading] = useState(false);
+  const [amendResult, setAmendResult]   = useState(null);
+  const [amendError, setAmendError]     = useState('');
+  const [amendDate, setAmendDate]       = useState('');
+  const [amendReason, setAmendReason]   = useState('');
+  const [amendNewRent, setAmendNewRent] = useState('');
+  const [amendNewEnd, setAmendNewEnd]   = useState('');
+  // Spaces for amendment: current (linked) + available, with chosen add/remove sets
+  const [amendCurrentSpaces, setAmendCurrentSpaces] = useState([]);
+  const [amendAvailSpaces, setAmendAvailSpaces]     = useState([]);
+  const [amendAddIds, setAmendAddIds]   = useState([]);
+  const [amendRemoveIds, setAmendRemoveIds] = useState([]);
+
   // Pre-fill quittancement with current month
   useEffect(() => {
     const now = new Date();
@@ -486,6 +503,27 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
     setTermNotice(todayStr);
     setTermEffective(todayStr);
   }, []);
+
+  // Load spaces when the amendment modal opens: current (linked) + available
+  useEffect(() => {
+    if (!amendModal) return;
+    setAmendAddIds([]); setAmendRemoveIds([]);
+    API.get(`/commercial/contracts/${contract.id}/spaces`)
+      .then(r => setAmendCurrentSpaces(r.data || []))
+      .catch(() => setAmendCurrentSpaces([]));
+    API.get('/commercial/spaces-leasable')
+      .then(r => {
+        const all = r.data || [];
+        // Only available/vacant spaces of the same business entity can be added
+        const beId = contract.business_entity_id || contract.business_entity?.id;
+        const avail = all.filter(s => {
+          const sBe = s.business_entity_id;
+          return sBe == null || String(sBe) === String(beId);
+        });
+        setAmendAvailSpaces(avail);
+      })
+      .catch(() => setAmendAvailSpaces([]));
+  }, [amendModal, contract]);
 
   const downloadInvoicePdf = async (invoiceId) => {
     try {
@@ -676,6 +714,12 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
           <button onClick={() => { setTermResult(null); setTermError(''); setTermModal(true); }}
             style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#dc2626', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 }}>
             🛑 Résilier
+          </button>
+        )}
+        {contract.status === 'released' && (
+          <button onClick={() => { setAmendResult(null); setAmendError(''); setAmendModal(true); }}
+            style={{ padding: '10px 18px', borderRadius: 8, border: 'none', background: '#0d9488', color: 'white', cursor: 'pointer', fontFamily: 'DM Sans', fontWeight: 700 }}>
+            📝 Avenant
           </button>
         )}
         {['released', 'terminated', 'expired'].includes(contract.status) && (
@@ -951,11 +995,116 @@ function ContractDetail({ contract, onClose, onRelease, onEdit, onDelete, t, onR
           </div>
         </div>
       )}
+
+      {amendModal && (
+        <Modal title="📝 Créer un avenant" onClose={() => setAmendModal(false)}>
+          {amendResult ? (
+            <div>
+              <div style={{ background: '#ecfdf5', border: '1px solid #86efac', borderRadius: 10, padding: 14, marginBottom: 14, fontSize: 14, color: '#166534' }}>
+                ✓ Avenant <strong>{amendResult.amendment_number}</strong> créé.<br />
+                {amendResult.change_summary}
+              </div>
+              <div style={{ textAlign: 'right' }}>
+                <button onClick={() => { setAmendModal(false); if (onRefresh) onRefresh(); }} style={btnPrimary}>Fermer</button>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p style={{ fontSize: 13, color: 'var(--slate)', marginBottom: 16 }}>
+                Un avenant modifie le contrat à partir d'une date donnée, en conservant l'historique des périodes précédentes.
+              </p>
+              {amendError && <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#dc2626', marginBottom: 14 }}>{amendError}</div>}
+
+              <Field label="Date d'effet *">
+                <input type="date" style={inputStyle} value={amendDate} onChange={e => setAmendDate(e.target.value)} />
+              </Field>
+              <Field label="Nouveau loyer (optionnel)">
+                <input type="number" style={inputStyle} value={amendNewRent} onChange={e => setAmendNewRent(e.target.value)} placeholder="Laisser vide si inchangé" />
+              </Field>
+              <Field label="Nouvelle date de fin (optionnel)">
+                <input type="date" style={inputStyle} value={amendNewEnd} onChange={e => setAmendNewEnd(e.target.value)} />
+              </Field>
+              <Field label="Motif (optionnel)">
+                <input style={inputStyle} value={amendReason} onChange={e => setAmendReason(e.target.value)} placeholder="ex. Renégociation, extension de surface…" />
+              </Field>
+
+              {/* Current spaces — tick to remove */}
+              <div style={{ marginTop: 8 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--slate)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Espaces actuels (cocher pour retirer)</div>
+                {amendCurrentSpaces.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--slate)', fontStyle: 'italic' }}>Aucun espace lié.</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {amendCurrentSpaces.map(sp => {
+                      const marked = amendRemoveIds.includes(sp.id);
+                      return (
+                        <div key={sp.id}
+                          onClick={() => setAmendRemoveIds(marked ? amendRemoveIds.filter(x => x !== sp.id) : [...amendRemoveIds, sp.id])}
+                          style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                            border: `2px solid ${marked ? '#dc2626' : 'var(--border)'}`,
+                            background: marked ? '#fef2f2' : 'white' }}>
+                          <div style={{ fontWeight: 700 }}>{sp.space_code} {marked ? '· à retirer' : ''}</div>
+                          <div style={{ fontSize: 11, color: 'var(--slate)' }}>{sp.usage_type || '—'}{sp.current_area_sqm ? ` · ${sp.current_area_sqm} m²` : ''}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Available spaces — tick to add */}
+              <div style={{ marginTop: 14 }}>
+                <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--slate)', textTransform: 'uppercase', letterSpacing: '0.06em', marginBottom: 6 }}>Ajouter des espaces (optionnel)</div>
+                {amendAvailSpaces.length === 0 ? (
+                  <div style={{ fontSize: 13, color: 'var(--slate)', fontStyle: 'italic' }}>Aucun espace disponible pour cette entité.</div>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {amendAvailSpaces.map(sp => {
+                      const marked = amendAddIds.includes(sp.id);
+                      return (
+                        <div key={sp.id}
+                          onClick={() => setAmendAddIds(marked ? amendAddIds.filter(x => x !== sp.id) : [...amendAddIds, sp.id])}
+                          style={{ padding: '8px 12px', borderRadius: 8, fontSize: 13, cursor: 'pointer',
+                            border: `2px solid ${marked ? '#0d9488' : 'var(--border)'}`,
+                            background: marked ? '#ecfdf5' : 'white' }}>
+                          <div style={{ fontWeight: 700 }}>{sp.space_code} {marked ? '· à ajouter' : ''}</div>
+                          <div style={{ fontSize: 11, color: 'var(--slate)' }}>{sp.usage_type || '—'}{sp.current_area_sqm ? ` · ${sp.current_area_sqm} m²` : ''}</div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 16 }}>
+                <button onClick={() => setAmendModal(false)} style={btnSecondary}>Annuler</button>
+                <button disabled={amendLoading || !amendDate} onClick={async () => {
+                  setAmendError('');
+                  if (!amendDate) { setAmendError('La date d\'effet est obligatoire.'); return; }
+                  const payload = { effective_date: amendDate };
+                  if (amendReason) payload.reason = amendReason;
+                  if (amendNewRent !== '') payload.new_rent = { condition_type: 'base_rent', amount: Number(amendNewRent) };
+                  if (amendNewEnd) payload.new_end_date = amendNewEnd;
+                  if (amendAddIds.length) payload.add_space_ids = amendAddIds;
+                  if (amendRemoveIds.length) payload.remove_space_ids = amendRemoveIds;
+                  setAmendLoading(true);
+                  try {
+                    const res = await API.post(`/commercial/contracts/${contract.id}/amend`, payload);
+                    setAmendResult(res.data);
+                  } catch (e) {
+                    setAmendError(parseApiError(e, 'Échec de la création de l\'avenant.'));
+                  } finally {
+                    setAmendLoading(false);
+                  }
+                }} style={btnPrimary}>{amendLoading ? '…' : 'Créer l\'avenant'}</button>
+              </div>
+            </div>
+          )}
+        </Modal>
+      )}
     </>
   );
 }
-
-// ── Compact contract card for the left list panel ────────────────────────────
 function ContractListItem({ contract, active, onClick, t }) {
   const s = getContractStatus(contract.status, t);
   const days = daysUntil(contract.absolute_end_date);
@@ -1084,7 +1233,17 @@ export default function Contracts() {
 
   return (
     <div className="animate-fade">
-      <PageHeader title={tc.contractsTitle} sub={tc.contractsSub} />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <PageHeader title={tc.contractsTitle} sub={tc.contractsSub} />
+        <button
+          onClick={async () => {
+            try { downloadBlob(await exportAPI.contracts(), 'contracts.csv'); }
+            catch { toast.error('Échec de l\'export'); }
+          }}
+          style={{ ...btnSecondary, whiteSpace: 'nowrap', marginTop: 8 }}
+          title="Exporter tous les contrats en CSV (ouvrable dans Excel)"
+        >⬇ Exporter CSV</button>
+      </div>
 
       {expiringCount > 0 && (
         <div style={{ background: '#fff8e1', border: '1px solid #f9a825', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 13, color: '#e65100' }}>
