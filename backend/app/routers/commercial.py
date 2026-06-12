@@ -501,6 +501,14 @@ class InvoiceOut(InvoiceCreate):
     status: str
     is_catch_up: bool
     created_at: datetime
+
+    @field_validator('condition_type', mode='before')
+    @classmethod
+    def _ct_to_str(cls, v):
+        if v is None:
+            return None
+        return v.value if hasattr(v, 'value') else str(v)
+
     class Config: from_attributes = True
 
 class MaintenanceCreate(BaseModel):
