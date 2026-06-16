@@ -70,14 +70,14 @@ export default function VacancyPostings() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [vRes, roRes] = await Promise.all([
-        API.get('/commercial/vacancy-postings'),
-        API.get('/commercial/spaces-leasable'),
-      ]);
+      const vRes = await API.get('/commercial/vacancy-postings');
       setItems(vRes.data || []);
+    } catch (e) { console.error('vacancy-postings load failed', e); }
+    try {
+      const roRes = await API.get('/commercial/spaces-leasable');
       setSpaces(roRes.data || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    } catch (e) { console.error('spaces load failed', e); }
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);

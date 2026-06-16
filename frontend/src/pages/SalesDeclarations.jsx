@@ -109,19 +109,24 @@ export default function SalesDeclarations() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Load independently so one failing request doesn't blank all the lists.
     try {
-      const [dRes, cRes, rRes, roRes] = await Promise.all([
-        API.get('/commercial/sales-declarations'),
-        API.get('/commercial/contracts'),
-        API.get('/commercial/sales-rules'),
-        API.get('/commercial/spaces-leasable'),
-      ]);
+      const dRes = await API.get('/commercial/sales-declarations');
       setItems(dRes.data || []);
+    } catch (e) { console.error('sales-declarations load failed', e); }
+    try {
+      const cRes = await API.get('/commercial/contracts');
       setContracts(cRes.data || []);
+    } catch (e) { console.error('contracts load failed', e); }
+    try {
+      const rRes = await API.get('/commercial/sales-rules');
       setSalesRules(rRes.data || []);
+    } catch (e) { console.error('sales-rules load failed', e); }
+    try {
+      const roRes = await API.get('/commercial/spaces-leasable');
       setSpaces(roRes.data || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    } catch (e) { console.error('spaces load failed', e); }
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);

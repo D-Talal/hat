@@ -131,17 +131,20 @@ export default function DepositContracts() {
 
   const load = useCallback(async () => {
     setLoading(true);
+    // Load independently so one failing request doesn't blank all the lists.
     try {
-      const [dRes, cRes, pRes] = await Promise.all([
-        API.get('/commercial/deposit-contracts'),
-        API.get('/commercial/contracts'),
-        API.get('/commercial/business-partners'),
-      ]);
+      const dRes = await API.get('/commercial/deposit-contracts');
       setItems(dRes.data || []);
+    } catch (e) { console.error('deposit-contracts load failed', e); }
+    try {
+      const cRes = await API.get('/commercial/contracts');
       setContracts(cRes.data || []);
+    } catch (e) { console.error('contracts load failed', e); }
+    try {
+      const pRes = await API.get('/commercial/business-partners');
       setPartners(pRes.data || []);
-    } catch { /* ignore */ }
-    finally { setLoading(false); }
+    } catch (e) { console.error('partners load failed', e); }
+    setLoading(false);
   }, []);
 
   useEffect(() => { load(); }, [load]);

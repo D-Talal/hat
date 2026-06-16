@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import API from "../api";
+import { parseApiError } from "../data/apiError";
 import "../components/Dashboard.css";
 import { useLanguage } from "../context/LanguageContext";
 import CommercialDashboard from "./CommercialDashboard";
@@ -27,7 +28,7 @@ function GlobalView() {
       ]);
       setData({ finance: finance.data, assets: assets.data });
     } catch (e) {
-      setError(d.error || "Erreur de chargement");
+      setError(parseApiError(e, "Erreur de chargement"));
     } finally {
       setLoading(false);
     }
