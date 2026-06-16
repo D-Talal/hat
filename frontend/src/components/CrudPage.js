@@ -10,7 +10,7 @@ const STRING_FIELDS = ['unit_number', 'room_number', 'phone', 'id_number', 'amen
 
 const DATE_FIELDS = ['lease_start', 'lease_end', 'due_date', 'paid_date', 'check_in', 'check_out'];
 
-export function CrudPage({ title, sub, api, columns, FormComponent, emptyForm, canCreatePerm = 'create', canEditPerm = 'update', canDeletePerm = 'delete' }) {
+export function CrudPage({ title, sub, api, columns, FormComponent, emptyForm, requiredFields = [], canCreatePerm = 'create', canEditPerm = 'update', canDeletePerm = 'delete' }) {
   const [items, setItems] = useState([]);
   const [modal, setModal] = useState(false);
   const [editing, setEditing] = useState(null);
@@ -38,8 +38,21 @@ export function CrudPage({ title, sub, api, columns, FormComponent, emptyForm, c
   const openEdit = (row) => { setEditing(row); setForm(row); setError(''); setModal(true); };
 
   const save = async () => {
-    setSaving(true);
     setError('');
+    // Validate required fields before sending (avoids a backend 422 and tells
+    // the user exactly which field is missing). Each entry is a string field
+    // name, or { key, label } for a friendlier message.
+    const missing = requiredFields.filter(rf => {
+      const key = typeof rf === 'string' ? rf : rf.key;
+      const v = form[key];
+      return v === '' || v === null || v === undefined;
+    });
+    if (missing.length > 0) {
+      const labels = missing.map(rf => (typeof rf === 'string' ? rf : rf.label || rf.key));
+      setError(`Champs obligatoires manquants : ${labels.join(', ')}`);
+      return;
+    }
+    setSaving(true);
     try {
       const cleaned = Object.fromEntries(
         Object.entries(form).map(([k, v]) => {
