@@ -36,6 +36,7 @@ const HotelForm = ({ form, setForm }) => {
 };
 export function HotelList() {
   return <CrudPage title="Hotels" sub="Hotel property portfolio" api={hotel.hotels}
+    requiredFields={[{ key: 'name', label: 'Hotel Name' }]}
     emptyForm={{ name: '', address: '', city: '', country: '', continent: '', star_rating: '', total_rooms: '', annual_revenue: '' }}
     columns={[
       { key: 'name', label: 'Hotel Name' },
@@ -92,6 +93,7 @@ const RoomForm = ({ form, setForm }) => {
 };
 export function HotelRooms() {
   return <CrudPage title="Rooms" sub="Room inventory and availability" api={hotel.rooms}
+    requiredFields={[{ key: 'hotel_id', label: 'Hotel' }, { key: 'room_number', label: 'Room Number' }]}
     emptyForm={{ hotel_id: '', room_number: '', floor: '', room_type: '', bed_type: '', capacity: 2, area_sqft: '', base_rate: '', status: 'available', amenities: '' }}
     columns={[
       { key: 'room_number', label: 'Room' },
@@ -131,6 +133,7 @@ const GuestForm = ({ form, setForm }) => {
 };
 export function HotelGuests() {
   return <CrudPage title="Guests" sub="Guest profiles and history" api={hotel.guests}
+    requiredFields={[{ key: 'first_name', label: 'First Name' }, { key: 'last_name', label: 'Last Name' }]}
     emptyForm={{ first_name: '', last_name: '', email: '', phone: '', nationality: '', id_type: '', id_number: '' }}
     columns={[
       { key: 'first_name', label: 'First Name' }, { key: 'last_name', label: 'Last Name' },
@@ -179,6 +182,7 @@ const BookingForm = ({ form, setForm }) => {
 };
 export function HotelBookings() {
   return <CrudPage title="Bookings" sub="Reservations and check-in/out" api={hotel.bookings}
+    requiredFields={[{ key: 'room_id', label: 'Room' }, { key: 'guest_id', label: 'Guest' }, { key: 'check_in', label: 'Check-in' }, { key: 'check_out', label: 'Check-out' }]}
     emptyForm={{ room_id: '', guest_id: '', check_in: '', check_out: '', adults: 1, children: 0, total_amount: '', paid_amount: 0, status: 'confirmed', special_requests: '' }}
     columns={[
       { key: 'guest_id', label: 'Guest ID' }, { key: 'room_id', label: 'Room ID' },
