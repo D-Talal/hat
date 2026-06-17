@@ -8,7 +8,7 @@ import { useDuplicateCheck } from '../hooks/useDuplicateCheck';
 import { inputStyle, btnPrimary, btnSecondary, btnDanger } from '../data/styles';
 import { Field } from '../components/shared/FormHelpers';
 import { daysUntil } from '../data/dates';
-import { getCountries } from '../data/geo';
+import { hasStates, getStateNames } from '../data/geo';
 import { exportAPI } from '../api';
 import { downloadBlob } from '../data/download';
 import { getContractStatus } from '../data/contractStatus';
@@ -42,6 +42,13 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
   const [spaces, setSpaces] = useState([]);
   const [selectedObjects, setSelectedObjects] = useState(initial?.space_ids || []);
   const [formError, setFormError] = useState('');
+  // Province/state part of the jurisdiction (when the entity's country has subdivisions).
+  // Initialize from an existing "Country — Province" jurisdiction in edit mode.
+  const [jurisdictionProvince, setJurisdictionProvince] = useState(
+    initial?.jurisdiction && initial.jurisdiction.includes(' — ')
+      ? initial.jurisdiction.split(' — ')[1]
+      : ''
+  );
   const [form, setForm] = useState({
     contract_number: initial?.contract_number || '',
     title: initial?.title || '',
@@ -89,6 +96,22 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
 
   // Inherit currency from selected BusinessEntity
   const selectedEntity = entities.find(e => String(e.id) === String(form.business_entity_id));
+
+  // Keep jurisdiction in sync with the selected entity's country.
+  useEffect(() => {
+    if (!selectedEntity || !selectedEntity.country) return;
+    const country = selectedEntity.country;
+    if (hasStates(country)) {
+      // Country has provinces/states: jurisdiction = "Country — Province"
+      // (province chosen via the dropdown). Default to country alone until picked.
+      setForm(f => ({ ...f, jurisdiction: jurisdictionProvince ? `${country} — ${jurisdictionProvince}` : country }));
+    } else {
+      // No subdivisions: jurisdiction is simply the country.
+      setJurisdictionProvince('');
+      setForm(f => ({ ...f, jurisdiction: country }));
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedEntity, jurisdictionProvince]);
   useEffect(() => {
     if (selectedEntity?.currency && !initial?.id) {
       // Show inheritance hint — don't auto-set, let user see it
@@ -279,10 +302,35 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
           </select>
         </Field>
         <Field label="Jurisdiction (tax)">
-          <select style={inputStyle} value={form.jurisdiction} onChange={set('jurisdiction')}>
-            <option value="">— Select —</option>
-            {getCountries().map(c => <option key={c} value={c}>{c}</option>)}
-          </select>
+          {!selectedEntity ? (
+            <div style={{ fontSize: 13, color: 'var(--slate)', padding: '10px 0' }}>
+              Sélectionnez d'abord une Business Entity — la juridiction découle de son pays.
+            </div>
+          ) : !selectedEntity.country ? (
+            <div style={{ fontSize: 13, color: '#92400e', padding: '8px 12px', background: '#fff8e1', borderRadius: 8 }}>
+              ⚠ L'entité « {selectedEntity.name} » n'a pas de pays défini. Renseignez son pays dans le Patrimoine pour activer la juridiction.
+            </div>
+          ) : hasStates(selectedEntity.country) ? (
+            <>
+              <div style={{ fontSize: 13, marginBottom: 6 }}>
+                Pays : <strong>{selectedEntity.country}</strong>
+              </div>
+              <select style={inputStyle}
+                value={jurisdictionProvince}
+                onChange={e => {
+                  const prov = e.target.value;
+                  setJurisdictionProvince(prov);
+                  setForm(f => ({ ...f, jurisdiction: prov ? `${selectedEntity.country} — ${prov}` : selectedEntity.country }));
+                }}>
+                <option value="">— Province / État —</option>
+                {getStateNames(selectedEntity.country).map(s => <option key={s} value={s}>{s}</option>)}
+              </select>
+            </>
+          ) : (
+            <div style={{ fontSize: 14, padding: '8px 12px', background: 'var(--cream, #faf8f3)', borderRadius: 8, border: '1px solid var(--border)' }}>
+              ⚖ {selectedEntity.country}
+            </div>
+          )}
           <div style={{ fontSize: 11, color: 'var(--slate)', marginTop: 4 }}>Détermine le régime fiscal applicable au contrat.</div>
         </Field>
         <Field label={tc.businessEntity + " *"}>
