@@ -110,7 +110,6 @@ function ContractForm({ onSave, onClose, initial, existingItems = [] }) {
       setJurisdictionProvince('');
       setForm(f => ({ ...f, jurisdiction: country }));
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedEntity, jurisdictionProvince]);
   useEffect(() => {
     if (selectedEntity?.currency && !initial?.id) {
