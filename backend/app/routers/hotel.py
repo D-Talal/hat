@@ -32,6 +32,7 @@ class HotelCreate(BaseModel):
     name: str
     address: Optional[str] = None
     city: Optional[str] = None
+    state: Optional[str] = None
     country: Optional[str] = None
     continent: Optional[str] = None
     star_rating: Optional[int] = None
