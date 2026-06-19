@@ -24,6 +24,7 @@ class Hotel(Base):
     name = Column(String(255), nullable=False)
     address = Column(String(500))
     city = Column(String(255))
+    state = Column(String(255))
     country = Column(String(255))
     continent = Column(String(100))
     star_rating = Column(Integer)
