@@ -102,6 +102,8 @@ def startup():
     db = SessionLocal()
     try:
         migrations = [
+            # Hotel: state/province (geo consistency with commercial entities)
+            "ALTER TABLE hotels ADD COLUMN IF NOT EXISTS state VARCHAR(255)",
             # Contract amendments (avenants)
             "CREATE TABLE IF NOT EXISTS re_contract_amendments (id SERIAL PRIMARY KEY, contract_id INTEGER NOT NULL REFERENCES re_contracts(id), amendment_number VARCHAR(50), effective_date DATE NOT NULL, title VARCHAR(200), reason TEXT, change_summary TEXT, created_at TIMESTAMPTZ DEFAULT now())",
             # Contract: title + jurisdiction (jurisdiction impacts tax handling)
