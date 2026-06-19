@@ -2,29 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { CrudPage } from '../components/CrudPage';
 import { Input, Select, Textarea } from '../components/UI';
 import { hotel } from '../api';
-import { COUNTRIES, CONTINENTS } from '../data/countries';
+import GeoSelect from '../components/shared/GeoSelect';
+import { COUNTRIES } from '../data/countries';
 
 const HotelForm = ({ form, setForm }) => {
   const s = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
-  const handleCountry = e => {
-    const country = e.target.value;
-    const found = COUNTRIES.find(c => c.name === country);
-    setForm(f => ({ ...f, country, continent: found?.continent || f.continent }));
-  };
+  const setGeo = (field, val) => setForm(f => ({ ...f, [field]: val }));
   return <>
     <Input label="Hotel Name" value={form.name || ''} onChange={s('name')} required />
     <Input label="Address" value={form.address || ''} onChange={s('address')} />
-    <Input label="City" value={form.city || ''} onChange={s('city')} />
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
-      <Select label="Country" value={form.country || ''} onChange={handleCountry}>
-        <option value="">— Select Country —</option>
-        {COUNTRIES.map(c => <option key={c.name} value={c.name}>{c.name}</option>)}
-      </Select>
-      <Select label="Continent" value={form.continent || ''} onChange={s('continent')}>
-        <option value="">— Select Continent —</option>
-        {CONTINENTS.map(c => <option key={c} value={c}>{c}</option>)}
-      </Select>
-    </div>
+    <GeoSelect
+      value={{ continent: form.continent, country: form.country, state: form.state || '', city: form.city || '' }}
+      onChange={setGeo}
+    />
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
       <Select label="Star Rating" value={form.star_rating || ''} onChange={s('star_rating')}>
         <option value="">—</option>{[1,2,3,4,5].map(n=><option key={n} value={n}>{n} ★</option>)}
@@ -37,10 +27,11 @@ const HotelForm = ({ form, setForm }) => {
 export function HotelList() {
   return <CrudPage title="Hotels" sub="Hotel property portfolio" api={hotel.hotels}
     requiredFields={[{ key: 'name', label: 'Hotel Name' }]}
-    emptyForm={{ name: '', address: '', city: '', country: '', continent: '', star_rating: '', total_rooms: '', annual_revenue: '' }}
+    emptyForm={{ name: '', address: '', city: '', state: '', country: '', continent: '', star_rating: '', total_rooms: '', annual_revenue: '' }}
     columns={[
       { key: 'name', label: 'Hotel Name' },
       { key: 'city', label: 'City' },
+      { key: 'state', label: 'Province/State', render: v => v || '—' },
       { key: 'country', label: 'Country' },
       { key: 'star_rating', label: 'Stars', render: v => v ? '★'.repeat(v) : '—' },
       { key: 'total_rooms', label: 'Rooms' },
