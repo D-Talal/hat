@@ -23,9 +23,11 @@ function NewPaymentForm({ pendingInvoices, contractMap, bankAccounts, onSave, on
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    if (selectedInvoice) setForm(f => ({ ...f, amount: selectedInvoice.amount }));
-  }, [invoiceId]); // eslint-disable-line react-hooks/exhaustive-deps
+  const handleInvoiceChange = (id) => {
+    setInvoiceId(id);
+    const inv = pendingInvoices.find(i => String(i.id) === String(id));
+    if (inv) setForm(f => ({ ...f, amount: inv.amount }));
+  };
 
   const methods = [
     { value: 'virement',    label: tc.methodTransfer },
@@ -64,7 +66,7 @@ function NewPaymentForm({ pendingInvoices, contractMap, bankAccounts, onSave, on
   return (
     <div>
       <Field label={tc.selectInvoicePending + ' *'}>
-        <select style={inputStyle} value={invoiceId} onChange={e => setInvoiceId(e.target.value)}>
+        <select style={inputStyle} value={invoiceId} onChange={e => handleInvoiceChange(e.target.value)}>
           <option value="">— {tc.select} —</option>
           {pendingInvoices.map(i => {
             const c = contractMap[i.contract_id];
