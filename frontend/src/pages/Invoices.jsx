@@ -57,14 +57,14 @@ function InvoiceForm({ onSave, onClose, initial, contracts }) {
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
   const [saving, setSaving] = useState(false);
 
-  const save = async () => {
+const save = async () => {
     if (!form.contract_id || !form.amount) return;
     setSaving(true);
     try {
       if (initial) {
-        await API.invoices.update(initial.id, form);
+        await API.put(`/commercial/invoices/${initial.id}`, form);
       } else {
-        await API.invoices.create(form);
+        await API.post('/commercial/invoices', form);
       }
       onSave();
     } catch (e) {
@@ -123,18 +123,103 @@ function InvoiceForm({ onSave, onClose, initial, contracts }) {
   );
 }
 
+function PaymentForm({ invoice, bankAccounts, onSave, onClose }) {
+  const toast = useToast();
+  const { t } = useLanguage();
+  const tc = t.commercial;
+  const [form, setForm] = useState({
+    bank_account_id: bankAccounts[0]?.id || '',
+    amount: invoice?.amount || '',
+    currency: invoice?.currency || 'MAD',
+    payment_date: new Date().toISOString().slice(0, 10),
+    method: 'virement',
+    reference: '',
+  });
+  const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
+  const [saving, setSaving] = useState(false);
+
+  const methods = [
+    { value: 'virement',    label: tc.methodTransfer },
+    { value: 'cheque',      label: tc.methodCheck },
+    { value: 'especes',     label: tc.methodCash },
+    { value: 'carte',       label: tc.methodCard },
+    { value: 'prelevement', label: tc.methodDirectDebit },
+  ];
+
+  const save = async () => {
+    if (!form.amount || !form.payment_date) return;
+    setSaving(true);
+    try {
+      await API.post('/banking/payments', {
+        invoice_id: invoice.id,
+        bank_account_id: form.bank_account_id || null,
+        amount: parseFloat(form.amount),
+        currency: form.currency,
+        payment_date: form.payment_date,
+        method: form.method,
+        reference: form.reference,
+      });
+      toast.success(tc.recordPayment + ' ✓');
+      onSave();
+    } catch (e) {
+      toast.error(parseApiError(e, 'Erreur lors de l\'enregistrement du paiement'));
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div>
+      <Field label={tc.invoice}>
+        <div style={{ ...inputStyle, background: '#f8f9fc', color: 'var(--slate)' }}>
+          INV-{String(invoice.id).padStart(5, '0')} — {invoice.amount} {invoice.currency}
+        </div>
+      </Field>
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
+        <Field label={tc.amount}>
+          <input style={inputStyle} type="number" step="0.01" value={form.amount} onChange={set('amount')} />
+        </Field>
+        <Field label={tc.paymentDate}>
+          <input style={inputStyle} type="date" value={form.payment_date} onChange={set('payment_date')} />
+        </Field>
+      </div>
+      <Field label={tc.paymentMethod}>
+        <select style={inputStyle} value={form.method} onChange={set('method')}>
+          {methods.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+        </select>
+      </Field>
+      <Field label={tc.bankAccount}>
+        <select style={inputStyle} value={form.bank_account_id} onChange={set('bank_account_id')}>
+          <option value="">— {tc.select} —</option>
+          {bankAccounts.map(b => <option key={b.id} value={b.id}>{b.name} ({b.currency})</option>)}
+        </select>
+      </Field>
+      <Field label={tc.reference}>
+        <input style={inputStyle} value={form.reference} onChange={set('reference')} placeholder="N° virement / chèque…" />
+      </Field>
+      <div style={{ display: 'flex', gap: 10, marginTop: 8 }}>
+        <button style={btnPrimary} onClick={save} disabled={saving}>{saving ? '…' : t.common.save}</button>
+        <button style={btnSecondary} onClick={onClose}>{t.common.cancel}</button>
+      </div>
+    </div>
+  );
+}
+
 export default function Invoices() {
   const toast = useToast();
   const { t } = useLanguage();
   const tc = t.commercial;
   const [invoices, setInvoices] = useState([]);
   const [contracts, setContracts] = useState([]);
+  const [bankAccounts, setBankAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [modal, setModal] = useState(null);  // 'create' | 'edit'
   const [selected, setSelected] = useState(null);
   const [confirm, setConfirm] = useState(null);
   const [filter, setFilter] = useState('all');  // all | pending | paid | overdue
   const [search, setSearch] = useState('');
+  const [payModal, setPayModal] = useState(null);      // invoice being paid
+  const [letterLoading, setLetterLoading] = useState(null); // contract_id currently generating a letter
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -147,10 +232,16 @@ export default function Invoices() {
       console.error('Failed to load contracts', e);
     }
     try {
-      const invRes = await API.invoices.list();
+      const invRes = await API.get('/commercial/invoices');
       setInvoices(invRes.data || []);
     } catch (e) {
       console.error('Failed to load invoices', e);
+    }
+    try {
+      const baRes = await API.get('/banking/accounts');
+      setBankAccounts(baRes.data || []);
+    } catch (e) {
+      console.error('Failed to load bank accounts', e);
     }
     setLoading(false);
   }, []);
@@ -159,7 +250,7 @@ export default function Invoices() {
 
   const downloadPdf = async (inv) => {
     try {
-      const res = await API.invoices.downloadPdf(inv.id);
+      const res = await API.get(`/pdf/invoice/${inv.id}`, { responseType: 'blob' });
       const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
       const a = document.createElement('a'); a.href = url;
       a.download = `invoice_INV-${String(inv.id).padStart(5,'0')}.pdf`;
@@ -168,11 +259,27 @@ export default function Invoices() {
   };
 
   const handlePay = async (id) => {
-    try { await API.invoices.pay(id); toast.success('Facture marquée payée'); load(); } catch { toast.error('Erreur'); }
+    try { await API.patch(`/commercial/invoices/${id}/pay`); toast.success('Facture marquée payée'); load(); } catch { toast.error('Erreur'); }
   };
 
   const handleDelete = async (id) => {
-    try { await API.invoices.delete(id); toast.success('Facture supprimée'); setConfirm(null); load(); } catch { toast.error('Erreur'); }
+    try { await API.delete(`/commercial/invoices/${id}`); toast.success('Facture supprimée'); setConfirm(null); load(); } catch { toast.error('Erreur'); }
+  };
+
+  const handleReminderLetter = async (inv) => {
+    setLetterLoading(inv.contract_id);
+    try {
+      const res = await API.get(`/pdf/reminder-letter/${inv.contract_id}`, { responseType: 'blob' });
+      const c = contractMap[inv.contract_id];
+      const url = window.URL.createObjectURL(new Blob([res.data], { type: 'application/pdf' }));
+      const a = document.createElement('a'); a.href = url;
+      a.download = `relance_${c?.contract_number || inv.contract_id}.pdf`;
+      a.click(); window.URL.revokeObjectURL(url);
+    } catch (e) {
+      toast.error(parseApiError(e, tc.noOverdueForContract || 'Erreur'));
+    } finally {
+      setLetterLoading(null);
+    }
   };
 
   // Stats
@@ -293,11 +400,26 @@ export default function Invoices() {
                     </td>
                     <td style={{ padding: '10px 14px' }}><StatusBadge status={displayStatus} /></td>
                     <td style={{ padding: '10px 14px' }}>
-                      <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'center', flexWrap: 'wrap', maxWidth: 260 }}>
                         {/* Download PDF */}
                         <button onClick={() => downloadPdf(inv)} title="Download PDF"
                           style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 15, padding: '2px 4px' }}>📥</button>
-                        {/* Mark as paid */}
+                        {/* Record payment (encaissement) */}
+                        {inv.status !== 'paid' && (
+                          <button onClick={() => setPayModal(inv)} title={tc.recordPayment}
+                            style={{ background: 'none', border: '1px solid #93c5fd', borderRadius: 6, cursor: 'pointer', fontSize: 11, padding: '3px 8px', color: '#2563eb', fontWeight: 700 }}>
+                            💳 {tc.recordPayment}
+                          </button>
+                        )}
+                        {/* Reminder letter (only relevant once overdue) */}
+                        {isOverdue && (
+                          <button onClick={() => handleReminderLetter(inv)} title={tc.reminderLetter}
+                            disabled={letterLoading === inv.contract_id}
+                            style={{ background: 'none', border: '1px solid #fca5a5', borderRadius: 6, cursor: 'pointer', fontSize: 11, padding: '3px 8px', color: '#dc2626', fontWeight: 700 }}>
+                            ✉️ {letterLoading === inv.contract_id ? (tc.generatingLetter || '…') : tc.reminderLetter}
+                          </button>
+                        )}
+                        {/* Mark as paid (quick, no banking record) */}
                         {inv.status !== 'paid' && (
                           <button onClick={() => handlePay(inv.id)} title="Mark as paid"
                             style={{ background: 'none', border: '1px solid #86efac', borderRadius: 6, cursor: 'pointer', fontSize: 11, padding: '3px 8px', color: '#16a34a', fontWeight: 700 }}>
@@ -328,6 +450,18 @@ export default function Invoices() {
             onClose={() => setModal(null)}
             initial={modal === 'edit' ? selected : null}
             contracts={contracts}
+          />
+        </Modal>
+      )}
+
+      {/* Record payment (encaissement) modal */}
+      {payModal && (
+        <Modal title={tc.recordPayment} onClose={() => setPayModal(null)}>
+          <PaymentForm
+            invoice={payModal}
+            bankAccounts={bankAccounts}
+            onSave={() => { setPayModal(null); load(); }}
+            onClose={() => setPayModal(null)}
           />
         </Modal>
       )}
