@@ -13,6 +13,7 @@ from app.routers.commercial import router as commercial_router
 from app.routers.posting import router as posting_router
 from app.routers.org_settings import router as org_settings_router
 from app.routers.export import router as export_router
+from app.routers.banking import router as banking_router
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -74,6 +75,7 @@ app.include_router(csv_import_router.router, prefix="/api/import", tags=["import
 app.include_router(export_router, prefix="/api/export", tags=["export"])
 app.include_router(super_admin_router.router, prefix="/api/super-admin", tags=["super-admin"])
 app.include_router(org_settings_router)
+app.include_router(banking_router, prefix="/api/banking", tags=["banking"])
 
 @app.get("/")
 def root():
