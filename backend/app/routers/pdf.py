@@ -550,7 +550,215 @@ def download_lease_statement(
     )
 
 
-# ── ENDPOINT 3: Hotel Stay Invoice ────────────────────────────────────────────
+# ── ENDPOINT 3: Lettre de relance (payment reminder letter) ───────────────────
+
+_LETTER_TXT = {
+    "fr": {
+        "doc_type": "LETTRE DE RELANCE",
+        "subject": "Objet : Rappel de paiement — Facture(s) impayée(s)",
+        "salutation": "Madame, Monsieur,",
+        "intro": (
+            "Sauf erreur ou omission de notre part, nous constatons que le(s) montant(s) "
+            "suivant(s) demeure(nt) impayé(s) à ce jour concernant le contrat "
+            f"<b>{{contract_number}}</b> :"
+        ),
+        "col_invoice": "FACTURE", "col_period": "PÉRIODE", "col_due": "ÉCHÉANCE",
+        "col_days": "RETARD", "col_amount": "MONTANT",
+        "days_suffix": "j",
+        "total_label": "TOTAL DÛ",
+        "deadline": (
+            "Nous vous remercions de bien vouloir régulariser cette situation dans un délai "
+            "de <b>8 jours</b> à compter de la date de la présente lettre, par virement bancaire "
+            "ou par tout autre moyen de paiement convenu."
+        ),
+        "bank_intro": "Coordonnées bancaires pour le règlement :",
+        "consequence": (
+            "À défaut de règlement dans ce délai, nous nous verrons contraints d'engager les "
+            "démarches nécessaires au recouvrement de cette créance, pouvant inclure des pénalités "
+            "de retard et des frais de recouvrement, sans préjudice de toute autre voie de droit."
+        ),
+        "closing_note": "Nous restons à votre disposition pour tout renseignement complémentaire.",
+        "signoff": "Veuillez agréer, Madame, Monsieur, l'expression de nos salutations distinguées.",
+        "management": "La Gérance",
+        "to_label": "DESTINATAIRE",
+        "from_label": "EXPÉDITEUR",
+    },
+    "en": {
+        "doc_type": "PAYMENT REMINDER LETTER",
+        "subject": "Subject: Payment reminder — Outstanding invoice(s)",
+        "salutation": "Dear Sir/Madam,",
+        "intro": (
+            "Our records show that the following amount(s) remain unpaid to date under "
+            f"contract <b>{{contract_number}}</b>:"
+        ),
+        "col_invoice": "INVOICE", "col_period": "PERIOD", "col_due": "DUE DATE",
+        "col_days": "OVERDUE", "col_amount": "AMOUNT",
+        "days_suffix": "d",
+        "total_label": "TOTAL DUE",
+        "deadline": (
+            "We kindly ask you to settle this amount within <b>8 days</b> from the date of this "
+            "letter, by bank transfer or any other agreed payment method."
+        ),
+        "bank_intro": "Bank details for payment:",
+        "consequence": (
+            "Should payment not be received within this timeframe, we will be compelled to "
+            "initiate the necessary debt collection procedures, which may include late payment "
+            "penalties and collection fees, without prejudice to any other legal remedy."
+        ),
+        "closing_note": "We remain at your disposal for any further information.",
+        "signoff": "Yours faithfully,",
+        "management": "Management",
+        "to_label": "TO",
+        "from_label": "FROM",
+    },
+}
+
+
+@router.get("/reminder-letter/{contract_id}")
+def download_reminder_letter(
+    contract_id: int,
+    db: Session = Depends(get_db),
+    u=Depends(get_current_user),
+    org=Depends(get_current_org),
+):
+    from app.models.finance import BankAccount  # local import to avoid a hard cross-module dependency at load time
+
+    contract = _load_contract(db, contract_id, org)
+    bp = contract.business_partner
+    be = contract.business_entity
+    st = _styles()
+
+    lang = "en" if (org.locale or "").lower().startswith("en") else "fr"
+    L = _LETTER_TXT[lang]
+
+    today = date.today()
+    overdue = sorted(
+        [i for i in (contract.invoices or []) if i.status == "pending" and i.due_date and i.due_date < today],
+        key=lambda i: i.due_date,
+    )
+    if not overdue:
+        raise HTTPException(400, "No overdue invoices for this contract" if lang == "en" else "Aucune facture en retard pour ce contrat")
+
+    currency = overdue[0].currency or "MAD"
+    total_due = sum(float(i.amount or 0) for i in overdue)
+
+    landlord = [org.name, be.name, be.address or "", f"{be.city or ''} {be.country or ''}".strip()]
+    landlord = [l for l in landlord if l]
+    tenant = [bp.company_name or "—", bp.trade_name or "", bp.address or "", f"{bp.city or ''} {bp.country or ''}".strip()]
+    tenant = [t for t in tenant if t]
+
+    bank = db.query(BankAccount).filter(BankAccount.org_id == org.id, BankAccount.is_active == True).first()
+
+    buf = io.BytesIO()
+    doc = SimpleDocTemplate(
+        buf, pagesize=A4,
+        leftMargin=20*mm, rightMargin=20*mm,
+        topMargin=18*mm, bottomMargin=18*mm,
+    )
+    story = []
+
+    doc_num = f"REL-{contract.id:05d}-{today.strftime('%Y%m%d')}"
+    _header_block(story, st, L["doc_type"], doc_num, today, org.name)
+
+    l_tbl = Table([[Paragraph(L["from_label"], st["label"])]] + [[Paragraph(x, st["body"])] for x in landlord], colWidths=[85*mm])
+    r_tbl = Table([[Paragraph(L["to_label"], st["label"])]] + [[Paragraph(x, st["body"])] for x in tenant], colWidths=[85*mm])
+    parties = Table([[l_tbl, r_tbl]], colWidths=[95*mm, 85*mm])
+    parties.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (0,0), BLUE_LT),
+        ("BACKGROUND", (1,0), (1,0), colors.HexColor("#fef2f2")),
+        ("BOX", (0,0), (0,0), 0.5, colors.HexColor("#d0d5f5")),
+        ("BOX", (1,0), (1,0), 0.5, colors.HexColor("#fecaca")),
+        ("TOPPADDING", (0,0), (-1,-1), 10), ("BOTTOMPADDING", (0,0), (-1,-1), 12),
+        ("LEFTPADDING", (0,0), (-1,-1), 10), ("RIGHTPADDING", (0,0), (-1,-1), 10),
+        ("VALIGN", (0,0), (-1,-1), "TOP"),
+    ]))
+    story.append(parties)
+    story.append(Spacer(1, 16))
+
+    story.append(Paragraph(f"<b>{L['subject']}</b>", st["bold"]))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(L["salutation"], st["body"]))
+    story.append(Spacer(1, 6))
+    story.append(Paragraph(L["intro"].format(contract_number=contract.contract_number or f"#{contract.id}"), st["body"]))
+    story.append(Spacer(1, 10))
+
+    rows = [[
+        Paragraph(L["col_invoice"], st["label"]), Paragraph(L["col_period"], st["label"]),
+        Paragraph(L["col_due"], st["label"]), Paragraph(L["col_days"], st["label"]),
+        Paragraph(L["col_amount"], st["label"]),
+    ]]
+    for inv in overdue:
+        days_late = (today - inv.due_date).days
+        rows.append([
+            Paragraph(f"INV-{inv.id:05d}", st["body"]),
+            Paragraph(f"{_fmt_date(inv.period_from)} – {_fmt_date(inv.period_to)}" if inv.period_from else "—", st["body"]),
+            Paragraph(_fmt_date(inv.due_date), st["body"]),
+            Paragraph(f"{days_late}{L['days_suffix']}", ParagraphStyle("dl", fontSize=9, textColor=RED, fontName="Helvetica-Bold")),
+            Paragraph(_fmt_amount(inv.amount, inv.currency or currency), st["body_r"]),
+        ])
+    tbl = Table(rows, colWidths=[35*mm, 55*mm, 30*mm, 25*mm, 35*mm])
+    tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,0), BLUE_LT),
+        ("FONTSIZE", (0,0), (-1,-1), 9),
+        ("TOPPADDING", (0,0), (-1,-1), 7), ("BOTTOMPADDING", (0,0), (-1,-1), 7),
+        ("LEFTPADDING", (0,0), (-1,-1), 8),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#d0d5f5")),
+        ("LINEBELOW", (0,0), (-1,-2), 0.3, colors.HexColor("#e4e6ef")),
+    ]))
+    story.append(tbl)
+    story.append(Spacer(1, 6))
+
+    total_tbl = Table([[Paragraph(L["total_label"], st["label"]), Paragraph(_fmt_amount(total_due, currency), st["amount"])]],
+                       colWidths=[145*mm, 35*mm])
+    total_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#fef2f2")),
+        ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#fecaca")),
+        ("TOPPADDING", (0,0), (-1,-1), 8), ("BOTTOMPADDING", (0,0), (-1,-1), 8),
+        ("LEFTPADDING", (0,0), (-1,-1), 10), ("ALIGN", (1,0), (1,0), "RIGHT"),
+    ]))
+    story.append(total_tbl)
+    story.append(Spacer(1, 16))
+
+    story.append(Paragraph(L["deadline"], st["body"]))
+
+    if bank:
+        story.append(Spacer(1, 10))
+        story.append(Paragraph(L["bank_intro"], st["label"]))
+        bank_rows = [
+            [Paragraph(bank.name, st["body"]), Paragraph(bank.bank_name or "—", st["body"])],
+            [Paragraph(f"IBAN/RIB: {bank.iban or '—'}", st["body"]), Paragraph(f"BIC/SWIFT: {bank.bic_swift or '—'}", st["body"])],
+        ]
+        bt = Table(bank_rows, colWidths=[90*mm, 90*mm])
+        bt.setStyle(TableStyle([
+            ("BACKGROUND", (0,0), (-1,-1), colors.HexColor("#f8f9fc")),
+            ("BOX", (0,0), (-1,-1), 0.5, colors.HexColor("#e4e6ef")),
+            ("TOPPADDING", (0,0), (-1,-1), 6), ("BOTTOMPADDING", (0,0), (-1,-1), 6),
+            ("LEFTPADDING", (0,0), (-1,-1), 8),
+        ]))
+        story.append(bt)
+
+    story.append(Spacer(1, 14))
+    story.append(Paragraph(L["consequence"], st["body"]))
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(L["closing_note"], st["body"]))
+    story.append(Spacer(1, 14))
+    story.append(Paragraph(L["signoff"], st["body"]))
+    story.append(Spacer(1, 24))
+    story.append(Paragraph(f"<b>{org.name}</b>", st["bold"]))
+    story.append(Paragraph(L["management"], st["small"]))
+
+    _footer(story, st, org.name)
+    doc.build(story)
+    buf.seek(0)
+
+    return StreamingResponse(
+        buf,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=relance_{contract.contract_number or contract_id}.pdf"},
+    )
+
+
+# ── ENDPOINT 4: Hotel Stay Invoice ─────────────────────────────────────────────
 
 @router.get("/hotel-stay/{booking_id}")
 def download_stay_invoice(
