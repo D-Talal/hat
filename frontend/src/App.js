@@ -25,6 +25,8 @@ import PostingEngine from './pages/PostingEngine';
 import Ifrs16 from './pages/Ifrs16';
 import CsvImport from './pages/CsvImport';
 import Invoices from './pages/Invoices';
+import BankAccounts from './pages/BankAccounts';
+import Payments from './pages/Payments';
 import DepositContracts from './pages/DepositContracts';
 import VacancyPostings from './pages/VacancyPostings';
 import SalesDeclarations from './pages/SalesDeclarations';
@@ -97,6 +99,8 @@ function AppRoutes() {
       <Route path="/commercial/conditions" element={<ProtectedRoute><AppLayout><Conditions /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/service-charges" element={<ProtectedRoute><AppLayout><ServiceCharges /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/invoices" element={<ProtectedRoute><AppLayout><Invoices /></AppLayout></ProtectedRoute>} />
+      <Route path="/commercial/payments" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><Payments /></AppLayout></ProtectedRoute>} />
+      <Route path="/commercial/bank-accounts" element={<ProtectedRoute roles={['admin','manager','accountant']}><AppLayout><BankAccounts /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/deposit-contracts" element={<ProtectedRoute><AppLayout><DepositContracts /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/vacancy-postings" element={<ProtectedRoute><AppLayout><VacancyPostings /></AppLayout></ProtectedRoute>} />
       <Route path="/commercial/sales-declarations" element={<ProtectedRoute><AppLayout><SalesDeclarations /></AppLayout></ProtectedRoute>} />
