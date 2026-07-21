@@ -161,6 +161,8 @@ export default function Sidebar() {
           {isFinance && (
             <SubGroup label={fr ? 'Finance' : 'Finance'}>
               <NavItem to="/commercial/invoices"          icon="🧾" label={fr ? 'Factures'        : 'Invoices'} />
+              <NavItem to="/commercial/payments"           icon="💳" label={fr ? 'Encaissements'    : 'Payments'} />
+              <NavItem to="/commercial/bank-accounts"      icon="🏦" label={fr ? 'Comptes bancaires': 'Bank Accounts'} />
               <NavItem to="/commercial/deposit-contracts" icon="🔒" label={fr ? 'Dépôts'          : 'Deposits'} />
               <NavItem to="/commercial/conditions"        icon="≡"  label={fr ? 'Conditions'      : 'Conditions'} />
             </SubGroup>
